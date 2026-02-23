@@ -1,0 +1,7 @@
+{
+  "category.textureeditor": "Texture Editor",
+  "key.textureeditor.toggle": "Toggle Editor Mode",
+  "key.textureeditor.open": "Open Editor (item/block/mob)",
+  "key.textureeditor.undo": "Undo",
+  "key.textureeditor.redo": "Redo"
+}
