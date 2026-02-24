@@ -58,7 +58,6 @@ The **Texture Editor Mod** allows you to edit blocks, items, entities, and GUI e
 
 ### Controls
 - **`R` (Default)**: Opens the editor for the block or entity you are looking at.
-- **`B` (Default)**: Opens the **Texture Browser** menu to search/select any asset (Blocks, Items, Mobs, GUI).
 
 ### In the Editor
 - **Left Click**: Draw / Use Tool.
