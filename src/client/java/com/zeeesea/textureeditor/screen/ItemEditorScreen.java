@@ -6,6 +6,8 @@ import com.zeeesea.textureeditor.editor.EditorTool;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.util.EntityMapper;
+import com.zeeesea.textureeditor.screen.MobEditorScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -65,6 +67,18 @@ public class ItemEditorScreen extends Screen {
 
     @Override
     protected void init() {
+        super.init();
+
+        // Add "Edit Entity Model" button if applicable
+        if (com.zeeesea.textureeditor.util.EntityMapper.hasEntityMode(itemStack)) {
+            addDrawableChild(ButtonWidget.builder(Text.literal("Edit Mob/Entity"), btn -> {
+                net.minecraft.entity.Entity entity = com.zeeesea.textureeditor.util.EntityMapper.getEntityFromItem(itemStack, client.world);
+                if (entity != null) {
+                    client.setScreen(new MobEditorScreen(entity));
+                }
+            }).position(this.width - 120, 55).size(110, 20).build());
+        }
+
         ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(itemStack);
         if (tex != null) {
             originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
@@ -112,11 +126,12 @@ public class ItemEditorScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal("Zoom -"), btn -> { if (zoom > 2) { zoom -= 2; recalcCanvasPos(); } }).position(57, toolY).size(48, 20).build());
 
         int resetX = this.width - 115;
-        int resetBaseY = 30 + ((PALETTE.length + 4) / 5) * 22 + 90;
+        int resetBaseY = this.height - 80;
         addDrawableChild(ButtonWidget.builder(Text.literal("Reset Item"), btn -> resetItem()).position(resetX, resetBaseY).size(110, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset All"), btn -> resetAll()).position(resetX, resetBaseY + 24).size(110, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aApply Live"), btn -> applyLive()).position(5, this.height - 54).size(100, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export Pack"), btn -> client.setScreen(new ExportScreen(this))).position(5, this.height - 30).size(100, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aApply Live"), btn -> applyLive()).position(5, this.height - 78).size(100, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export Pack"), btn -> client.setScreen(new ExportScreen(this))).position(5, this.height - 54).size(100, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> client.setScreen(new BrowseScreen())).position(5, this.height - 30).size(100, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), btn -> this.close()).position(this.width - 65, 5).size(60, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bPicker"), btn -> showColorPicker = !showColorPicker).position(this.width - 65, this.height - 26).size(60, 20).build());
 
@@ -199,7 +214,7 @@ public class ItemEditorScreen extends Screen {
 
     private void drawColorHistory(DrawContext ctx, int mx, int my) {
         ColorHistory hist = ColorHistory.getInstance(); if (hist.size() == 0) return;
-        int px0 = this.width - 115; int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 55;
+        int px0 = this.width - 115; int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 80;
         ctx.drawText(textRenderer, "History:", px0, sy, 0x999999, false); sy += 12;
         int cols = 5, cs = 18; java.util.List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) { int c = i%cols, r = i/cols; int px = px0+c*(cs+2), py = sy+r*(cs+2); ctx.fill(px, py, px+cs, py+cs, colors.get(i)); if (colors.get(i) == currentColor) drawRectOutline(ctx, px-1, py-1, px+cs+1, py+cs+1, 0xFFFFFF00); else drawRectOutline(ctx, px, py, px+cs, py+cs, 0xFF333333); }
@@ -239,8 +254,8 @@ public class ItemEditorScreen extends Screen {
         if (showColorPicker && btn == 0 && handlePickerClick(mx, my)) return true;
         if (btn == 0 && handleHistoryClick(mx, my)) return true;
         if (btn == 1) { isPanning = true; panStartMouseX = mx; panStartMouseY = my; panStartOffsetX = panOffsetX; panStartOffsetY = panOffsetY; return true; }
-        if (isInUIRegion(mx, my)) return false;
         if (btn == 0 && handlePaletteClick(mx, my)) return true;
+        if (isInUIRegion(mx, my)) return false;
         if (btn == 0) { int px = (int)((mx-canvasScreenX)/zoom), py = (int)((my-canvasScreenY)/zoom); if (px>=0 && px<canvas.getWidth() && py>=0 && py<canvas.getHeight()) { handleCanvasClick(px, py, btn); return true; } }
         return false;
     }
@@ -265,7 +280,7 @@ public class ItemEditorScreen extends Screen {
 
     private boolean handleHistoryClick(double mx, double my) {
         ColorHistory hist = ColorHistory.getInstance(); if (hist.size() == 0) return false;
-        int px0 = this.width-115; int sy = 30+((PALETTE.length+4)/5)*22+67; int cols = 5, cs = 18;
+        int px0 = this.width-115; int sy = 30+((PALETTE.length+4)/5)*22+92; int cols = 5, cs = 18; // 80 + 12
         java.util.List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) { int c = i%cols, r = i/cols; int px = px0+c*(cs+2), py = sy+r*(cs+2); if (mx>=px&&mx<px+cs&&my>=py&&my<py+cs) { currentColor = colors.get(i); hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF)); return true; } }
         return false;

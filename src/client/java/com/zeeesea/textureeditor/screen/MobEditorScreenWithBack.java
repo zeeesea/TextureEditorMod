@@ -11,36 +11,36 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.List;
+
 /**
- * Editor screen for mob/entity textures.
- * Shows the full UV-map texture sheet for the entity and lets you paint on it.
+ * Mob/Entity editor with back navigation and spawn egg switch.
+ * Used when opening a mob from the BrowseScreen.
  */
-public class MobEditorScreen extends Screen {
+public class MobEditorScreenWithBack extends Screen {
 
     private final net.minecraft.entity.Entity entity;
     private final String entityName;
+    private final ItemStack itemStack; // spawn egg or item that spawned this
+    private final Screen parent;
 
-    // Texture data
     private Identifier textureId;
     private PixelCanvas canvas;
     private int[][] originalPixels;
 
-    // Editor state
     private EditorTool currentTool = EditorTool.PENCIL;
     private int currentColor = 0xFFFF0000;
-    private int zoom = 6; // Mob textures are usually 64x64, so smaller zoom
+    private int zoom = 6;
     private boolean showGrid = true;
 
-    private int canvasBaseX;
-    private int canvasBaseY;
-    private int panOffsetX = 0;
-    private int panOffsetY = 0;
-    private int canvasScreenX;
-    private int canvasScreenY;
+    private int canvasBaseX, canvasBaseY;
+    private int panOffsetX = 0, panOffsetY = 0;
+    private int canvasScreenX, canvasScreenY;
 
     private boolean isPanning = false;
     private double panStartMouseX, panStartMouseY;
@@ -64,10 +64,16 @@ public class MobEditorScreen extends Screen {
 
     private TextFieldWidget hexInput;
 
-    public MobEditorScreen(net.minecraft.entity.Entity entity) {
+    // Color history Y constants (consistent across all editors)
+    private static final int HISTORY_LABEL_OFFSET = 80; // offset from palette base
+    private static final int HISTORY_SWATCH_OFFSET = 92; // label + 12
+
+    public MobEditorScreenWithBack(net.minecraft.entity.Entity entity, ItemStack itemStack, Screen parent) {
         super(Text.literal("Mob Texture Editor"));
         this.entity = entity;
         this.entityName = entity.getType().getName().getString();
+        this.itemStack = itemStack;
+        this.parent = parent;
     }
 
     @Override
@@ -76,8 +82,6 @@ public class MobEditorScreen extends Screen {
         if (tex != null) {
             originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
             textureId = tex.textureId();
-
-            // Load previously saved pixels if they exist
             int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
             int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
             if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
@@ -88,7 +92,6 @@ public class MobEditorScreen extends Screen {
         }
         if (canvas == null) { canvas = new PixelCanvas(64, 64); originalPixels = new int[64][64]; }
 
-        // Calculate zoom to fit
         int canvasPixelSize = Math.min(zoom, Math.min((this.width - 200) / canvas.getWidth(), (this.height - 80) / canvas.getHeight()));
         if (canvasPixelSize < 1) canvasPixelSize = 1;
         zoom = canvasPixelSize;
@@ -106,26 +109,28 @@ public class MobEditorScreen extends Screen {
             toolY += 24;
         }
         toolY += 10;
-        String undoKeyName = TextureEditorClient.getUndoKey().getBoundKeyLocalizedText().getString();
-        String redoKeyName = TextureEditorClient.getRedoKey().getBoundKeyLocalizedText().getString();
-        addDrawableChild(ButtonWidget.builder(Text.literal("Undo (" + undoKeyName + ")"), btn -> canvas.undo()).position(5, toolY).size(100, 20).build());
+        String undoK = TextureEditorClient.getUndoKey().getBoundKeyLocalizedText().getString();
+        String redoK = TextureEditorClient.getRedoKey().getBoundKeyLocalizedText().getString();
+        addDrawableChild(ButtonWidget.builder(Text.literal("Undo (" + undoK + ")"), btn -> canvas.undo()).position(5, toolY).size(100, 20).build());
         toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Redo (" + redoKeyName + ")"), btn -> canvas.redo()).position(5, toolY).size(100, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Redo (" + redoK + ")"), btn -> canvas.redo()).position(5, toolY).size(100, 20).build());
         toolY += 34;
         addDrawableChild(ButtonWidget.builder(Text.literal("Grid (G)"), btn -> showGrid = !showGrid).position(5, toolY).size(100, 20).build());
         toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom +"), btn -> { if (zoom < 20) { zoom += 1; recalcCanvasPos(); } }).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom -"), btn -> { if (zoom > 1) { zoom -= 1; recalcCanvasPos(); } }).position(57, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom +"), btn -> { if (zoom < 20) { zoom++; recalcCanvasPos(); } }).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom -"), btn -> { if (zoom > 1) { zoom--; recalcCanvasPos(); } }).position(57, toolY).size(48, 20).build());
 
-        // Reset buttons - positioned below color history area
+        // Reset buttons
         int resetX = this.width - 115;
-        // History takes up to 4 rows (20 colors / 5 cols) * 20px + labels etc.
         int resetBaseY = this.height - 80;
         addDrawableChild(ButtonWidget.builder(Text.literal("Reset Mob"), btn -> resetMob()).position(resetX, resetBaseY).size(110, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset All"), btn -> resetAll()).position(resetX, resetBaseY + 24).size(110, 20).build());
+
+        // Bottom buttons
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aApply Live"), btn -> applyLive()).position(5, this.height - 78).size(100, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export Pack"), btn -> client.setScreen(new ExportScreen(this))).position(5, this.height - 54).size(100, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> client.setScreen(new BrowseScreen())).position(5, this.height - 30).size(100, 20).build());
+
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> client.setScreen(parent)).position(5, this.height - 30).size(100, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), btn -> this.close()).position(this.width - 65, 5).size(60, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bPicker"), btn -> showColorPicker = !showColorPicker).position(this.width - 65, this.height - 26).size(60, 20).build());
 
@@ -152,33 +157,22 @@ public class MobEditorScreen extends Screen {
 
     private boolean isInUIRegion(double mx, double my) { return mx < 110 || mx > this.width - 120 || my < 28; }
 
-    @Override public void renderBackground(DrawContext ctx, int mx, int my, float d) {
-        // Don't let super draw its default background - we handle it ourselves
-    }
+    @Override public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // 1. Full background
         context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
-
-        // 2. Canvas
         drawCanvas(context, mouseX, mouseY);
-
-        // 3. UI panel backgrounds
         context.fill(0, 0, 110, this.height, 0xFF1A1A2E);
         context.fill(this.width - 120, 0, this.width, this.height, 0xFF1A1A2E);
         context.fill(110, 0, this.width - 120, 28, 0xFF1A1A2E);
-
-        // 4. Widgets
         super.render(context, mouseX, mouseY, delta);
 
-        // 5. Custom draws
-        context.drawText(textRenderer, "Mob Editor - " + entityName, 120, 8, 0xFFFFFF, true);
+        context.drawText(textRenderer, "\u00a7b\u00a7lMob Editor\u00a7r - " + entityName, 120, 8, 0xFFFFFF, true);
         context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() + "  |  " + canvas.getWidth() + "x" + canvas.getHeight(), 120, 20, 0xCCCCCC, false);
 
         drawPalette(context, mouseX, mouseY);
 
-        // Current color preview
         int paletteX = this.width - 115;
         int paletteEndY = 30 + ((PALETTE.length + 4) / 5) * 22 + 35;
         context.drawText(textRenderer, "Current Color:", paletteX, paletteEndY, 0xCCCCCC, false);
@@ -187,7 +181,8 @@ public class MobEditorScreen extends Screen {
 
         drawColorHistory(context, mouseX, mouseY);
         if (showColorPicker) drawColorPicker(context, mouseX, mouseY);
-        if (currentTool == EditorTool.LINE && lineFirstClick) context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFF00, false);
+        if (currentTool == EditorTool.LINE && lineFirstClick)
+            context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFF00, false);
     }
 
     private void drawCanvas(DrawContext ctx, int mx, int my) {
@@ -214,9 +209,10 @@ public class MobEditorScreen extends Screen {
 
     private void drawColorHistory(DrawContext ctx, int mx, int my) {
         ColorHistory hist = ColorHistory.getInstance(); if (hist.size() == 0) return;
-        int px0 = this.width - 115; int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 80;
+        int px0 = this.width - 115;
+        int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + HISTORY_LABEL_OFFSET;
         ctx.drawText(textRenderer, "History:", px0, sy, 0x999999, false); sy += 12;
-        int cols = 5, cs = 18; java.util.List<Integer> colors = hist.getColors();
+        int cols = 5, cs = 18; List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) { int c = i % cols, r = i / cols; int px = px0 + c * (cs + 2), py = sy + r * (cs + 2); ctx.fill(px, py, px + cs, py + cs, colors.get(i)); if (colors.get(i) == currentColor) drawRectOutline(ctx, px - 1, py - 1, px + cs + 1, py + cs + 1, 0xFFFFFF00); else drawRectOutline(ctx, px, py, px + cs, py + cs, 0xFF333333); }
     }
 
@@ -241,7 +237,6 @@ public class MobEditorScreen extends Screen {
     }
 
     private void drawRectOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int c) { ctx.fill(x1,y1,x2,y1+1,c); ctx.fill(x1,y2-1,x2,y2,c); ctx.fill(x1,y1,x1+1,y2,c); ctx.fill(x2-1,y1,x2,y2,c); }
-
     private void setColor(int c) { currentColor = c; ColorHistory.getInstance().addColor(c); if (hexInput != null) hexInput.setText(String.format("#%06X", c & 0xFFFFFF)); }
 
     @Override public boolean mouseScrolled(double mx, double my, double ha, double va) {
@@ -281,8 +276,10 @@ public class MobEditorScreen extends Screen {
 
     private boolean handleHistoryClick(double mx, double my) {
         ColorHistory hist = ColorHistory.getInstance(); if (hist.size() == 0) return false;
-        int px0 = this.width - 115; int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 92; int cols = 5, cs = 18;
-        java.util.List<Integer> colors = hist.getColors();
+        int px0 = this.width - 115;
+        int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + HISTORY_SWATCH_OFFSET;
+        int cols = 5, cs = 18;
+        List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) { int c = i % cols, r = i / cols; int px = px0+c*(cs+2), py = sy+r*(cs+2); if (mx>=px&&mx<px+cs&&my>=py&&my<py+cs) { currentColor = colors.get(i); hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF)); return true; } }
         return false;
     }
@@ -307,13 +304,9 @@ public class MobEditorScreen extends Screen {
         if (TextureEditorClient.getUndoKey().matchesKey(kc, sc)) { canvas.undo(); return true; }
         if (TextureEditorClient.getRedoKey().matchesKey(kc, sc)) { canvas.redo(); return true; }
         if (kc == GLFW.GLFW_KEY_G && !hexInput.isFocused()) { showGrid = !showGrid; return true; }
-        if (kc == GLFW.GLFW_KEY_EQUAL || kc == GLFW.GLFW_KEY_KP_ADD) { if (zoom < 20) { zoom++; recalcCanvasPos(); } return true; }
-        if (kc == GLFW.GLFW_KEY_MINUS || kc == GLFW.GLFW_KEY_KP_SUBTRACT) { if (zoom > 1) { zoom--; recalcCanvasPos(); } return true; }
         if (kc == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
         return super.keyPressed(kc, sc, m);
     }
-
-    // --- Reset ---
 
     private void resetMob() {
         if (originalPixels == null) return; canvas.saveSnapshot();
@@ -326,8 +319,6 @@ public class MobEditorScreen extends Screen {
         TextureManager.getInstance().clear(); MinecraftClient.getInstance().reloadResources();
         if (originalPixels != null) { canvas.saveSnapshot(); for (int x = 0; x < canvas.getWidth(); x++) for (int y = 0; y < canvas.getHeight(); y++) canvas.setPixel(x, y, originalPixels[x][y]); }
     }
-
-    // --- Apply live ---
 
     private void applyLive() {
         if (textureId == null || canvas == null) return;

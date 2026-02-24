@@ -88,8 +88,108 @@ public class ItemTextureExtractor {
             }
         }
 
+        // Strategy 4: Fallback to Particle Sprite (fixes Leaves and other complex blocks)
+        if (block != net.minecraft.block.Blocks.AIR) {
+            BakedModel blockModel = client.getBlockRenderManager().getModel(block.getDefaultState());
+            if (blockModel != null) {
+                Sprite particle = blockModel.getParticleSprite();
+                if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
+                    System.out.println("[TextureEditor] Found sprite via particle texture: " + particle.getContents().getId());
+                    return extractFromSprite(particle);
+                }
+            }
+        }
+
         System.out.println("[TextureEditor] FAILED to find valid sprite for item: " + itemId);
+
+        // Strategy 5: Try loading entity/special texture paths directly from resources
+        // This handles items like elytra, shields, signs, banners, etc. that use entity textures
+        Identifier entityTexture = getSpecialItemTexturePath(itemId);
+        if (entityTexture != null) {
+            try {
+                var optResource = client.getResourceManager().getResource(entityTexture);
+                if (optResource.isPresent()) {
+                    java.io.InputStream stream = optResource.get().getInputStream();
+                    net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(stream);
+                    int w = image.getWidth();
+                    int h = image.getHeight();
+                    int[][] pixels = new int[w][h];
+                    for (int x = 0; x < w; x++)
+                        for (int y = 0; y < h; y++)
+                            pixels[x][y] = image.getColorArgb(x, y);
+                    image.close();
+                    stream.close();
+                    // Use the entity texture path itself as both IDs (not atlas-based)
+                    Identifier spriteId = Identifier.of(entityTexture.getNamespace(),
+                            entityTexture.getPath().replace("textures/", "").replace(".png", ""));
+                    System.out.println("[TextureEditor] Found special item texture: " + entityTexture);
+                    return new ItemTexture(entityTexture, spriteId, pixels, w, h);
+                }
+            } catch (Exception e) {
+                System.out.println("[TextureEditor] Failed to load special texture: " + entityTexture + " - " + e.getMessage());
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * Get known texture paths for special items that don't use the block atlas.
+     */
+    private static Identifier getSpecialItemTexturePath(Identifier itemId) {
+        String path = itemId.getPath();
+        String ns = itemId.getNamespace();
+        return switch (path) {
+            case "elytra" -> Identifier.of(ns, "textures/entity/elytra.png");
+            case "shield" -> Identifier.of(ns, "textures/entity/shield/shield_base.png");
+            case "trident" -> Identifier.of(ns, "textures/entity/trident.png");
+            case "decorated_pot" -> Identifier.of(ns, "textures/entity/decorated_pot/decorated_pot_base.png");
+            case "conduit" -> Identifier.of(ns, "textures/entity/conduit/base.png");
+            case "bell" -> Identifier.of(ns, "textures/entity/bell/bell_body.png");
+            default -> {
+                // Signs
+                if (path.endsWith("_sign") || path.endsWith("_hanging_sign")) {
+                    String wood = path.replace("_hanging_sign", "").replace("_wall_sign", "").replace("_sign", "");
+                    if (path.contains("hanging")) {
+                        yield Identifier.of(ns, "textures/entity/signs/hanging/" + wood + ".png");
+                    }
+                    yield Identifier.of(ns, "textures/entity/signs/" + wood + ".png");
+                }
+                // Banners
+                if (path.endsWith("_banner")) {
+                    yield Identifier.of(ns, "textures/entity/banner_base.png");
+                }
+                // Beds
+                if (path.endsWith("_bed")) {
+                    String color = path.replace("_bed", "");
+                    yield Identifier.of(ns, "textures/entity/bed/" + color + ".png");
+                }
+                // Chests
+                if (path.equals("chest") || path.equals("trapped_chest")) {
+                    yield Identifier.of(ns, "textures/entity/chest/normal.png");
+                }
+                if (path.equals("ender_chest")) {
+                    yield Identifier.of(ns, "textures/entity/chest/ender.png");
+                }
+                // Boats
+                if (path.contains("boat")) {
+                    String wood = path.replace("_chest_boat", "").replace("_boat", "");
+                    if (path.contains("chest")) {
+                        yield Identifier.of(ns, "textures/entity/chest_boat/" + wood + ".png");
+                    }
+                    yield Identifier.of(ns, "textures/entity/boat/" + wood + ".png");
+                }
+                // Shulker boxes
+                if (path.contains("shulker_box")) {
+                    if (path.equals("shulker_box")) {
+                        yield Identifier.of(ns, "textures/entity/shulker/shulker.png");
+                    }
+                    String color = path.replace("_shulker_box", "");
+                    yield Identifier.of(ns, "textures/entity/shulker/shulker_" + color + ".png");
+                }
+                yield null;
+            }
+        };
     }
 
     private static ItemTexture extractFromSprite(Sprite sprite) {

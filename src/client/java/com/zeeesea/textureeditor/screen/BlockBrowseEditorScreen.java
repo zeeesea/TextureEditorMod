@@ -4,8 +4,10 @@ import com.zeeesea.textureeditor.TextureEditorClient;
 import com.zeeesea.textureeditor.editor.ColorHistory;
 import com.zeeesea.textureeditor.editor.EditorTool;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
-import com.zeeesea.textureeditor.texture.MobTextureExtractor;
+import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -13,34 +15,31 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Direction;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * Editor screen for mob/entity textures.
- * Shows the full UV-map texture sheet for the entity and lets you paint on it.
- */
-public class MobEditorScreen extends Screen {
+import java.util.List;
 
-    private final net.minecraft.entity.Entity entity;
-    private final String entityName;
+public class BlockBrowseEditorScreen extends Screen {
 
-    // Texture data
+    private final Block block;
+    private final BlockState blockState;
+    private final Screen parent;
+    private Direction currentFace = Direction.UP;
+
+    private Identifier spriteId;
     private Identifier textureId;
     private PixelCanvas canvas;
     private int[][] originalPixels;
 
-    // Editor state
     private EditorTool currentTool = EditorTool.PENCIL;
     private int currentColor = 0xFFFF0000;
-    private int zoom = 6; // Mob textures are usually 64x64, so smaller zoom
+    private int zoom = 12;
     private boolean showGrid = true;
 
-    private int canvasBaseX;
-    private int canvasBaseY;
-    private int panOffsetX = 0;
-    private int panOffsetY = 0;
-    private int canvasScreenX;
-    private int canvasScreenY;
+    private int canvasBaseX, canvasBaseY;
+    private int panOffsetX = 0, panOffsetY = 0;
+    private int canvasScreenX, canvasScreenY;
 
     private boolean isPanning = false;
     private double panStartMouseX, panStartMouseY;
@@ -64,33 +63,69 @@ public class MobEditorScreen extends Screen {
 
     private TextFieldWidget hexInput;
 
-    public MobEditorScreen(net.minecraft.entity.Entity entity) {
-        super(Text.literal("Mob Texture Editor"));
-        this.entity = entity;
-        this.entityName = entity.getType().getName().getString();
+    private int blockTint = -1;
+    private boolean isTinted = false;
+
+    public BlockBrowseEditorScreen(Block block, Screen parent) {
+        super(Text.literal("Block Texture Editor"));
+        this.block = block;
+        this.blockState = block.getDefaultState();
+        this.parent = parent;
+
+        // Try to determine tint color based on player position (biome)
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world != null && client.player != null) {
+            int color = client.getBlockColors().getColor(blockState, client.world, client.player.getBlockPos(), 0);
+            if (color != -1) {
+                blockTint = color | 0xFF000000;
+                isTinted = true;
+            }
+        }
+    }
+
+    private int applyTint(int pixel) {
+        if (!isTinted) return pixel;
+        int a = (pixel >> 24) & 0xFF;
+        int r = (pixel >> 16) & 0xFF, g = (pixel >> 8) & 0xFF, b = pixel & 0xFF;
+        int tr = (blockTint >> 16) & 0xFF, tg = (blockTint >> 8) & 0xFF, tb = blockTint & 0xFF;
+        return (a << 24) | ((r * tr / 255) << 16) | ((g * tg / 255) << 8) | (b * tb / 255);
+    }
+
+    private int removeTint(int color) {
+        if (!isTinted) return color;
+        int a = (color >> 24) & 0xFF;
+        int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
+        int tr = (blockTint >> 16) & 0xFF, tg = (blockTint >> 8) & 0xFF, tb = blockTint & 0xFF;
+        r = tr > 0 ? Math.min(255, r * 255 / tr) : r;
+        g = tg > 0 ? Math.min(255, g * 255 / tg) : g;
+        b = tb > 0 ? Math.min(255, b * 255 / tb) : b;
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     @Override
     protected void init() {
-        MobTextureExtractor.MobTexture tex = MobTextureExtractor.extract(entity);
-        if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
-            textureId = tex.textureId();
+        addDrawableChild(ButtonWidget.builder(Text.literal("<"), btn -> {
+            applyLive();
+            int i = currentFace.getId();
+            i = (i - 1 + 6) % 6;
+            currentFace = Direction.byId(i);
+            loadFaceTexture(currentFace);
+            recalcZoomAndPos();
+        }).position(this.width / 2 - 120, 5).size(20, 20).build());
 
-            // Load previously saved pixels if they exist
-            int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
-            int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
-            if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
-                canvas = new PixelCanvas(savedDims[0], savedDims[1], savedPixels);
-            } else {
-                canvas = new PixelCanvas(tex.width(), tex.height(), tex.pixels());
-            }
-        }
-        if (canvas == null) { canvas = new PixelCanvas(64, 64); originalPixels = new int[64][64]; }
+        addDrawableChild(ButtonWidget.builder(Text.literal(">"), btn -> {
+            applyLive();
+            int i = currentFace.getId();
+            i = (i + 1) % 6;
+            currentFace = Direction.byId(i);
+            loadFaceTexture(currentFace);
+            recalcZoomAndPos();
+        }).position(this.width / 2 + 100, 5).size(20, 20).build());
 
-        // Calculate zoom to fit
+        loadFaceTexture(currentFace);
+
         int canvasPixelSize = Math.min(zoom, Math.min((this.width - 200) / canvas.getWidth(), (this.height - 80) / canvas.getHeight()));
-        if (canvasPixelSize < 1) canvasPixelSize = 1;
+        if (canvasPixelSize < 2) canvasPixelSize = 2;
         zoom = canvasPixelSize;
 
         canvasBaseX = 120 + (this.width - 240 - canvas.getWidth() * zoom) / 2;
@@ -98,38 +133,49 @@ public class MobEditorScreen extends Screen {
         canvasScreenX = canvasBaseX + panOffsetX;
         canvasScreenY = canvasBaseY + panOffsetY;
 
-        // Tool buttons
         int toolY = 30;
         for (EditorTool tool : EditorTool.values()) {
             final EditorTool t = tool;
-            addDrawableChild(ButtonWidget.builder(Text.literal(tool.getDisplayName()), btn -> currentTool = t).position(5, toolY).size(100, 20).build());
+            addDrawableChild(ButtonWidget.builder(Text.literal(tool.getDisplayName()), btn -> currentTool = t)
+                    .position(5, toolY).size(100, 20).build());
             toolY += 24;
         }
+
+        String undoK = TextureEditorClient.getUndoKey().getBoundKeyLocalizedText().getString();
+        String redoK = TextureEditorClient.getRedoKey().getBoundKeyLocalizedText().getString();
         toolY += 10;
-        String undoKeyName = TextureEditorClient.getUndoKey().getBoundKeyLocalizedText().getString();
-        String redoKeyName = TextureEditorClient.getRedoKey().getBoundKeyLocalizedText().getString();
-        addDrawableChild(ButtonWidget.builder(Text.literal("Undo (" + undoKeyName + ")"), btn -> canvas.undo()).position(5, toolY).size(100, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Undo (" + undoK + ")"), btn -> canvas.undo()).position(5, toolY).size(100, 20).build());
         toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Redo (" + redoKeyName + ")"), btn -> canvas.redo()).position(5, toolY).size(100, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Redo (" + redoK + ")"), btn -> canvas.redo()).position(5, toolY).size(100, 20).build());
         toolY += 34;
         addDrawableChild(ButtonWidget.builder(Text.literal("Grid (G)"), btn -> showGrid = !showGrid).position(5, toolY).size(100, 20).build());
         toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom +"), btn -> { if (zoom < 20) { zoom += 1; recalcCanvasPos(); } }).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom -"), btn -> { if (zoom > 1) { zoom -= 1; recalcCanvasPos(); } }).position(57, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom +"), btn -> { if (zoom < 40) { zoom += 2; recalcCanvasPos(); } }).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Zoom -"), btn -> { if (zoom > 2) { zoom -= 2; recalcCanvasPos(); } }).position(57, toolY).size(48, 20).build());
 
-        // Reset buttons - positioned below color history area
+        // Face selection buttons (continue from toolY)
+        toolY += 30;
+        addDrawableChild(ButtonWidget.builder(Text.literal("Top"), btn -> switchFace(Direction.UP)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Bottom"), btn -> switchFace(Direction.DOWN)).position(57, toolY).size(48, 20).build());
+        toolY += 24;
+        addDrawableChild(ButtonWidget.builder(Text.literal("North"), btn -> switchFace(Direction.NORTH)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("South"), btn -> switchFace(Direction.SOUTH)).position(57, toolY).size(48, 20).build());
+        toolY += 24;
+        addDrawableChild(ButtonWidget.builder(Text.literal("East"), btn -> switchFace(Direction.EAST)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("West"), btn -> switchFace(Direction.WEST)).position(57, toolY).size(48, 20).build());
+
         int resetX = this.width - 115;
-        // History takes up to 4 rows (20 colors / 5 cols) * 20px + labels etc.
-        int resetBaseY = this.height - 80;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Reset Mob"), btn -> resetMob()).position(resetX, resetBaseY).size(110, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset All"), btn -> resetAll()).position(resetX, resetBaseY + 24).size(110, 20).build());
+        int resetBaseY = this.height - 100;
+        addDrawableChild(ButtonWidget.builder(Text.literal("Reset Face"), btn -> resetFace()).position(resetX, resetBaseY).size(110, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Reset Block"), btn -> resetBlock()).position(resetX, resetBaseY + 24).size(110, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset All"), btn -> resetAll()).position(resetX, resetBaseY + 48).size(110, 20).build());
+
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aApply Live"), btn -> applyLive()).position(5, this.height - 78).size(100, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export Pack"), btn -> client.setScreen(new ExportScreen(this))).position(5, this.height - 54).size(100, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> client.setScreen(new BrowseScreen())).position(5, this.height - 30).size(100, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> client.setScreen(parent)).position(5, this.height - 30).size(100, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), btn -> this.close()).position(this.width - 65, 5).size(60, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bPicker"), btn -> showColorPicker = !showColorPicker).position(this.width - 65, this.height - 26).size(60, 20).build());
 
-        // Hex input
         int paletteX = this.width - 115;
         int paletteEndY = 30 + ((PALETTE.length + 4) / 5) * 22 + 10;
         hexInput = new TextFieldWidget(this.textRenderer, paletteX, paletteEndY, 110, 18, Text.literal("Hex"));
@@ -144,6 +190,39 @@ public class MobEditorScreen extends Screen {
         addDrawableChild(hexInput);
     }
 
+    private void loadFaceTexture(Direction face) {
+        TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, face);
+        if (tex != null) {
+            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
+            textureId = tex.textureId();
+            spriteId = Identifier.of(tex.textureId().getNamespace(), tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+            int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
+            int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
+            if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
+                canvas = new PixelCanvas(savedDims[0], savedDims[1], savedPixels);
+            } else {
+                canvas = new PixelCanvas(tex.width(), tex.height(), tex.pixels());
+            }
+        }
+        if (canvas == null) { canvas = new PixelCanvas(16, 16); originalPixels = new int[16][16]; }
+    }
+
+    private void switchFace(Direction face) {
+        applyLive();
+        currentFace = face;
+        panOffsetX = 0; panOffsetY = 0;
+        canvas = null;
+        this.clearChildren();
+        this.init();
+    }
+
+    private void recalcZoomAndPos() {
+        int canvasPixelSize = Math.min(zoom, Math.min((this.width - 200) / canvas.getWidth(), (this.height - 80) / canvas.getHeight()));
+        if (canvasPixelSize < 2) canvasPixelSize = 2;
+        zoom = canvasPixelSize;
+        recalcCanvasPos();
+    }
+
     private void recalcCanvasPos() {
         canvasBaseX = 120 + (this.width - 240 - canvas.getWidth() * zoom) / 2;
         canvasBaseY = 30 + (this.height - 80 - canvas.getHeight() * zoom) / 2;
@@ -152,39 +231,28 @@ public class MobEditorScreen extends Screen {
 
     private boolean isInUIRegion(double mx, double my) { return mx < 110 || mx > this.width - 120 || my < 28; }
 
-    @Override public void renderBackground(DrawContext ctx, int mx, int my, float d) {
-        // Don't let super draw its default background - we handle it ourselves
-    }
+    @Override public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // 1. Full background
         context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
-
-        // 2. Canvas
         drawCanvas(context, mouseX, mouseY);
-
-        // 3. UI panel backgrounds
         context.fill(0, 0, 110, this.height, 0xFF1A1A2E);
         context.fill(this.width - 120, 0, this.width, this.height, 0xFF1A1A2E);
         context.fill(110, 0, this.width - 120, 28, 0xFF1A1A2E);
-
-        // 4. Widgets
         super.render(context, mouseX, mouseY, delta);
 
-        // 5. Custom draws
-        context.drawText(textRenderer, "Mob Editor - " + entityName, 120, 8, 0xFFFFFF, true);
-        context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() + "  |  " + canvas.getWidth() + "x" + canvas.getHeight(), 120, 20, 0xCCCCCC, false);
+        context.drawText(textRenderer, "Block - " + block.getName().getString() + " (" + currentFace.getName() + ")", 120, 8, 0xFFFFFF, true);
+        context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName(), 120, 20, 0xCCCCCC, false);
 
         drawPalette(context, mouseX, mouseY);
-
-        // Current color preview
+        // Current color (Y+35)
         int paletteX = this.width - 115;
         int paletteEndY = 30 + ((PALETTE.length + 4) / 5) * 22 + 35;
         context.drawText(textRenderer, "Current Color:", paletteX, paletteEndY, 0xCCCCCC, false);
         context.fill(paletteX, paletteEndY + 12, paletteX + 30, paletteEndY + 32, currentColor);
         drawRectOutline(context, paletteX, paletteEndY + 12, paletteX + 30, paletteEndY + 32, 0xFFFFFFFF);
-
+        // History (Y+92)
         drawColorHistory(context, mouseX, mouseY);
         if (showColorPicker) drawColorPicker(context, mouseX, mouseY);
         if (currentTool == EditorTool.LINE && lineFirstClick) context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFF00, false);
@@ -196,9 +264,9 @@ public class MobEditorScreen extends Screen {
             int sx = canvasScreenX + x * zoom, sy = canvasScreenY + y * zoom;
             ctx.fill(sx, sy, sx + zoom, sy + zoom, ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
             int c = canvas.getPixel(x, y);
-            if (((c >> 24) & 0xFF) > 0) ctx.fill(sx, sy, sx + zoom, sy + zoom, c);
+            if (((c >> 24) & 0xFF) > 0) ctx.fill(sx, sy, sx + zoom, sy + zoom, applyTint(c));
         }
-        if (showGrid && zoom >= 3) {
+        if (showGrid && zoom >= 4) {
             for (int x = 0; x <= w; x++) ctx.fill(canvasScreenX + x * zoom, canvasScreenY, canvasScreenX + x * zoom + 1, canvasScreenY + h * zoom, 0x40FFFFFF);
             for (int y = 0; y <= h; y++) ctx.fill(canvasScreenX, canvasScreenY + y * zoom, canvasScreenX + w * zoom, canvasScreenY + y * zoom + 1, 0x40FFFFFF);
         }
@@ -216,7 +284,7 @@ public class MobEditorScreen extends Screen {
         ColorHistory hist = ColorHistory.getInstance(); if (hist.size() == 0) return;
         int px0 = this.width - 115; int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 80;
         ctx.drawText(textRenderer, "History:", px0, sy, 0x999999, false); sy += 12;
-        int cols = 5, cs = 18; java.util.List<Integer> colors = hist.getColors();
+        int cols = 5, cs = 18; List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) { int c = i % cols, r = i / cols; int px = px0 + c * (cs + 2), py = sy + r * (cs + 2); ctx.fill(px, py, px + cs, py + cs, colors.get(i)); if (colors.get(i) == currentColor) drawRectOutline(ctx, px - 1, py - 1, px + cs + 1, py + cs + 1, 0xFFFFFF00); else drawRectOutline(ctx, px, py, px + cs, py + cs, 0xFF333333); }
     }
 
@@ -241,65 +309,69 @@ public class MobEditorScreen extends Screen {
     }
 
     private void drawRectOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int c) { ctx.fill(x1,y1,x2,y1+1,c); ctx.fill(x1,y2-1,x2,y2,c); ctx.fill(x1,y1,x1+1,y2,c); ctx.fill(x2-1,y1,x2,y2,c); }
-
     private void setColor(int c) { currentColor = c; ColorHistory.getInstance().addColor(c); if (hexInput != null) hexInput.setText(String.format("#%06X", c & 0xFFFFFF)); }
 
     @Override public boolean mouseScrolled(double mx, double my, double ha, double va) {
-        int old = zoom; if (va > 0 && zoom < 20) zoom++; else if (va < 0 && zoom > 1) zoom--;
-        if (zoom != old) { double rx = (mx-canvasScreenX)/(double)(canvas.getWidth()*old), ry = (my-canvasScreenY)/(double)(canvas.getHeight()*old); recalcCanvasPos(); canvasScreenX=(int)(mx-rx*canvas.getWidth()*zoom); canvasScreenY=(int)(my-ry*canvas.getHeight()*zoom); panOffsetX=canvasScreenX-canvasBaseX; panOffsetY=canvasScreenY-canvasBaseY; }
+        int old = zoom; if (va > 0 && zoom < 40) zoom += 2; else if (va < 0 && zoom > 2) zoom -= 2;
+        if (zoom != old) { double rx = (mx - canvasScreenX) / (double)(canvas.getWidth() * old), ry = (my - canvasScreenY) / (double)(canvas.getHeight() * old); recalcCanvasPos(); canvasScreenX = (int)(mx - rx * canvas.getWidth() * zoom); canvasScreenY = (int)(my - ry * canvas.getHeight() * zoom); panOffsetX = canvasScreenX - canvasBaseX; panOffsetY = canvasScreenY - canvasBaseY; }
         return true;
     }
 
     @Override public boolean mouseClicked(double mx, double my, int btn) {
         if (super.mouseClicked(mx, my, btn)) return true;
         if (showColorPicker && btn == 0 && handlePickerClick(mx, my)) return true;
+        if (btn == 0 && handlePaletteClick(mx, my)) return true;
         if (btn == 0 && handleHistoryClick(mx, my)) return true;
         if (btn == 1) { isPanning = true; panStartMouseX = mx; panStartMouseY = my; panStartOffsetX = panOffsetX; panStartOffsetY = panOffsetY; return true; }
-        if (btn == 0 && handlePaletteClick(mx, my)) return true;
         if (isInUIRegion(mx, my)) return false;
-        if (btn == 0) { int px = (int)((mx-canvasScreenX)/zoom), py = (int)((my-canvasScreenY)/zoom); if (px>=0 && px<canvas.getWidth() && py>=0 && py<canvas.getHeight()) { handleCanvasClick(px, py, btn); return true; } }
+        if (btn == 0) { int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom); if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) { handleCanvasClick(px, py, btn); return true; } }
         return false;
     }
 
     @Override public boolean mouseReleased(double mx, double my, int btn) { if (btn == 1) { isPanning = false; return true; } return super.mouseReleased(mx, my, btn); }
 
     @Override public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
-        if (btn == 1 && isPanning) { panOffsetX = panStartOffsetX+(int)(mx-panStartMouseX); panOffsetY = panStartOffsetY+(int)(my-panStartMouseY); canvasScreenX = canvasBaseX+panOffsetX; canvasScreenY = canvasBaseY+panOffsetY; return true; }
+        if (btn == 1 && isPanning) { panOffsetX = panStartOffsetX + (int)(mx - panStartMouseX); panOffsetY = panStartOffsetY + (int)(my - panStartMouseY); canvasScreenX = canvasBaseX + panOffsetX; canvasScreenY = canvasBaseY + panOffsetY; return true; }
         if (showColorPicker && btn == 0 && handlePickerClick(mx, my)) return true;
         if (isInUIRegion(mx, my)) return super.mouseDragged(mx, my, btn, dx, dy);
-        int px = (int)((mx-canvasScreenX)/zoom), py = (int)((my-canvasScreenY)/zoom);
-        if (px>=0 && px<canvas.getWidth() && py>=0 && py<canvas.getHeight()) { if (currentTool == EditorTool.PENCIL) canvas.drawPixel(px, py, currentColor); else if (currentTool == EditorTool.ERASER) canvas.erasePixel(px, py); return true; }
+        int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
+        if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
+            if (currentTool == EditorTool.PENCIL) canvas.drawPixel(px, py, isTinted ? removeTint(currentColor) : currentColor);
+            else if (currentTool == EditorTool.ERASER) canvas.erasePixel(px, py);
+            return true;
+        }
         return super.mouseDragged(mx, my, btn, dx, dy);
     }
 
     private boolean handlePickerClick(double mx, double my) {
         int cpX = this.width / 2 - 80, cpY = this.height - 90, svW = 120, svH = 80, hueX = cpX + svW + 5, hueW = 20;
-        if (mx >= cpX && mx < cpX + svW && my >= cpY && my < cpY + svH) { pickerSat = Math.max(0, Math.min(1, (float)(mx-cpX)/(svW-1))); pickerVal = Math.max(0, Math.min(1, 1f-(float)(my-cpY)/(svH-1))); setColor(hsvToRgb(pickerHue, pickerSat, pickerVal)); return true; }
-        if (mx >= hueX && mx < hueX + hueW && my >= cpY && my < cpY + svH) { pickerHue = Math.max(0, Math.min(1, (float)(my-cpY)/(svH-1))); setColor(hsvToRgb(pickerHue, pickerSat, pickerVal)); return true; }
+        if (mx >= cpX && mx < cpX + svW && my >= cpY && my < cpY + svH) { pickerSat = Math.max(0, Math.min(1, (float)(mx - cpX) / (svW - 1))); pickerVal = Math.max(0, Math.min(1, 1f - (float)(my - cpY) / (svH - 1))); setColor(hsvToRgb(pickerHue, pickerSat, pickerVal)); return true; }
+        if (mx >= hueX && mx < hueX + hueW && my >= cpY && my < cpY + svH) { pickerHue = Math.max(0, Math.min(1, (float)(my - cpY) / (svH - 1))); setColor(hsvToRgb(pickerHue, pickerSat, pickerVal)); return true; }
         return false;
     }
 
     private boolean handleHistoryClick(double mx, double my) {
         ColorHistory hist = ColorHistory.getInstance(); if (hist.size() == 0) return false;
         int px0 = this.width - 115; int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 92; int cols = 5, cs = 18;
-        java.util.List<Integer> colors = hist.getColors();
-        for (int i = 0; i < colors.size(); i++) { int c = i % cols, r = i / cols; int px = px0+c*(cs+2), py = sy+r*(cs+2); if (mx>=px&&mx<px+cs&&my>=py&&my<py+cs) { currentColor = colors.get(i); hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF)); return true; } }
+        List<Integer> colors = hist.getColors();
+        for (int i = 0; i < colors.size(); i++) { int c = i % cols, r = i / cols; int px = px0 + c * (cs + 2), py = sy + r * (cs + 2); if (mx >= px && mx < px + cs && my >= py && my < py + cs) { currentColor = colors.get(i); hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF)); return true; } }
         return false;
     }
 
     private void handleCanvasClick(int px, int py, int btn) {
+        int storeColor = isTinted ? removeTint(currentColor) : currentColor;
         switch (currentTool) {
-            case PENCIL -> { canvas.saveSnapshot(); canvas.drawPixel(px, py, btn == 1 ? 0 : currentColor); ColorHistory.getInstance().addColor(currentColor); }
+            case PENCIL -> { canvas.saveSnapshot(); canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor); ColorHistory.getInstance().addColor(currentColor); }
             case ERASER -> { canvas.saveSnapshot(); canvas.erasePixel(px, py); }
-            case FILL -> { canvas.saveSnapshot(); canvas.floodFill(px, py, currentColor); ColorHistory.getInstance().addColor(currentColor); }
-            case EYEDROPPER -> { currentColor = canvas.pickColor(px, py); hexInput.setText(String.format("#%08X", currentColor)); }
-            case LINE -> { if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; } else { canvas.saveSnapshot(); canvas.drawLine(lineStartX, lineStartY, px, py, currentColor); lineFirstClick = false; ColorHistory.getInstance().addColor(currentColor); } }
+            case FILL -> { canvas.saveSnapshot(); canvas.floodFill(px, py, storeColor); ColorHistory.getInstance().addColor(currentColor); }
+            case EYEDROPPER -> { int raw = canvas.pickColor(px, py); currentColor = applyTint(raw); hexInput.setText(String.format("#%08X", currentColor)); }
+            case LINE -> { if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; } else { canvas.saveSnapshot(); canvas.drawLine(lineStartX, lineStartY, px, py, storeColor); lineFirstClick = false; ColorHistory.getInstance().addColor(currentColor); } }
         }
     }
 
     private boolean handlePaletteClick(double mx, double my) {
         int px0 = this.width - 115, py0 = 30, cs = 20, cols = 5;
-        for (int i = 0; i < PALETTE.length; i++) { int c = i%cols, r = i/cols; int px = px0+c*(cs+2), py = py0+r*(cs+2); if (mx>=px&&mx<px+cs&&my>=py&&my<py+cs) { setColor(PALETTE[i]); return true; } }
+        for (int i = 0; i < PALETTE.length; i++) { int c = i % cols, r = i / cols; int px = px0 + c * (cs + 2), py = py0 + r * (cs + 2); if (mx >= px && mx < px + cs && my >= py && my < py + cs) { setColor(PALETTE[i]); return true; } }
         return false;
     }
 
@@ -307,19 +379,27 @@ public class MobEditorScreen extends Screen {
         if (TextureEditorClient.getUndoKey().matchesKey(kc, sc)) { canvas.undo(); return true; }
         if (TextureEditorClient.getRedoKey().matchesKey(kc, sc)) { canvas.redo(); return true; }
         if (kc == GLFW.GLFW_KEY_G && !hexInput.isFocused()) { showGrid = !showGrid; return true; }
-        if (kc == GLFW.GLFW_KEY_EQUAL || kc == GLFW.GLFW_KEY_KP_ADD) { if (zoom < 20) { zoom++; recalcCanvasPos(); } return true; }
-        if (kc == GLFW.GLFW_KEY_MINUS || kc == GLFW.GLFW_KEY_KP_SUBTRACT) { if (zoom > 1) { zoom--; recalcCanvasPos(); } return true; }
         if (kc == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
         return super.keyPressed(kc, sc, m);
     }
 
-    // --- Reset ---
-
-    private void resetMob() {
-        if (originalPixels == null) return; canvas.saveSnapshot();
+    private void resetFace() {
+        if (originalPixels == null || spriteId == null) return; canvas.saveSnapshot();
         for (int x = 0; x < canvas.getWidth(); x++) for (int y = 0; y < canvas.getHeight(); y++) canvas.setPixel(x, y, originalPixels[x][y]);
         if (textureId != null) TextureManager.getInstance().removeTexture(textureId);
         applyLive();
+    }
+
+    private void resetBlock() {
+        for (Direction dir : Direction.values()) {
+            TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, dir);
+            if (tex != null) {
+                Identifier sid = Identifier.of(tex.textureId().getNamespace(), tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+                TextureManager.getInstance().removeTexture(tex.textureId());
+                MinecraftClient.getInstance().execute(() -> TextureManager.getInstance().applyLive(sid, tex.pixels(), tex.width(), tex.height()));
+            }
+        }
+        if (originalPixels != null) { canvas.saveSnapshot(); for (int x = 0; x < canvas.getWidth(); x++) for (int y = 0; y < canvas.getHeight(); y++) canvas.setPixel(x, y, originalPixels[x][y]); }
     }
 
     private void resetAll() {
@@ -327,19 +407,9 @@ public class MobEditorScreen extends Screen {
         if (originalPixels != null) { canvas.saveSnapshot(); for (int x = 0; x < canvas.getWidth(); x++) for (int y = 0; y < canvas.getHeight(); y++) canvas.setPixel(x, y, originalPixels[x][y]); }
     }
 
-    // --- Apply live ---
-
     private void applyLive() {
-        if (textureId == null || canvas == null) return;
-        MinecraftClient client = MinecraftClient.getInstance();
-        TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
-        client.execute(() -> {
-            try (var img = new net.minecraft.client.texture.NativeImage(canvas.getWidth(), canvas.getHeight(), false)) {
-                for (int x = 0; x < canvas.getWidth(); x++) for (int y = 0; y < canvas.getHeight(); y++) img.setColorArgb(x, y, canvas.getPixels()[x][y]);
-                var tex = client.getTextureManager().getTexture(textureId);
-                if (tex != null) { tex.bindTexture(); img.upload(0, 0, 0, false); }
-            }
-        });
+        if (spriteId == null || canvas == null) return;
+        MinecraftClient.getInstance().execute(() -> TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight()));
     }
 
     private static int[][] copyPixels(int[][] s, int w, int h) { int[][] c = new int[w][h]; for (int x = 0; x < w; x++) System.arraycopy(s[x], 0, c[x], 0, h); return c; }

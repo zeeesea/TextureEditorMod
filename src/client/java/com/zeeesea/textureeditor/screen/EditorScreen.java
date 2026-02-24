@@ -25,7 +25,7 @@ import org.lwjgl.glfw.GLFW;
 public class EditorScreen extends Screen {
 
     private final BlockPos blockPos;
-    private final Direction face;
+    private Direction face;
     private final BlockState blockState;
 
     // Texture data
@@ -88,6 +88,7 @@ public class EditorScreen extends Screen {
         // Get biome tint color for this block at this position
         if (blockState != null && client.world != null) {
             int color = client.getBlockColors().getColor(blockState, client.world, blockPos, 0);
+            System.out.println("[TextureEditor] Block: " + blockState.getBlock().getName().getString() + " Tint Color: " + Integer.toHexString(color));
             if (color != -1) {
                 blockTint = color | 0xFF000000; // ensure full alpha
                 isTinted = true;
@@ -199,9 +200,20 @@ public class EditorScreen extends Screen {
             if (zoom > 2) { zoom -= 2; recalcCanvasPos(); }
         }).position(57, toolY).size(48, 20).build());
 
-        // Reset buttons
+        // Face selection buttons
+        toolY += 30;
+        addDrawableChild(ButtonWidget.builder(Text.literal("Top"), btn -> switchFace(Direction.UP)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Bottom"), btn -> switchFace(Direction.DOWN)).position(57, toolY).size(48, 20).build());
+        toolY += 24;
+        addDrawableChild(ButtonWidget.builder(Text.literal("North"), btn -> switchFace(Direction.NORTH)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("South"), btn -> switchFace(Direction.SOUTH)).position(57, toolY).size(48, 20).build());
+        toolY += 24;
+        addDrawableChild(ButtonWidget.builder(Text.literal("East"), btn -> switchFace(Direction.EAST)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("West"), btn -> switchFace(Direction.WEST)).position(57, toolY).size(48, 20).build());
+
+        // Reset buttons - positioned at bottom of right panel, below history
         int resetX = this.width - 115;
-        int resetBaseY = 30 + ((PALETTE.length + 4) / 5) * 22 + 90;
+        int resetBaseY = this.height - 100;
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Reset Face"), btn -> resetFace())
                 .position(resetX, resetBaseY).size(110, 20).build());
@@ -212,11 +224,16 @@ public class EditorScreen extends Screen {
 
         // Apply live
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aApply Live"), btn -> applyLive())
-                .position(5, this.height - 54).size(100, 20).build());
+                .position(5, this.height - 78).size(100, 20).build());
 
         // Export
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export Pack"), btn ->
                 client.setScreen(new ExportScreen(this)))
+                .position(5, this.height - 54).size(100, 20).build());
+
+        // Browse
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn ->
+                client.setScreen(new BrowseScreen()))
                 .position(5, this.height - 30).size(100, 20).build());
 
         // Close
@@ -249,6 +266,15 @@ public class EditorScreen extends Screen {
         canvasBaseY = 30 + (this.height - 80 - canvas.getHeight() * zoom) / 2;
         canvasScreenX = canvasBaseX + panOffsetX;
         canvasScreenY = canvasBaseY + panOffsetY;
+    }
+
+    private void switchFace(Direction newFace) {
+        applyLive(); // save current work
+        this.face = newFace;
+        panOffsetX = 0; panOffsetY = 0;
+        canvas = null;
+        this.clearChildren();
+        this.init();
     }
 
     private boolean isInUIRegion(double mouseX, double mouseY) {
@@ -354,7 +380,9 @@ public class EditorScreen extends Screen {
         ColorHistory hist = ColorHistory.getInstance();
         if (hist.size() == 0) return;
         int paletteX = this.width - 115;
-        int startY = 30 + ((PALETTE.length + 4) / 5) * 22 + 55;
+        // Move history down to avoid overlapping "Current Color" box
+        // Current color box ends at: 30 + ((PALETTE.length + 4) / 5) * 22 + 35 + 32 = ~67 offset
+        int startY = 30 + ((PALETTE.length + 4) / 5) * 22 + 80;
         context.drawText(textRenderer, "History:", paletteX, startY, 0x999999, false);
         startY += 12;
         int cols = 5, cellSize = 18;
@@ -451,8 +479,12 @@ public class EditorScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        System.out.println("[TextureEditor] EditorScreen.mouseClicked(" + mouseX + ", " + mouseY + ", btn=" + button + ") isInUIRegion=" + isInUIRegion(mouseX, mouseY));
         // Let widgets handle first (buttons, text fields)
-        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            System.out.println("[TextureEditor] -> handled by super (widget)");
+            return true;
+        }
 
         // Color picker click
         if (showColorPicker && button == 0 && handleColorPickerClick(mouseX, mouseY)) return true;
@@ -468,11 +500,12 @@ public class EditorScreen extends Screen {
             return true;
         }
 
+        // Palette click (must be before UI region guard since palette IS in UI region)
+        if (button == 0 && handlePaletteClick(mouseX, mouseY)) return true;
+
         // Don't draw on canvas if clicking UI region
         if (isInUIRegion(mouseX, mouseY)) return false;
 
-        // Palette click
-        if (button == 0 && handlePaletteClick(mouseX, mouseY)) return true;
 
         // Canvas click
         if (button == 0) {
@@ -543,7 +576,8 @@ public class EditorScreen extends Screen {
         ColorHistory hist = ColorHistory.getInstance();
         if (hist.size() == 0) return false;
         int paletteX = this.width - 115;
-        int startY = 30 + ((PALETTE.length + 4) / 5) * 22 + 67;
+        // Adjusted Y position to match drawColorHistory
+        int startY = 30 + ((PALETTE.length + 4) / 5) * 22 + 92; // 80 + 12 (text height)
         int cols = 5, cellSize = 18;
         java.util.List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) {
@@ -574,14 +608,17 @@ public class EditorScreen extends Screen {
 
     private boolean handlePaletteClick(double mouseX, double mouseY) {
         int paletteX = this.width - 115, paletteY = 30, cellSize = 20, cols = 5;
+        System.out.println("[TextureEditor] handlePaletteClick called at (" + mouseX + ", " + mouseY + ") paletteX=" + paletteX + " paletteY=" + paletteY);
         for (int i = 0; i < PALETTE.length; i++) {
             int col = i % cols, row = i / cols;
             int px = paletteX + col * (cellSize + 2), py = paletteY + row * (cellSize + 2);
             if (mouseX >= px && mouseX < px + cellSize && mouseY >= py && mouseY < py + cellSize) {
+                System.out.println("[TextureEditor] Palette color " + i + " clicked! Color=#" + String.format("%08X", PALETTE[i]));
                 setColor(PALETTE[i]);
                 return true;
             }
         }
+        System.out.println("[TextureEditor] No palette cell hit.");
         return false;
     }
 

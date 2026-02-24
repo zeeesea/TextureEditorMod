@@ -35,29 +35,44 @@ public class TextureExtractor {
             quads = model.getQuads(state, null, Random.create());
         }
         if (quads.isEmpty()) {
-            return null;
+            // Try any face
+            for (Direction dir : Direction.values()) {
+                quads = model.getQuads(state, dir, Random.create());
+                if (!quads.isEmpty()) break;
+            }
         }
 
-        // Use the first quad's sprite
-        BakedQuad quad = quads.get(0);
-        Sprite sprite = quad.getSprite();
+        if (!quads.isEmpty()) {
+            BakedQuad quad = quads.get(0);
+            Sprite sprite = quad.getSprite();
+            if (!sprite.getContents().getId().getPath().equals("missingno")) {
+                return extractFromSprite(sprite);
+            }
+        }
+
+        // Fallback: particle sprite (works for leaves, signs, etc.)
+        Sprite particle = model.getParticleSprite();
+        if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
+            return extractFromSprite(particle);
+        }
+
+        return null;
+    }
+
+    private static BlockFaceTexture extractFromSprite(Sprite sprite) {
         SpriteContents contents = sprite.getContents();
         int w = contents.getWidth();
         int h = contents.getHeight();
 
-        // Get the NativeImage from SpriteContents via accessor mixin
         NativeImage image = ((SpriteContentsAccessor) contents).getImage();
 
-        // Read pixels into an array (ABGR from NativeImage -> convert to ARGB)
         int[][] pixels = new int[w][h];
         for (int x = 0; x < w; x++) {
             for (int y = 0; y < h; y++) {
-                int abgr = image.getColorArgb(x, y);
-                pixels[x][y] = abgr;
+                pixels[x][y] = image.getColorArgb(x, y);
             }
         }
 
-        // Build the texture identifier path
         Identifier spriteId = contents.getId();
         Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
 
