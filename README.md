@@ -104,12 +104,7 @@ This mod works seamlessly with other resource packs.
 4. Drop the `.jar` file into your `.minecraft/mods` folder.
 5. Launch Minecraft!
 
----
-
-## 📜 License
-
-This project is licensed under the **MIT License**. You are free to fork, modify, and distribute this mod.
 
 ---
 
-*Made with ❤️ by [YourUsername]*
+Made by zeee
