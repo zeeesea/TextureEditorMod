@@ -22,7 +22,7 @@ The **Texture Editor Mod** allows you to edit blocks, items, entities, and GUI e
 - **Item Textures**: Edit 2D item icons with pixel-perfect precision.
 - **Spawn Egg Integration**: Clicking a spawn egg in the browser opens the corresponding mob entity for editing.
 
-### 🖥️ GUI & HUD Editor (New!)
+### 🖥️ GUI & HUD Editor
 - **Full Interface Control**: Edit the Hotbar, Crosshair, Hearts, Hunger, and XP bar.
 - **Container Customization**: Redesign the Inventory, Crafting Table, Furnace, Chests, and more.
 - **Atlas Support**: Smart handling of both standalone textures and sprite atlases (HUD elements).
