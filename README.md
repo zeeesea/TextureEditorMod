@@ -98,12 +98,7 @@ This mod works seamlessly with other resource packs.
 
 ## 📥 Installation
 
-1. Download and install **Fabric Loader** for Minecraft 1.21.4.
-2. Download the **Fabric API** mod and place it in your `mods` folder.
-3. Download the latest `texture-editor-x.x.x.jar` from the releases page.
-4. Drop the `.jar` file into your `.minecraft/mods` folder.
-5. Launch Minecraft!
-
+On Modrinth
 
 ---
 
