@@ -46,15 +46,11 @@ The **Texture Editor Mod** allows you to edit blocks, items, entities, and GUI e
 
 | Block Editor | Mob Editor |
 |:---:|:---:|
-| *<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/0aa63573-d4b9-4e4b-8c1e-6862e765c645" />
-* | *<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/76a166dd-89da-4c57-956b-388ef8a842b2" />
-* |
+| <img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/0aa63573-d4b9-4e4b-8c1e-6862e765c645" /> | <img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/76a166dd-89da-4c57-956b-388ef8a842b2" /> |
 
 | GUI Editor | Browse Menu |
 |:---:|:---:|
-| *<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/cf06af3c-f185-4e50-b4ff-0c631f634945" />
-* | *<img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/636f8987-02af-436e-b268-7f52ea4222dc" />
-* |
+| <img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/cf06af3c-f185-4e50-b4ff-0c631f634945" /> | <img width="2560" height="1440" alt="image" src="https://github.com/user-attachments/assets/636f8987-02af-436e-b268-7f52ea4222dc" /> |
 
 ---
 
