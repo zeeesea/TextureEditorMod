@@ -1,40 +1,49 @@
-# gradle
-
+# Minecraft mod specific
 .gradle/
 build/
 out/
 classes/
+*.log
+*.hprof
+*.jfr
+hs_err_*.log
+replay_*.log
 
-# eclipse
-
-*.launch
-
-# idea
-
+# IDE
 .idea/
 *.iml
 *.ipr
 *.iws
-
-# vscode
-
-.settings/
 .vscode/
+.settings/
 bin/
 .classpath
 .project
 
-# macos
-
+# MacOS
 *.DS_Store
 
-# fabric
+# Gradle Wrapper
+gradle/
+gradle.properties
+gradle-wrapper.jar
+gradle-wrapper.properties
 
+# GitHub Actions und Attribute
+.github/
+.gitattributes/
+
+# Fabric
 run/
 
-# java
+# Eclipse
+*.launch
 
-hs_err_*.log
-replay_*.log
-*.hprof
-*.jfr
+# Exportierte JARs
+build/libs/
+
+# Sonstiges
+out.txt
+err.txt
+build_log.txt
+build_output.txt
