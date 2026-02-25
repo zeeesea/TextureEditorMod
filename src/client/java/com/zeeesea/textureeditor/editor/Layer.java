@@ -51,6 +51,20 @@ public class Layer {
         return copyPixels(pixels, width, height);
     }
 
+    /**
+     * Gibt true zurück, wenn alle Pixel der Layer transparent (0x00000000) sind.
+     */
+    public boolean isEmpty() {
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if ((pixels[x][y] & 0xFF000000) != 0) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private static int[][] copyPixels(int[][] src, int w, int h) {
         int[][] copy = new int[w][h];
         for (int x = 0; x < w; x++) {

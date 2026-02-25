@@ -1,5 +1,10 @@
 package com.zeeesea.textureeditor.editor;
 
+import com.zeeesea.textureeditor.settings.ModSettings;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.toast.SystemToast;
+import net.minecraft.text.Text;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -15,12 +20,16 @@ public class PixelCanvas {
     private final LayerStack layerStack;
     private final Deque<LayerSnapshot> undoStack = new ArrayDeque<>();
     private final Deque<LayerSnapshot> redoStack = new ArrayDeque<>();
-    private static final int MAX_UNDO = 50;
+    private static int MAX_UNDO = 50;
     private boolean dirty = false;
 
     // Cached flattened pixels (invalidated on changes)
     private int[][] flattenedCache;
     private boolean cacheValid = false;
+
+    // Toast cooldowns (ms)
+    private static long lastLayerEmptyToast = 0;
+    private static final long TOAST_COOLDOWN_MS = 5000;
 
     /**
      * Snapshot of a single layer for undo/redo.
@@ -31,8 +40,7 @@ public class PixelCanvas {
         this.width = width;
         this.height = height;
         this.layerStack = new LayerStack(width, height);
-        // Create a transparent base layer
-        layerStack.addLayer("Base");
+        MAX_UNDO = ModSettings.getInstance().maxUndoSteps;
     }
 
     public PixelCanvas(int width, int height, int[][] initialPixels) {
@@ -131,9 +139,20 @@ public class PixelCanvas {
     }
 
     /**
-     * Erase a pixel on active layer (set to transparent).
+     * Erase a pixel on the active layer (set to transparent). Shows toast feedback with cooldown.
+     * Only shows the 'layer already empty' message if not shown in the last 5 seconds.
      */
     public void erasePixel(int x, int y) {
+        Layer active = layerStack.getActiveLayer();
+        if (active == null) return;
+        long now = System.currentTimeMillis();
+        if (active.isEmpty()) {
+            if (now - lastLayerEmptyToast > TOAST_COOLDOWN_MS) {
+                MinecraftClient.getInstance().getToastManager().add(SystemToast.create(MinecraftClient.getInstance(), SystemToast.Type.PACK_LOAD_FAILURE, Text.literal("Layer is already completely empty!"), Text.empty()));
+                lastLayerEmptyToast = now;
+            }
+            return;
+        }
         setPixel(x, y, 0x00000000);
     }
 

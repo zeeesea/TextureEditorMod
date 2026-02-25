@@ -9,7 +9,7 @@ import java.util.List;
  */
 public class ColorHistory {
     private static final ColorHistory INSTANCE = new ColorHistory();
-    private static final int MAX_HISTORY = 20;
+    private static int MAX_HISTORY = 20;
 
     private final List<Integer> history = new ArrayList<>();
 
@@ -42,5 +42,9 @@ public class ColorHistory {
 
     public int size() {
         return history.size();
+    }
+
+    public static void setMaxHistory(int maxHistory) {
+        MAX_HISTORY = maxHistory;
     }
 }

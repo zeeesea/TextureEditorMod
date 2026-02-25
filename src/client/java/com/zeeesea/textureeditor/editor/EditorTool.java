@@ -22,4 +22,14 @@ public enum EditorTool {
     public String getIcon() {
         return icon;
     }
+
+    public static EditorTool getToolByName(String name) {
+        for (EditorTool tool : EditorTool.values()) {
+            if (tool.name.equals(name)) {
+                return tool;
+            }
+        }
+        //Default fallback
+        return PENCIL;
+    }
 }

@@ -24,6 +24,7 @@ public class KeybindSettingsScreen extends Screen {
             {"undo", "Undo"},
             {"redo", "Redo"},
             {"grid", "Toggle Grid"},
+            {"browse", "Browse Tool"},
     };
 
     public KeybindSettingsScreen(Screen parent) {
@@ -67,6 +68,7 @@ public class KeybindSettingsScreen extends Screen {
             settings.keybinds.put("undo", GLFW.GLFW_KEY_Z);
             settings.keybinds.put("redo", GLFW.GLFW_KEY_Y);
             settings.keybinds.put("grid", GLFW.GLFW_KEY_G);
+            settings.keybinds.put("browse", GLFW.GLFW_KEY_LEFT_CONTROL);
             settings.save();
             waitingForKey = null;
             this.clearChildren();

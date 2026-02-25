@@ -53,8 +53,14 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean lineFirstClick = false;
 
     // UI toggles
-    protected boolean showColorPicker = false;
-    protected boolean showLayerPanel = false;
+    //protected boolean showColorPicker = false;
+    //protected boolean showLayerPanel = false;
+    protected PanelType currentPanel = PanelType.NONE;
+    protected enum PanelType {
+        NONE,
+        COLOR_PANEL,
+        LAYER_PANEL
+    }
     private float pickerHue = 0f, pickerSat = 1f, pickerVal = 1f;
 
     protected static final int[] PALETTE = {
@@ -167,11 +173,15 @@ public abstract class AbstractEditorScreen extends Screen {
 
         ModSettings settings = ModSettings.getInstance();
 
+        currentTool = EditorTool.getToolByName(settings.defaultTool);
+        ColorHistory.setMaxHistory(settings.colorHistorySize);
+        showGrid = settings.gridOnByDefault;
+
         // Tool buttons with keybind hints
         int toolY = 30;
         for (EditorTool tool : EditorTool.values()) {
             final EditorTool t = tool;
-            String keyHint = getToolKeyHint(tool);
+            String keyHint = settings.showToolHints ? getToolKeyHint(tool) : "";
             String label = keyHint.isEmpty() ? tool.getDisplayName() : tool.getDisplayName() + " (" + keyHint + ")";
             addDrawableChild(ButtonWidget.builder(Text.literal(label), btn -> currentTool = t)
                     .position(5, toolY).size(100, 20).build());
@@ -180,18 +190,23 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Undo/Redo
         toolY += 10;
-        String undoHint = settings.getKeyName("undo");
-        String redoHint = settings.getKeyName("redo");
-        addDrawableChild(ButtonWidget.builder(Text.literal("Undo (" + undoHint + ")"), btn -> canvas.undo())
+        String undoHint = settings.showToolHints ? settings.getKeyName("undo") : "";
+        String redoHint = settings.showToolHints ? settings.getKeyName("redo") : "";
+        String undoText = undoHint.isEmpty() ? "Undo" : "Undo (" + undoHint + ")";
+        String redoText = redoHint.isEmpty() ? "Redo" : "Redo (" + redoHint + ")";
+
+        addDrawableChild(ButtonWidget.builder(Text.literal(undoText), btn -> canvas.undo())
                 .position(5, toolY).size(100, 20).build());
         toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Redo (" + redoHint + ")"), btn -> canvas.redo())
+        addDrawableChild(ButtonWidget.builder(Text.literal(redoText), btn -> canvas.redo())
                 .position(5, toolY).size(100, 20).build());
 
         // Grid
+        String gridHint = settings.showToolHints ? settings.getKeyName("grid") : "";
+        String gridText = gridHint.isEmpty() ? "Grid" : "Grid (" + gridHint + ")";
+
         toolY += 34;
-        String gridHint = settings.getKeyName("grid");
-        addDrawableChild(ButtonWidget.builder(Text.literal("Grid (" + gridHint + ")"), btn -> showGrid = !showGrid)
+        addDrawableChild(ButtonWidget.builder(Text.literal(gridText), btn -> showGrid = !showGrid)
                 .position(5, toolY).size(100, 20).build());
 
         // Zoom
@@ -224,20 +239,30 @@ public abstract class AbstractEditorScreen extends Screen {
                 .position(5, this.height - 54).size(100, 20).build());
 
         Screen back = getBackScreen();
-        addDrawableChild(ButtonWidget.builder(Text.literal(back != null ? "\u00a7dBrowse" : "\u00a7dMenu"), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> {
             Screen bs = getBackScreen();
             if (bs != null) MinecraftClient.getInstance().setScreen(bs);
             else MinecraftClient.getInstance().setScreen(new BrowseScreen());
         }).position(5, this.height - 30).size(100, 20).build());
 
         // Top-right close
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), btn -> this.close())
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), btn -> {
+            if (settings.autoApplyLive) this.applyLive();
+            this.close();
+        })
                 .position(this.width - 65, 5).size(60, 20).build());
 
         // Bottom-right row: Picker, Layers (and optionally 3D from subclass)
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bPicker"), btn -> showColorPicker = !showColorPicker)
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bPicker"), btn -> {
+            currentPanel = currentPanel == PanelType.COLOR_PANEL ?  PanelType.NONE : PanelType.COLOR_PANEL;
+            setColor(currentColor, false);
+            //showColorPicker = !showColorPicker;
+        })
                 .position(this.width - 65, this.height - 26).size(60, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7eLayers"), btn -> showLayerPanel = !showLayerPanel)
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7eLayers"), btn -> {
+            currentPanel = currentPanel == PanelType.LAYER_PANEL ?  PanelType.NONE : PanelType.LAYER_PANEL;
+            //showLayerPanel = !showLayerPanel;
+        })
                 .position(this.width - 130, this.height - 26).size(60, 20).build());
 
         // Hex input
@@ -289,13 +314,46 @@ public abstract class AbstractEditorScreen extends Screen {
         }
     }
 
-    protected void setColor(int c) {
+    protected void setColor(int c, boolean addToHistory) {
         currentColor = c;
-        ColorHistory.getInstance().addColor(c);
+        if (addToHistory) ColorHistory.getInstance().addColor(c);
+        if (currentPanel == PanelType.COLOR_PANEL) setColorPickerFromInt(c);
         if (hexInput != null) hexInput.setText(String.format("#%06X", c & 0xFFFFFF));
     }
 
-    // --- Rendering ---
+    /**
+     * Set the Color Picker (pickerHue, pickerSat, pickerVal) to an int-Color (ARGB).
+     * @param color ARGB-Color, e.g. 0xFF004080
+     */
+    public void setColorPickerFromInt(int color) {
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        float[] hsv = new float[3];
+        rgbToHsv(r, g, b, hsv);
+        pickerHue = hsv[0];
+        pickerSat = hsv[1];
+        pickerVal = hsv[2];
+    }
+
+    /**
+     * Convert RGB (0-255) to HSV (all 0..1)
+     */
+    private static void rgbToHsv(int r, int g, int b, float[] hsv) {
+        float rf = r / 255f, gf = g / 255f, bf = b / 255f;
+        float max = Math.max(rf, Math.max(gf, bf));
+        float min = Math.min(rf, Math.min(gf, bf));
+        float h, s, v = max;
+        float d = max - min;
+        s = max == 0 ? 0 : d / max;
+        if (d == 0) h = 0;
+        else if (max == rf) h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6f;
+        else if (max == gf) h = ((bf - rf) / d + 2) / 6f;
+        else h = ((rf - gf) / d + 4) / 6f;
+        hsv[0] = h;
+        hsv[1] = s;
+        hsv[2] = v;
+    }
 
     @Override
     public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
@@ -321,8 +379,12 @@ public abstract class AbstractEditorScreen extends Screen {
         context.fill(paletteX, paletteEndY + 12, paletteX + 30, paletteEndY + 32, currentColor);
         drawRectOutline(context, paletteX, paletteEndY + 12, paletteX + 30, paletteEndY + 32, 0xFFFFFFFF);
         drawColorHistory(context);
-        if (showColorPicker) drawColorPicker(context);
-        if (showLayerPanel) drawLayerPanel(context);
+        // Old toggles
+        //if (showColorPicker) drawColorPicker(context);
+        //if (showLayerPanel) drawLayerPanel(context);
+        // New toggles
+        if (currentPanel == PanelType.COLOR_PANEL) drawColorPicker(context);
+        if (currentPanel == PanelType.LAYER_PANEL) drawLayerPanel(context);
         if (currentTool == EditorTool.LINE && lineFirstClick)
             context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFF00, false);
 
@@ -365,7 +427,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ColorHistory hist = ColorHistory.getInstance();
         if (hist.size() == 0) return;
         int px0 = this.width - 115;
-        int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 80;
+        int sy = 30 + ((PALETTE.length + 4) / 5) * 22 + 74;
         ctx.drawText(textRenderer, "History:", px0, sy, 0x999999, false);
         sy += 12;
         int cols = 5, cs = 18;
@@ -458,8 +520,10 @@ public abstract class AbstractEditorScreen extends Screen {
     public boolean mouseClicked(double mx, double my, int btn) {
         if (super.mouseClicked(mx, my, btn)) return true;
         if (handleExtraClick(mx, my, btn)) return true;
-        if (showColorPicker && btn == 0 && handlePickerClick(mx, my)) return true;
-        if (showLayerPanel && btn == 0 && handleLayerPanelClick(mx, my)) return true;
+        //if (showColorPicker && btn == 0 && handlePickerClick(mx, my)) return true;
+        //if (showLayerPanel && btn == 0 && handleLayerPanelClick(mx, my)) return true;
+        if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
+        if (currentPanel == PanelType.LAYER_PANEL && btn == 0 && handleLayerPanelClick(mx, my)) return true;
         if (btn == 0 && handleHistoryClick(mx, my)) return true;
         if (btn == 1) {
             isPanning = true;
@@ -496,7 +560,8 @@ public abstract class AbstractEditorScreen extends Screen {
             return true;
         }
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
-        if (showColorPicker && btn == 0 && handlePickerClick(mx, my)) return true;
+        //if (showColorPicker && btn == 0 && handlePickerClick(mx, my)) return true;
+        if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
         if (isInUIRegion(mx, my)) return super.mouseDragged(mx, my, btn, dx, dy);
         if (canvas != null) {
             int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
@@ -523,12 +588,18 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("fill")) { currentTool = EditorTool.FILL; return true; }
         if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
         if (kc == s.getKeybind("line")) { currentTool = EditorTool.LINE; return true; }
+        if (kc == s.getKeybind("browse")) { MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
 
         // R key (openEditor) closes this screen too
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
-        if (openKey != null && openKey.matchesKey(kc, sc)) { applyLive(); this.close(); return true; }
+        if (openKey != null && openKey.matchesKey(kc, sc)) {
+            if (s.autoApplyLive) this.applyLive();
+            this.close(); return true;
+        }
 
-        if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) { applyLive(); this.close(); return true; }
+        if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            if (s.autoApplyLive) this.applyLive();
+            this.close(); return true; }
         return super.keyPressed(kc, sc, m);
     }
 
@@ -539,12 +610,12 @@ public abstract class AbstractEditorScreen extends Screen {
         if (mx >= cpX && mx < cpX + svW && my >= cpY && my < cpY + svH) {
             pickerSat = Math.max(0, Math.min(1, (float) (mx - cpX) / (svW - 1)));
             pickerVal = Math.max(0, Math.min(1, 1f - (float) (my - cpY) / (svH - 1)));
-            setColor(hsvToRgb(pickerHue, pickerSat, pickerVal));
+            setColor(hsvToRgb(pickerHue, pickerSat, pickerVal), false);
             return true;
         }
         if (mx >= hueX && mx < hueX + hueW && my >= cpY && my < cpY + svH) {
             pickerHue = Math.max(0, Math.min(1, (float) (my - cpY) / (svH - 1)));
-            setColor(hsvToRgb(pickerHue, pickerSat, pickerVal));
+            setColor(hsvToRgb(pickerHue, pickerSat, pickerVal), false);
             return true;
         }
         return false;
@@ -570,7 +641,8 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     private boolean handleLayerPanelClick(double mx, double my) {
-        if (!showLayerPanel || canvas == null) return false;
+        //if (!showLayerPanel || canvas == null) return false;
+        if (!(currentPanel == PanelType.LAYER_PANEL) || canvas == null) return false;
         var stack = canvas.getLayerStack();
         int panelW = 150, rowH = 20;
         int panelH = 30 + stack.getLayerCount() * rowH + 30;
@@ -588,7 +660,7 @@ public abstract class AbstractEditorScreen extends Screen {
         }
         int btnY = listY + stack.getLayerCount() * rowH + 4;
         if (my >= btnY && my < btnY + 18) {
-            if (mx >= panelX && mx < panelX + 34) { stack.addLayerAbove("Layer " + stack.getLayerCount()); canvas.invalidateCache(); return true; }
+            if (mx >= panelX && mx < panelX + 34) { stack.addLayerAbove("Layer " + (stack.getLayerCount() - 1)); canvas.invalidateCache(); return true; }
             if (mx >= panelX + 38 && mx < panelX + 76) { stack.removeLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true; }
             if (mx >= panelX + 80 && mx < panelX + 110) { int idx = stack.getActiveIndex(); if (idx < stack.getLayerCount() - 1) { stack.moveLayerDown(idx); canvas.invalidateCache(); } return true; }
             if (mx >= panelX + 114 && mx < panelX + panelW) { int idx = stack.getActiveIndex(); if (idx > 0) { stack.moveLayerUp(idx); canvas.invalidateCache(); } return true; }
@@ -601,12 +673,13 @@ public abstract class AbstractEditorScreen extends Screen {
         for (int i = 0; i < PALETTE.length; i++) {
             int c = i % cols, r = i / cols;
             int px = px0 + c * (cs + 2), py = py0 + r * (cs + 2);
-            if (mx >= px && mx < px + cs && my >= py && my < py + cs) { setColor(PALETTE[i]); return true; }
+            if (mx >= px && mx < px + cs && my >= py && my < py + cs) { setColor(PALETTE[i], false); return true; }
         }
         return false;
     }
 
     private void handleCanvasClick(int px, int py, int btn) {
+        setColor(currentColor, true);
         int storeColor = usesTint() ? removeTint(currentColor) : currentColor;
         switch (currentTool) {
             case PENCIL -> { canvas.saveSnapshot(); canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor); ColorHistory.getInstance().addColor(currentColor); }

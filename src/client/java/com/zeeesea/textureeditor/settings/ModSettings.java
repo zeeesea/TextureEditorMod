@@ -26,7 +26,7 @@ public class ModSettings {
 
     // Behavior
     public boolean showToolHints = true;
-    public boolean autoApplyLive = false;
+    public boolean autoApplyLive = true;
     public boolean confirmResetAll = true;
     public int maxUndoSteps = 50;
     public int colorHistorySize = 20;

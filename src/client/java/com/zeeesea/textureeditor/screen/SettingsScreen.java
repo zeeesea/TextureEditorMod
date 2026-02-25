@@ -29,9 +29,20 @@ public class SettingsScreen extends Screen {
         // Title
         // (rendered in render())
 
+        /*
         // Default Zoom
         addDrawableChild(ButtonWidget.builder(Text.literal("Default Zoom: " + s.defaultZoom), btn -> {
             s.defaultZoom = (s.defaultZoom % 20) + 2;
+            s.save();
+            this.clearChildren();
+            this.init();
+        }).position(centerX - 100, y).size(200, 20).build());
+        y += 28;
+        */
+
+        // Auto Apply live
+        addDrawableChild(ButtonWidget.builder(Text.literal("Auto Apply Live: " + (s.autoApplyLive ? "ON" : "OFF")), btn -> {
+            s.autoApplyLive = !s.autoApplyLive;
             s.save();
             this.clearChildren();
             this.init();
@@ -74,10 +85,10 @@ public class SettingsScreen extends Screen {
         // Color History Size
         addDrawableChild(ButtonWidget.builder(Text.literal("Color History Size: " + s.colorHistorySize), btn -> {
             s.colorHistorySize = switch (s.colorHistorySize) {
-                case 10 -> 20;
-                case 20 -> 30;
-                case 30 -> 50;
-                default -> 10;
+                case 5 -> 10;
+                case 10 -> 15;
+                case 15 -> 20;
+                default -> 5;
             };
             s.save();
             this.clearChildren();
@@ -88,11 +99,11 @@ public class SettingsScreen extends Screen {
         // Default Tool
         addDrawableChild(ButtonWidget.builder(Text.literal("Default Tool: " + s.defaultTool), btn -> {
             s.defaultTool = switch (s.defaultTool) {
-                case "PENCIL" -> "ERASER";
-                case "ERASER" -> "FILL";
-                case "FILL" -> "EYEDROPPER";
-                case "EYEDROPPER" -> "LINE";
-                default -> "PENCIL";
+                case "Pencil" -> "Eraser";
+                case "Eraser" -> "Fill";
+                case "Fill" -> "Eyedropper";
+                case "Eyedropper" -> "Line";
+                default -> "Pencil";
             };
             s.save();
             this.clearChildren();

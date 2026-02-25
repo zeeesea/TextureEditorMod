@@ -10,7 +10,7 @@ public class LayerStack {
     private final int width;
     private final int height;
     private final List<Layer> layers = new ArrayList<>();
-    private int activeIndex = 0;
+    private int activeIndex = 1;
 
     public LayerStack(int width, int height) {
         this.width = width;
@@ -24,6 +24,7 @@ public class LayerStack {
         this.width = width;
         this.height = height;
         layers.add(new Layer(width, height, "Base", basePixels));
+        layers.add(new Layer(width, height, "Layer 0"));
     }
 
     public int getWidth() { return width; }
