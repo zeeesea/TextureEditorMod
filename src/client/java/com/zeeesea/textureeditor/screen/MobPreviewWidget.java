@@ -20,6 +20,9 @@ public class MobPreviewWidget {
     private double dragStartX, dragStartY;
     private float dragStartYaw, dragStartPitch;
     private final Entity entity;
+    private float scale = 1.0f;
+    private static final float MIN_SCALE = 0.5f;
+    private static final float MAX_SCALE = 2.5f;
 
     public MobPreviewWidget(Entity entity) {
         this.entity = entity;
@@ -31,7 +34,7 @@ public class MobPreviewWidget {
 
     public void setPosition(int x, int y, int width, int height) {
         this.x = x;
-        this.y = y;
+        this.y = y + 30; // weiter unten (default y + 30)
         this.width = width;
         this.height = height;
     }
@@ -55,13 +58,11 @@ public class MobPreviewWidget {
         if (entity instanceof LivingEntity livingEntity) {
             int centerX = x + width / 2;
             int centerY = y + height - 10;
-
-            // Calculate entity scale based on bounding box
             float entityHeight = livingEntity.getHeight();
             float entityWidth = livingEntity.getWidth();
             float maxDim = Math.max(entityHeight, entityWidth);
-            int entitySize = (int) (Math.min(width, height) * 0.35f / maxDim);
-            entitySize = Math.max(10, Math.min(entitySize, 80));
+            int entitySize = (int) (Math.min(width, height) * 0.35f * scale / maxDim);
+            entitySize = Math.max(10, Math.min(entitySize, (int)(80 * scale)));
 
             // Use Minecraft's built-in entity rendering
             // Create rotation quaternions from our yaw/pitch
@@ -92,7 +93,6 @@ public class MobPreviewWidget {
         }
 
         // Instructions
-        context.drawText(client.textRenderer, "\u00a77Drag to rotate", x + 2, y + height - 8, 0x888888, false);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -127,7 +127,13 @@ public class MobPreviewWidget {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double ha, double va) {
-        // No zoom/scroll logic implemented yet
+        if (!visible) return false;
+        // Nur zoomen, wenn Maus im Preview-Bereich
+        if (mouseX >= x - 2 && mouseX <= x + width + 2 && mouseY >= y - 16 && mouseY <= y + height + 2) {
+            if (va > 0) scale = Math.min(MAX_SCALE, scale + 0.1f);
+            else if (va < 0) scale = Math.max(MIN_SCALE, scale - 0.1f);
+            return true;
+        }
         return false;
     }
 }

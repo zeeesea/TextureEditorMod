@@ -208,6 +208,7 @@ public abstract class AbstractEditorScreen extends Screen {
         toolY = addExtraButtons(toolY);
 
         // Reset buttons (bottom-right)
+        // Reset buttons (bottom-right)
         int resetX = this.width - 115;
         int resetBaseY = this.height - 100;
         addDrawableChild(ButtonWidget.builder(Text.literal(getResetCurrentLabel()), btn -> resetCurrent())
@@ -235,7 +236,7 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Bottom-right row: Picker, Layers (and optionally 3D from subclass)
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bPicker"), btn -> showColorPicker = !showColorPicker)
-                .position(this.width - 195, this.height - 26).size(60, 20).build());
+                .position(this.width - 65, this.height - 26).size(60, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7eLayers"), btn -> showLayerPanel = !showLayerPanel)
                 .position(this.width - 130, this.height - 26).size(60, 20).build());
 
@@ -525,9 +526,9 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // R key (openEditor) closes this screen too
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
-        if (openKey != null && openKey.matchesKey(kc, sc)) { this.close(); return true; }
+        if (openKey != null && openKey.matchesKey(kc, sc)) { applyLive(); this.close(); return true; }
 
-        if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
+        if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) { applyLive(); this.close(); return true; }
         return super.keyPressed(kc, sc, m);
     }
 

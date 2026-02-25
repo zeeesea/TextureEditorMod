@@ -69,7 +69,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
         mobPreview = new MobPreviewWidget(entity);
         mobPreview.setPosition(115, 30, 140, 160);
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7d3D"), btn -> mobPreview.toggleVisible())
-                .position(this.width - 65, this.height - 26).size(60, 20).build());
+                .position(this.width - 195, this.height - 26).size(60, 20).build());
         return toolY;
     }
 

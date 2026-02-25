@@ -105,8 +105,8 @@ public class BrowseScreen extends Screen {
                 .position(this.width - 130, 5).size(60, 20).build());
 
         // Settings button
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u2699"), btn -> client.setScreen(new SettingsScreen(this)))
-                .position(this.width - 195, 5).size(20, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Settings"), btn -> client.setScreen(new SettingsScreen(this)))
+                .position(this.width - 195, 5).size(60, 20).build());
 
         // Calculate grid layout
         columns = Math.max(1, (this.width - GRID_SIDE_MARGIN * 2) / (CELL_SIZE + CELL_PADDING));
@@ -420,12 +420,12 @@ public class BrowseScreen extends Screen {
             if (entry.stack != null && client.world != null) {
                 net.minecraft.entity.Entity entity = com.zeeesea.textureeditor.util.EntityMapper.getEntityFromItem(entry.stack, client.world);
                 if (entity != null) {
-                    client.setScreen(new MobEditorScreenWithBack(entity, entry.stack, this));
+                    client.setScreen(new MobEditorScreen(entity, this));
                 }
             }
         } else if (entry.type == EntryType.ITEM) {
             if (entry.stack != null) {
-                client.setScreen(new ItemEditorScreenWithBack(entry.stack, this));
+                client.setScreen(new ItemEditorScreen(entry.stack, this));
             }
         } else if (entry.type == EntryType.GUI) {
             client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
