@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  */
 public class BrowseScreen extends Screen {
 
-    private enum Tab { ALL, BLOCKS, ITEMS, MOBS, GUI }
+    private enum Tab { ALL, BLOCKS, ITEMS, MOBS, GUI, SKY }
 
     private Tab currentTab = Tab.ALL;
     private TextFieldWidget searchField;
@@ -49,7 +49,7 @@ public class BrowseScreen extends Screen {
     private int maxScroll = 0;
 
     // Tab buttons
-    private ButtonWidget tabAll, tabBlocks, tabItems, tabMobs, tabGui;
+    private ButtonWidget tabAll, tabBlocks, tabItems, tabMobs, tabGui, tabSky;
 
     public BrowseScreen() {
         super(Text.literal("Texture Browser"));
@@ -80,6 +80,10 @@ public class BrowseScreen extends Screen {
         tabX += tabW + 4;
         tabGui = addDrawableChild(ButtonWidget.builder(Text.literal("GUI"), btn -> switchTab(Tab.GUI))
                 .position(tabX, tabY).size(tabW, 20).build());
+        tabX += tabW + 4;
+        tabSky = addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> {
+            client.setScreen(new SkyEditorScreen(this));
+        }).position(tabX, tabY).size(tabW, 20).build());
 
         // Search field
         searchField = new TextFieldWidget(this.textRenderer, this.width / 2 - 80, 32, 160, 18, Text.literal("Search"));
@@ -99,6 +103,10 @@ public class BrowseScreen extends Screen {
         // Export button
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export"), btn -> client.setScreen(new ExportScreen(this)))
                 .position(this.width - 130, 5).size(60, 20).build());
+
+        // Settings button
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u2699"), btn -> client.setScreen(new SettingsScreen(this)))
+                .position(this.width - 195, 5).size(20, 20).build());
 
         // Calculate grid layout
         columns = Math.max(1, (this.width - GRID_SIDE_MARGIN * 2) / (CELL_SIZE + CELL_PADDING));
@@ -248,6 +256,7 @@ public class BrowseScreen extends Screen {
             case ITEMS -> tabItems;
             case MOBS -> tabMobs;
             case GUI -> tabGui;
+            case SKY -> tabSky;
         };
         context.fill(activeTab.getX(), activeTab.getY() + 20, activeTab.getX() + activeTab.getWidth(), activeTab.getY() + 22, 0xFFFFFF00);
 
