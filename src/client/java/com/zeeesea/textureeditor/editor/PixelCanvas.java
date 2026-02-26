@@ -1,5 +1,6 @@
 package com.zeeesea.textureeditor.editor;
 
+import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.toast.SystemToast;
@@ -61,7 +62,7 @@ public class PixelCanvas {
     public int getPixel(int x, int y) {
         if (x < 0 || x >= width || y < 0 || y >= height) return 0;
         if (!cacheValid) {
-            flattenedCache = layerStack.flatten();
+            flattenedCache = layerStack.getCompositeLayer().getPixels();
             cacheValid = true;
         }
         return flattenedCache[x][y];
@@ -145,12 +146,8 @@ public class PixelCanvas {
     public void erasePixel(int x, int y) {
         Layer active = layerStack.getActiveLayer();
         if (active == null) return;
-        long now = System.currentTimeMillis();
         if (active.isEmpty()) {
-            if (now - lastLayerEmptyToast > TOAST_COOLDOWN_MS) {
-                MinecraftClient.getInstance().getToastManager().add(SystemToast.create(MinecraftClient.getInstance(), SystemToast.Type.PACK_LOAD_FAILURE, Text.literal("Layer is already completely empty!"), Text.empty()));
-                lastLayerEmptyToast = now;
-            }
+            NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE, "Layer is already completely empty!");
             return;
         }
         setPixel(x, y, 0x00000000);
@@ -211,10 +208,17 @@ public class PixelCanvas {
     /**
      * Pick color at position from the active layer (eyedropper).
      */
-    public int pickColor(int x, int y) {
+    public int pickColorOnActiveLayer(int x, int y) {
         Layer active = layerStack.getActiveLayer();
         if (active == null) return getPixel(x, y); // fallback to composited
         return active.getPixel(x, y);
+    }
+
+    /**
+     * Pick color at position from composited Texture (color on top layer) (eyedropper).
+     */
+    public int pickColorComposited(int x, int y) {
+        return getPixel(x, y);
     }
 
     /**

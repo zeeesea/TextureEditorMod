@@ -113,6 +113,32 @@ public class LayerStack {
     }
 
     /**
+     * Returns a Layer representing the visible composite of all layers.
+     * For each pixel, takes the topmost visible non-transparent pixel.
+     */
+    public Layer getCompositeLayer() {
+        int[][] composite = new int[width][height];
+        // Initialize as fully transparent
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                composite[x][y] = 0x00000000;
+        // Go from bottom to top
+        for (int i = 0; i < layers.size(); i++) {
+            Layer layer = layers.get(i);
+            if (!layer.isVisible()) continue;
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    int color = layer.getPixel(x, y);
+                    if ((color & 0xFF000000) != 0) {
+                        composite[x][y] = color;
+                    }
+                }
+            }
+        }
+        return new Layer(width, height, "Composite", composite);
+    }
+
+    /**
      * Alpha-blend src over dst (both ARGB).
      */
     private static int alphaBlend(int src, int dst) {

@@ -3,6 +3,7 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.editor.ColorHistory;
 import com.zeeesea.textureeditor.editor.EditorTool;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
+import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.minecraft.client.MinecraftClient;
@@ -10,6 +11,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.toast.SystemToast;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
@@ -679,20 +681,24 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     private void handleCanvasClick(int px, int py, int btn) {
-        setColor(currentColor, true);
         int storeColor = usesTint() ? removeTint(currentColor) : currentColor;
         switch (currentTool) {
-            case PENCIL -> { canvas.saveSnapshot(); canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor); ColorHistory.getInstance().addColor(currentColor); }
+            case PENCIL -> { canvas.saveSnapshot(); canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor); setColor(currentColor, true);; }
             case ERASER -> { canvas.saveSnapshot(); canvas.erasePixel(px, py); }
-            case FILL -> { canvas.saveSnapshot(); canvas.floodFill(px, py, storeColor); ColorHistory.getInstance().addColor(currentColor); }
+            case FILL -> { canvas.saveSnapshot(); canvas.floodFill(px, py, storeColor); setColor(currentColor, true); }
             case EYEDROPPER -> {
-                int raw = canvas.pickColor(px, py);
+                int raw = canvas.pickColorComposited(px, py);
+                if (raw == 0x00000000) {
+                    NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE, "Layer is completely empty!");
+                    return;
+                }
                 currentColor = usesTint() ? applyTint(raw) : raw;
+                setColor(currentColor, false);
                 if (hexInput != null) hexInput.setText(String.format("#%08X", currentColor));
             }
             case LINE -> {
                 if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; }
-                else { canvas.saveSnapshot(); canvas.drawLine(lineStartX, lineStartY, px, py, storeColor); lineFirstClick = false; ColorHistory.getInstance().addColor(currentColor); }
+                else { canvas.saveSnapshot(); canvas.drawLine(lineStartX, lineStartY, px, py, storeColor); lineFirstClick = false; setColor(currentColor, true); }
             }
         }
     }
