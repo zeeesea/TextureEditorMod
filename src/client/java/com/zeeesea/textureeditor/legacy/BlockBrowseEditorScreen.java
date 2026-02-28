@@ -1,6 +1,7 @@
-package com.zeeesea.textureeditor.screen;
+package com.zeeesea.textureeditor.legacy;
 
 import com.zeeesea.textureeditor.editor.PixelCanvas;
+import com.zeeesea.textureeditor.screen.AbstractEditorScreen;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.minecraft.block.Block;
@@ -12,9 +13,11 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
 
+
 /**
- * Block texture editor opened from BrowseScreen. Supports face switching.
+ * LEGACY: Use EditorScreen instead. This class is no longer maintained.
  */
+@Deprecated
 public class BlockBrowseEditorScreen extends AbstractEditorScreen {
 
     private final Block block;

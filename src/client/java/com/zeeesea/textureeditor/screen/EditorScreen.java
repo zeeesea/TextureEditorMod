@@ -3,8 +3,10 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -17,19 +19,40 @@ import net.minecraft.util.math.Direction;
  */
 public class EditorScreen extends AbstractEditorScreen {
 
+    private final Block block;
+    private final BlockState blockState;
     private final BlockPos blockPos;
     private Direction face;
-    private final BlockState blockState;
+    private final Screen parent;
 
+    // World block constructor
     public EditorScreen(BlockHitResult hitResult) {
         super(Text.literal("Texture Editor"));
         this.blockPos = hitResult.getBlockPos();
         this.face = hitResult.getSide();
         MinecraftClient client = MinecraftClient.getInstance();
         this.blockState = client.world != null ? client.world.getBlockState(blockPos) : null;
+        this.block = blockState != null ? blockState.getBlock() : null;
+        this.parent = null;
+        setTint();
+    }
 
+    // Browse block constructor
+    public EditorScreen(Block block, Screen parent) {
+        super(Text.literal("Block Texture Editor"));
+        this.block = block;
+        this.blockState = block.getDefaultState();
+        this.face = Direction.UP;
+        this.blockPos = null;
+        this.parent = parent;
+        setTint();
+    }
+
+    private void setTint() {
+        MinecraftClient client = MinecraftClient.getInstance();
         if (blockState != null && client.world != null) {
-            int color = client.getBlockColors().getColor(blockState, client.world, blockPos, 0);
+            int color = client.getBlockColors().getColor(blockState, client.world,
+                    blockPos != null ? blockPos : client.player != null ? client.player.getBlockPos() : null, 0);
             if (color != -1) {
                 blockTint = color | 0xFF000000;
                 isTinted = true;
@@ -59,26 +82,34 @@ public class EditorScreen extends AbstractEditorScreen {
 
     @Override
     protected String getEditorTitle() {
-        String blockName = blockState != null ? blockState.getBlock().getName().getString() : "Unknown";
+        String name = block != null ? block.getName().getString() : (blockState != null ? blockState.getBlock().getName().getString() : "Unknown");
         String tintLabel = isTinted ? " \u00a7a[Tinted]" : "";
-        return "Block Editor - " + blockName + " (" + face.getName() + ")" + tintLabel;
+        return "Block Editor - " + name + " (" + face.getName() + ")" + tintLabel;
     }
 
     @Override
     protected String getResetCurrentLabel() { return "Reset Face"; }
 
     @Override
-    protected int addExtraButtons(int toolY) {
-        addDrawableChild(ButtonWidget.builder(Text.literal("Top"), btn -> switchFace(Direction.UP)).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Bottom"), btn -> switchFace(Direction.DOWN)).position(57, toolY).size(48, 20).build());
-        toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("North"), btn -> switchFace(Direction.NORTH)).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("South"), btn -> switchFace(Direction.SOUTH)).position(57, toolY).size(48, 20).build());
-        toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("East"), btn -> switchFace(Direction.EAST)).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("West"), btn -> switchFace(Direction.WEST)).position(57, toolY).size(48, 20).build());
-        toolY += 24;
+    protected Screen getBackScreen() { return parent; }
 
+    @Override
+    protected int addExtraButtons(int toolY) {
+        // Face cycle button — only at scale <= 4
+        if (showFaceButton()) {
+            addDrawableChild(ButtonWidget.builder(
+                    Text.literal("Face: " + face.getName().toUpperCase()),
+                    btn -> {
+                        Direction[] dirs = Direction.values();
+                        face = dirs[(face.ordinal() + 1) % dirs.length];
+                        btn.setMessage(Text.literal("Face: " + face.getName().toUpperCase()));
+                        switchFace(face);
+                    }
+            ).position(5, toolY).size(100, 20).build());
+            toolY += 24;
+        }
+
+        // Reset Block button — always shown
         addDrawableChild(ButtonWidget.builder(Text.literal("Reset Block"), btn -> resetBlock())
                 .position(this.width - 115, this.height - 124).size(110, 20).build());
 
@@ -105,7 +136,7 @@ public class EditorScreen extends AbstractEditorScreen {
     protected void resetCurrent() {
         if (originalPixels == null || spriteId == null) return;
         canvas.saveSnapshot();
-        canvas.setLayerStack(new LayerStack(canvas.getWidth(),canvas.getHeight(), originalPixels));
+        canvas.setLayerStack(new LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels));
         canvas.invalidateCache();
         applyLive();
     }

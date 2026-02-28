@@ -64,26 +64,50 @@ public class BrowseScreen extends Screen {
 
         // Tab buttons
         int tabY = 5;
-        int tabW = 50;
-        int tabX = 10;
-        tabAll = addDrawableChild(ButtonWidget.builder(Text.literal("All"), btn -> switchTab(Tab.ALL))
-                .position(tabX, tabY).size(tabW, 20).build());
-        tabX += tabW + 4;
-        tabBlocks = addDrawableChild(ButtonWidget.builder(Text.literal("Blocks"), btn -> switchTab(Tab.BLOCKS))
-                .position(tabX, tabY).size(tabW, 20).build());
-        tabX += tabW + 4;
-        tabItems = addDrawableChild(ButtonWidget.builder(Text.literal("Items"), btn -> switchTab(Tab.ITEMS))
-                .position(tabX, tabY).size(tabW, 20).build());
-        tabX += tabW + 4;
-        tabMobs = addDrawableChild(ButtonWidget.builder(Text.literal("Mobs"), btn -> switchTab(Tab.MOBS))
-                .position(tabX, tabY).size(tabW, 20).build());
-        tabX += tabW + 4;
-        tabGui = addDrawableChild(ButtonWidget.builder(Text.literal("GUI"), btn -> switchTab(Tab.GUI))
-                .position(tabX, tabY).size(tabW, 20).build());
-        tabX += tabW + 4;
-        tabSky = addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> {
-            client.setScreen(new SkyEditorScreen(this));
-        }).position(tabX, tabY).size(tabW, 20).build());
+        int guiScale = (int) net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaleFactor();
+
+        if (guiScale >= 5) {
+            // Alle Tabs als ein Cycle-Button
+            addDrawableChild(ButtonWidget.builder(
+                    Text.literal("Tab: " + currentTab.name()),
+                    btn -> {
+                        Tab[] tabs = Tab.values();
+                        // SKY überspringen (öffnet extra screen)
+                        Tab next = tabs[(currentTab.ordinal() + 1) % (tabs.length - 1)];
+                        switchTab(next);
+                        btn.setMessage(Text.literal("Tab: " + next.name()));
+                    }
+            ).position(10, tabY).size(80, 20).build());
+
+            // Sky Button separat
+            addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
+                    .position(94, tabY).size(40, 20).build());
+
+            // Referenzen für den Tab-Underline-Indikator setzen (brauchen wir für render())
+            tabAll = tabBlocks = tabItems = tabMobs = tabGui = null;
+            tabSky = null;
+        } else {
+            // Normal: alle 6 Buttons
+            int tabX = 10;
+            int tabW = 50;
+            tabAll = addDrawableChild(ButtonWidget.builder(Text.literal("All"), btn -> switchTab(Tab.ALL))
+                    .position(tabX, tabY).size(tabW, 20).build());
+            tabX += tabW + 4;
+            tabBlocks = addDrawableChild(ButtonWidget.builder(Text.literal("Blocks"), btn -> switchTab(Tab.BLOCKS))
+                    .position(tabX, tabY).size(tabW, 20).build());
+            tabX += tabW + 4;
+            tabItems = addDrawableChild(ButtonWidget.builder(Text.literal("Items"), btn -> switchTab(Tab.ITEMS))
+                    .position(tabX, tabY).size(tabW, 20).build());
+            tabX += tabW + 4;
+            tabMobs = addDrawableChild(ButtonWidget.builder(Text.literal("Mobs"), btn -> switchTab(Tab.MOBS))
+                    .position(tabX, tabY).size(tabW, 20).build());
+            tabX += tabW + 4;
+            tabGui = addDrawableChild(ButtonWidget.builder(Text.literal("GUI"), btn -> switchTab(Tab.GUI))
+                    .position(tabX, tabY).size(tabW, 20).build());
+            tabX += tabW + 4;
+            tabSky = addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
+                    .position(tabX, tabY).size(tabW, 20).build());
+        }
 
         // Search field
         searchField = new TextFieldWidget(this.textRenderer, this.width / 2 - 80, 32, 160, 18, Text.literal("Search"));
@@ -343,21 +367,25 @@ public class BrowseScreen extends Screen {
         context.fill(0, 0, this.width, 28, 0xFF16213E);
 
         // Tab underline indicator
-        ButtonWidget activeTab = switch (currentTab) {
-            case ALL -> tabAll;
-            case BLOCKS -> tabBlocks;
-            case ITEMS -> tabItems;
-            case MOBS -> tabMobs;
-            case GUI -> tabGui;
-            case SKY -> tabSky;
-        };
-        context.fill(activeTab.getX(), activeTab.getY() + 20, activeTab.getX() + activeTab.getWidth(), activeTab.getY() + 22, 0xFFFFFF00);
+        if (tabAll != null) {
+            ButtonWidget activeTab = switch (currentTab) {
+                case ALL -> tabAll;
+                case BLOCKS -> tabBlocks;
+                case ITEMS -> tabItems;
+                case MOBS -> tabMobs;
+                case GUI -> tabGui;
+                case SKY -> tabSky;
+            };
+            if (activeTab != null)
+                context.fill(activeTab.getX(), activeTab.getY() + 20, activeTab.getX() + activeTab.getWidth(), activeTab.getY() + 22, 0xFFFFFF00);
+        }
 
         // Render widgets
         super.render(context, mouseX, mouseY, delta);
 
         // Title info
-        context.drawText(textRenderer, filteredEntries.size() + " entries", this.width - 200, 36, 0x999999, false);
+        String entriesText = filteredEntries.size() + " entries";
+        context.drawText(textRenderer, entriesText, this.width - textRenderer.getWidth(entriesText) - 5, 36, 0x999999, false);
 
         // Render grid
         renderGrid(context, mouseX, mouseY);
@@ -507,7 +535,7 @@ public class BrowseScreen extends Screen {
     private void openEditor(BrowseEntry entry) {
         if (entry.type == EntryType.BLOCK) {
             Block block = Registries.BLOCK.get(entry.id);
-            client.setScreen(new BlockBrowseEditorScreen(block, this));
+            client.setScreen(new EditorScreen(block, this));
         } else if (entry.type == EntryType.MOB) {
             if (entry.stack == null) {
                 // No entity (e.g sheep fur)

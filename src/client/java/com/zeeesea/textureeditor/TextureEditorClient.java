@@ -95,7 +95,7 @@ public class TextureEditorClient implements ClientModInitializer {
                         // Priority 2: Holding a block item -> block editor
                         if (!heldItem.isEmpty() && heldItem.getItem() instanceof BlockItem blockItem) {
                             if (BlockFilter.isEditableBlock(blockItem.getBlock().getDefaultState())) {
-                                client.execute(() -> client.setScreen(new com.zeeesea.textureeditor.screen.BlockBrowseEditorScreen(blockItem.getBlock(), null)));
+                                client.execute(() -> client.setScreen(new EditorScreen(blockItem.getBlock(), null)));
                                 continue;
                             }
                         }

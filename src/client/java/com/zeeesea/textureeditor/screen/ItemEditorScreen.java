@@ -55,14 +55,14 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected int addExtraButtons(int toolY) {
-        // "Edit Mob/Entity" button if applicable
+        // "Edit Mob/Entity" button — same position as "Reset Block" in EditorScreen
         if (EntityMapper.hasEntityMode(itemStack)) {
             addDrawableChild(ButtonWidget.builder(Text.literal("Edit Mob/Entity"), btn -> {
                 var entity = EntityMapper.getEntityFromItem(itemStack, MinecraftClient.getInstance().world);
                 if (entity != null) {
                     MinecraftClient.getInstance().setScreen(new MobEditorScreen(entity, parent));
                 }
-            }).position(this.width - 120, 55).size(110, 20).build());
+            }).position(this.width - 115, this.height - 124).size(110, 20).build());
         }
         return toolY;
     }

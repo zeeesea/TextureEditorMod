@@ -81,6 +81,8 @@ public class SkyEditorScreen extends AbstractEditorScreen {
             canvas = new PixelCanvas(currentSkyTexture.defaultWidth, currentSkyTexture.defaultHeight);
             originalPixels = new int[currentSkyTexture.defaultWidth][currentSkyTexture.defaultHeight];
         }
+        // Repositioning editor title
+        editorTitleXPos = 5;
     }
 
     @Override
