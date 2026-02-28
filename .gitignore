@@ -25,7 +25,7 @@ bin/
 
 # Gradle Wrapper
 gradle/
-gradle.properties
+# gradle.properties INCLUDE IN COMMITS, CONTAINS VERSION DATA
 gradle-wrapper.jar
 gradle-wrapper.properties
 
