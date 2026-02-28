@@ -63,8 +63,8 @@ The **Texture Editor Mod** allows you to edit blocks, items, entities, and GUI e
 - **Left Click**: Draw / Use Tool.
 - **Right Click + Drag**: Pan the canvas.
 - **Scroll Wheel**: Zoom in/out.
-- **`Ctrl + Z`**: Undo.
-- **`Ctrl + Y`**: Redo.
+- **`Z`**: Undo.
+- **`Y`**: Redo.
 - **`G`**: Toggle Grid.
 
 ### Applying Changes
@@ -97,8 +97,11 @@ This mod works seamlessly with other resource packs.
 
 ## 📥 Installation
 
-On Modrinth
+On Modrinth or Curseforge
 
+https://modrinth.com/mod/livetextureeditor
+
+https://www.curseforge.com/minecraft/mc-mods/live-texture-editor
 ---
 
 Made by zeee
