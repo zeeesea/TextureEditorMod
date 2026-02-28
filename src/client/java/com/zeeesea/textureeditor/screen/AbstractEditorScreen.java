@@ -30,6 +30,8 @@ public abstract class AbstractEditorScreen extends Screen {
     protected PixelCanvas canvas;
     protected int[][] originalPixels;
 
+    private int testfabric1214 = 1;
+
     // Tint support (used by block editors)
     protected int blockTint = -1;
     protected boolean isTinted = false;
