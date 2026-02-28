@@ -18,7 +18,7 @@ import java.util.Queue;
 public class PixelCanvas {
     private final int width;
     private final int height;
-    private final LayerStack layerStack;
+    private LayerStack layerStack;
     private final Deque<LayerSnapshot> undoStack = new ArrayDeque<>();
     private final Deque<LayerSnapshot> redoStack = new ArrayDeque<>();
     private static int MAX_UNDO = 50;
@@ -55,6 +55,9 @@ public class PixelCanvas {
     public boolean isDirty() { return dirty; }
     public void setDirty(boolean dirty) { this.dirty = dirty; }
     public LayerStack getLayerStack() { return layerStack; }
+    public void setLayerStack(LayerStack layerStack) {
+        this.layerStack = layerStack;
+    }
 
     /**
      * Get the composited pixel at (x, y) - flattening all visible layers.

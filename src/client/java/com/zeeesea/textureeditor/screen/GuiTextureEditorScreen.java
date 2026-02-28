@@ -34,7 +34,11 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void loadTexture() {
-        fullTextureId = Identifier.of(guiTextureId.getNamespace(), "textures/" + guiTextureId.getPath() + ".png");
+        if (guiTextureId.getPath().startsWith("textures/")) {
+            fullTextureId = guiTextureId;
+        } else {
+            fullTextureId = Identifier.of(guiTextureId.getNamespace(), "textures/" + guiTextureId.getPath() + ".png");
+        }
         isSpriteTexture = guiTextureId.getPath().startsWith("gui/sprites/");
         if (isSpriteTexture) {
             spriteAtlasId = Identifier.of(guiTextureId.getNamespace(),

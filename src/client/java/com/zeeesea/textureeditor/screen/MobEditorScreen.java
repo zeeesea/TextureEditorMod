@@ -1,5 +1,6 @@
 package com.zeeesea.textureeditor.screen;
 
+import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.MobTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
@@ -20,6 +21,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
     private final String entityName;
     private final Screen parent;
     private MobPreviewWidget mobPreview;
+    private boolean mobPreviewActive = false;
 
     public MobEditorScreen(Entity entity, Screen parent) {
         super(Text.literal("Mob Texture Editor"));
@@ -68,7 +70,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
         // 3D Preview toggle
         mobPreview = new MobPreviewWidget(entity);
         mobPreview.setPosition(115, 30, 140, 160);
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7d3D"), btn -> mobPreview.toggleVisible())
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7d3D"), btn -> {mobPreview.toggleVisible(); mobPreviewActive = mobPreview.isVisible(); })
                 .position(this.width - 195, this.height - 26).size(60, 20).build());
         return toolY;
     }
@@ -99,6 +101,19 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
+    protected void handleCanvasClick(int px, int py, int btn) {
+        super.handleCanvasClick(px,py,btn);
+        if (mobPreviewActive) applyLive();
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
+        boolean b = super.mouseDragged(mx, my, btn, dx, dy);
+        if (mobPreviewActive) applyLive();
+        return b;
+    }
+
+    @Override
     protected void applyLive() {
         if (textureId == null || canvas == null) return;
         MinecraftClient client = MinecraftClient.getInstance();
@@ -116,12 +131,10 @@ public class MobEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null) return;
+        if (originalPixels == null || textureId == null) return;
         canvas.saveSnapshot();
-        for (int x = 0; x < canvas.getWidth(); x++)
-            for (int y = 0; y < canvas.getHeight(); y++)
-                canvas.setPixel(x, y, originalPixels[x][y]);
-        if (textureId != null) TextureManager.getInstance().removeTexture(textureId);
+        canvas.setLayerStack(new LayerStack(canvas.getWidth(),canvas.getHeight(), originalPixels));
+        canvas.invalidateCache();
         applyLive();
     }
 }

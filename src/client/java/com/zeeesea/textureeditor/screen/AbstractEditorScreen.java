@@ -680,7 +680,7 @@ public abstract class AbstractEditorScreen extends Screen {
         return false;
     }
 
-    private void handleCanvasClick(int px, int py, int btn) {
+    protected void handleCanvasClick(int px, int py, int btn) {
         int storeColor = usesTint() ? removeTint(currentColor) : currentColor;
         switch (currentTool) {
             case PENCIL -> { canvas.saveSnapshot(); canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor); setColor(currentColor, true);; }

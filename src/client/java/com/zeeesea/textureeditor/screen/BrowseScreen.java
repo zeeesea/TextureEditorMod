@@ -177,6 +177,7 @@ public class BrowseScreen extends Screen {
 
         // Add GUI texture entries
         entries.addAll(buildGuiEntries());
+        entries.addAll(buildNotNormalEntries());
 
         return entries;
     }
@@ -187,51 +188,143 @@ public class BrowseScreen extends Screen {
     private List<BrowseEntry> buildGuiEntries() {
         List<BrowseEntry> entries = new ArrayList<>();
         // HUD elements
-        addGuiEntry(entries, "gui/sprites/hud/hotbar", "Hotbar");
-        addGuiEntry(entries, "gui/sprites/hud/hotbar_selection", "Hotbar Selection");
-        addGuiEntry(entries, "gui/sprites/hud/crosshair", "Crosshair");
-        addGuiEntry(entries, "gui/sprites/hud/experience_bar_background", "XP Bar Background");
-        addGuiEntry(entries, "gui/sprites/hud/experience_bar_progress", "XP Bar Progress");
-        addGuiEntry(entries, "gui/sprites/hud/armor_empty", "Armor Empty");
-        addGuiEntry(entries, "gui/sprites/hud/armor_half", "Armor Half");
-        addGuiEntry(entries, "gui/sprites/hud/armor_full", "Armor Full");
-        addGuiEntry(entries, "gui/sprites/hud/heart/full", "Heart Full");
-        addGuiEntry(entries, "gui/sprites/hud/heart/half", "Heart Half");
-        addGuiEntry(entries, "gui/sprites/hud/heart/container", "Heart Container");
-        addGuiEntry(entries, "gui/sprites/hud/food_empty", "Food Empty");
-        addGuiEntry(entries, "gui/sprites/hud/food_half", "Food Half");
-        addGuiEntry(entries, "gui/sprites/hud/food_full", "Food Full");
-        addGuiEntry(entries, "gui/sprites/hud/air", "Air Bubble");
-        addGuiEntry(entries, "gui/sprites/hud/air_bursting", "Air Bubble Bursting");
+        addGUIEntry(entries, "gui/sprites/hud/hotbar", "Hotbar");
+        addGUIEntry(entries, "gui/sprites/hud/hotbar_selection", "Hotbar Selection");
+        addGUIEntry(entries, "gui/sprites/hud/crosshair", "Crosshair");
+        addGUIEntry(entries, "gui/sprites/hud/experience_bar_background", "XP Bar Background");
+        addGUIEntry(entries, "gui/sprites/hud/experience_bar_progress", "XP Bar Progress");
+        addGUIEntry(entries, "gui/sprites/hud/armor_empty", "Armor Empty");
+        addGUIEntry(entries, "gui/sprites/hud/armor_half", "Armor Half");
+        addGUIEntry(entries, "gui/sprites/hud/armor_full", "Armor Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/full", "Heart Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/half", "Heart Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/container", "Heart Container");
+        addGUIEntry(entries, "gui/sprites/hud/food_empty", "Food Empty");
+        addGUIEntry(entries, "gui/sprites/hud/food_half", "Food Half");
+        addGUIEntry(entries, "gui/sprites/hud/food_full", "Food Full");
+        addGUIEntry(entries, "gui/sprites/hud/air", "Air Bubble");
+        addGUIEntry(entries, "gui/sprites/hud/air_bursting", "Air Bubble Bursting");
         // Container screens
-        addGuiEntry(entries, "gui/container/inventory", "Inventory");
-        addGuiEntry(entries, "gui/container/crafting_table", "Crafting Table");
-        addGuiEntry(entries, "gui/container/furnace", "Furnace");
-        addGuiEntry(entries, "gui/container/blast_furnace", "Blast Furnace");
-        addGuiEntry(entries, "gui/container/smoker", "Smoker");
-        addGuiEntry(entries, "gui/container/generic_54", "Large Chest");
-        addGuiEntry(entries, "gui/container/shulker_box", "Shulker Box UI");
-        addGuiEntry(entries, "gui/container/dispenser", "Dispenser/Dropper");
-        addGuiEntry(entries, "gui/container/hopper", "Hopper");
-        addGuiEntry(entries, "gui/container/brewing_stand", "Brewing Stand");
-        addGuiEntry(entries, "gui/container/enchanting_table", "Enchanting Table");
-        addGuiEntry(entries, "gui/container/anvil", "Anvil");
-        addGuiEntry(entries, "gui/container/beacon", "Beacon");
-        addGuiEntry(entries, "gui/container/villager", "Villager Trading");
-        addGuiEntry(entries, "gui/container/grindstone", "Grindstone");
-        addGuiEntry(entries, "gui/container/loom", "Loom");
-        addGuiEntry(entries, "gui/container/cartography_table", "Cartography Table");
-        addGuiEntry(entries, "gui/container/stonecutter", "Stonecutter");
-        addGuiEntry(entries, "gui/container/smithing", "Smithing Table");
-        addGuiEntry(entries, "gui/container/creative_inventory/tabs", "Creative Tabs");
+        addGUIEntry(entries, "gui/container/inventory", "Inventory");
+        addGUIEntry(entries, "gui/container/crafting_table", "Crafting Table");
+        addGUIEntry(entries, "gui/container/furnace", "Furnace");
+        addGUIEntry(entries, "gui/container/blast_furnace", "Blast Furnace");
+        addGUIEntry(entries, "gui/container/smoker", "Smoker");
+        addGUIEntry(entries, "gui/container/generic_54", "Large Chest");
+        addGUIEntry(entries, "gui/container/shulker_box", "Shulker Box UI");
+        addGUIEntry(entries, "gui/container/dispenser", "Dispenser/Dropper");
+        addGUIEntry(entries, "gui/container/hopper", "Hopper");
+        addGUIEntry(entries, "gui/container/brewing_stand", "Brewing Stand");
+        addGUIEntry(entries, "gui/container/enchanting_table", "Enchanting Table");
+        addGUIEntry(entries, "gui/container/anvil", "Anvil");
+        addGUIEntry(entries, "gui/container/beacon", "Beacon");
+        addGUIEntry(entries, "gui/container/villager", "Villager Trading");
+        addGUIEntry(entries, "gui/container/grindstone", "Grindstone");
+        addGUIEntry(entries, "gui/container/loom", "Loom");
+        addGUIEntry(entries, "gui/container/cartography_table", "Cartography Table");
+        addGUIEntry(entries, "gui/container/stonecutter", "Stonecutter");
+        addGUIEntry(entries, "gui/container/smithing", "Smithing Table");
+        addGUIEntry(entries, "gui/container/creative_inventory/tabs", "Creative Tabs");
         // General GUI
-        addGuiEntry(entries, "gui/widgets", "Widgets (Buttons)");
-        addGuiEntry(entries, "gui/title/minecraft", "Title Logo");
-        addGuiEntry(entries, "gui/title/edition", "Edition Badge");
+        addGUIEntry(entries, "gui/widgets", "Widgets (Buttons)");
+        addGUIEntry(entries, "gui/title/minecraft", "Title Logo");
+        addGUIEntry(entries, "gui/title/edition", "Edition Badge");
         return entries;
     }
 
-    private void addGuiEntry(List<BrowseEntry> entries, String texturePath, String displayName) {
+    private List<BrowseEntry> buildNotNormalEntries() {
+        List<BrowseEntry> entries = new ArrayList<>();
+        // Sheep Fur
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_fur.png"), "Sheep Fur", EntryType.MOB, null));
+
+        // Wolf
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf.png"), "Wolf", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_angry.png"), "Wolf (Angry)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_tame.png"), "Wolf (Tame)", EntryType.MOB, null));
+
+        // Cat variants
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/tabby.png"), "Cat (Tabby)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/black.png"), "Cat (Black)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/british_shorthair.png"), "Cat (British Shorthair)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/calico.png"), "Cat (Calico)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/jellie.png"), "Cat (Jellie)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/ocelot.png"), "Cat (Ocelot)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/persian.png"), "Cat (Persian)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/ragdoll.png"), "Cat (Ragdoll)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/red.png"), "Cat (Red)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/siamese.png"), "Cat (Siamese)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/white.png"), "Cat (White)", EntryType.MOB, null));
+
+        // Horse variants
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_white.png"), "Horse (White)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_creamy.png"), "Horse (Creamy)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_chestnut.png"), "Horse (Chestnut)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_brown.png"), "Horse (Brown)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_black.png"), "Horse (Black)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_gray.png"), "Horse (Gray)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_darkbrown.png"), "Horse (Dark Brown)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_white.png"), "Horse Markings (White)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_whitefield.png"), "Horse Markings (Whitefield)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_whitedots.png"), "Horse Markings (White Dots)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_blackdots.png"), "Horse Markings (Black Dots)", EntryType.MOB, null));
+
+        // Villager professions
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/villager.png"), "Villager", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/armorer.png"), "Villager (Armorer)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/butcher.png"), "Villager (Butcher)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/cartographer.png"), "Villager (Cartographer)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/cleric.png"), "Villager (Cleric)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/farmer.png"), "Villager (Farmer)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/fisherman.png"), "Villager (Fisherman)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/fletcher.png"), "Villager (Fletcher)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/leatherworker.png"), "Villager (Leatherworker)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/librarian.png"), "Villager (Librarian)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/mason.png"), "Villager (Mason)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/nitwit.png"), "Villager (Nitwit)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/shepherd.png"), "Villager (Shepherd)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/toolsmith.png"), "Villager (Toolsmith)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/weaponsmith.png"), "Villager (Weaponsmith)", EntryType.MOB, null));
+
+        // Zombie Villager
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/zombie_villager.png"), "Zombie Villager", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/armorer.png"), "Zombie Villager (Armorer)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/butcher.png"), "Zombie Villager (Butcher)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/cartographer.png"), "Zombie Villager (Cartographer)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/cleric.png"), "Zombie Villager (Cleric)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/farmer.png"), "Zombie Villager (Farmer)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/fisherman.png"), "Zombie Villager (Fisherman)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/fletcher.png"), "Zombie Villager (Fletcher)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/leatherworker.png"), "Zombie Villager (Leatherworker)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/librarian.png"), "Zombie Villager (Librarian)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/mason.png"), "Zombie Villager (Mason)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/nitwit.png"), "Zombie Villager (Nitwit)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/shepherd.png"), "Zombie Villager (Shepherd)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/toolsmith.png"), "Zombie Villager (Toolsmith)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/weaponsmith.png"), "Zombie Villager (Weaponsmith)", EntryType.MOB, null));
+
+        // Shulker colors
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker.png"), "Shulker", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_white.png"), "Shulker (White)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_orange.png"), "Shulker (Orange)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_magenta.png"), "Shulker (Magenta)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_light_blue.png"), "Shulker (Light Blue)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_yellow.png"), "Shulker (Yellow)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_lime.png"), "Shulker (Lime)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_pink.png"), "Shulker (Pink)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_gray.png"), "Shulker (Gray)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_light_gray.png"), "Shulker (Light Gray)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_cyan.png"), "Shulker (Cyan)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_purple.png"), "Shulker (Purple)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_blue.png"), "Shulker (Blue)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_brown.png"), "Shulker (Brown)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_green.png"), "Shulker (Green)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_red.png"), "Shulker (Red)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_black.png"), "Shulker (Black)", EntryType.MOB, null));
+
+        return entries;
+    }
+
+    private void addGUIEntry(List<BrowseEntry> entries, String texturePath, String displayName) {
         Identifier id = Identifier.of("minecraft", texturePath);
         entries.add(new BrowseEntry(id, displayName, EntryType.GUI, null));
     }
@@ -416,8 +509,10 @@ public class BrowseScreen extends Screen {
             Block block = Registries.BLOCK.get(entry.id);
             client.setScreen(new BlockBrowseEditorScreen(block, this));
         } else if (entry.type == EntryType.MOB) {
-            // Mobs: always open mob editor
-            if (entry.stack != null && client.world != null) {
+            if (entry.stack == null) {
+                // No entity (e.g sheep fur)
+                client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+            } else if (client.world != null) {
                 net.minecraft.entity.Entity entity = com.zeeesea.textureeditor.util.EntityMapper.getEntityFromItem(entry.stack, client.world);
                 if (entity != null) {
                     client.setScreen(new MobEditorScreen(entity, this));

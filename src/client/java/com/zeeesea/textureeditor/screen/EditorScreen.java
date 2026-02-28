@@ -1,5 +1,6 @@
 package com.zeeesea.textureeditor.screen;
 
+import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.minecraft.block.BlockState;
@@ -104,9 +105,8 @@ public class EditorScreen extends AbstractEditorScreen {
     protected void resetCurrent() {
         if (originalPixels == null || spriteId == null) return;
         canvas.saveSnapshot();
-        for (int x = 0; x < canvas.getWidth(); x++)
-            for (int y = 0; y < canvas.getHeight(); y++)
-                canvas.setPixel(x, y, originalPixels[x][y]);
+        canvas.setLayerStack(new LayerStack(canvas.getWidth(),canvas.getHeight(), originalPixels));
+        canvas.invalidateCache();
         applyLive();
     }
 
@@ -122,11 +122,6 @@ public class EditorScreen extends AbstractEditorScreen {
                         TextureManager.getInstance().applyLive(sid, tex.pixels(), tex.width(), tex.height()));
             }
         }
-        if (originalPixels != null) {
-            canvas.saveSnapshot();
-            for (int x = 0; x < canvas.getWidth(); x++)
-                for (int y = 0; y < canvas.getHeight(); y++)
-                    canvas.setPixel(x, y, originalPixels[x][y]);
-        }
+        resetCurrent();
     }
 }
