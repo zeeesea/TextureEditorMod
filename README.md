@@ -102,6 +102,7 @@ On Modrinth or Curseforge
 https://modrinth.com/mod/livetextureeditor
 
 https://www.curseforge.com/minecraft/mc-mods/live-texture-editor
+
 ---
 
 Made by zeee
