@@ -8,7 +8,9 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 /**
  * Item texture editor. Optionally has a parent screen for back navigation.
@@ -55,23 +57,37 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected int addExtraButtons(int toolY) {
-        // "Edit Mob/Entity" button — same position as "Reset Block" in EditorScreen
+        int rsw = getRightSidebarWidth();
+        int resetBtnW = rsw - 10;
+        int tbh = getToolButtonHeight();
+
+        // "Edit Mob/Entity" button for spawn eggs, boats, minecarts, etc.
         if (EntityMapper.hasEntityMode(itemStack)) {
             addDrawableChild(ButtonWidget.builder(Text.literal("Edit Mob/Entity"), btn -> {
                 var entity = EntityMapper.getEntityFromItem(itemStack, MinecraftClient.getInstance().world);
                 if (entity != null) {
                     MinecraftClient.getInstance().setScreen(new MobEditorScreen(entity, parent));
                 }
-            }).position(this.width - 115, this.height - 124).size(110, 20).build());
+            }).position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
         }
+
+        // "Edit Wing Texture" button for elytra → opens the entity/elytra.png texture
+        if (itemStack.getItem() == Items.ELYTRA) {
+            addDrawableChild(ButtonWidget.builder(Text.literal("Edit Wing Tex"), btn -> {
+                Identifier elytraTexId = Identifier.of("minecraft", "textures/entity/elytra.png");
+                MinecraftClient.getInstance().setScreen(new GuiTextureEditorScreen(elytraTexId, "Elytra Wings", parent != null ? parent : this));
+            }).position(this.width - rsw + 5, this.height - 148).size(resetBtnW, tbh).build());
+        }
+
         return toolY;
     }
 
     @Override
     protected void applyLive() {
         if (spriteId == null || canvas == null) return;
+        final int[][] origCopy = originalPixels;
         MinecraftClient.getInstance().execute(() ->
-                TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight()));
+                TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));
     }
 
     @Override

@@ -47,10 +47,46 @@ public class EntityMapper {
             return EntityType.ARMOR_STAND.create(world, null);
         }
 
+        // Elytra -> no entity, but we support it via item
         return null;
     }
 
     public static boolean hasEntityMode(ItemStack stack) {
         return getEntityFromItem(stack, MinecraftClient.getInstance().world) != null;
+    }
+
+    /**
+     * Get the corresponding ItemStack for an entity (reverse mapping).
+     * Returns null if no item form exists.
+     */
+    public static ItemStack getItemFromEntity(Entity entity) {
+        if (entity instanceof BoatEntity) {
+            return new ItemStack(Items.OAK_BOAT);
+        }
+        if (entity instanceof ChestBoatEntity) {
+            return new ItemStack(Items.OAK_CHEST_BOAT);
+        }
+        if (entity instanceof MinecartEntity) {
+            return new ItemStack(Items.MINECART);
+        }
+        if (entity instanceof ArmorStandEntity) {
+            return new ItemStack(Items.ARMOR_STAND);
+        }
+        // For spawn egg mobs, try to find the spawn egg
+        EntityType<?> type = entity.getType();
+        Identifier entityId = Registries.ENTITY_TYPE.getId(type);
+        Identifier eggId = Identifier.of(entityId.getNamespace(), entityId.getPath() + "_spawn_egg");
+        Item eggItem = Registries.ITEM.get(eggId);
+        if (eggItem != Items.AIR) {
+            return new ItemStack(eggItem);
+        }
+        return null;
+    }
+
+    /**
+     * Check whether an entity has an item form that can be edited in ItemEditorScreen.
+     */
+    public static boolean hasItemMode(Entity entity) {
+        return getItemFromEntity(entity) != null;
     }
 }

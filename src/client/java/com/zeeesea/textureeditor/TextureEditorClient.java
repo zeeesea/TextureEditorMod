@@ -7,6 +7,7 @@ import com.zeeesea.textureeditor.screen.MobEditorScreen;
 import com.zeeesea.textureeditor.screen.AbstractEditorScreen;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import com.zeeesea.textureeditor.util.EntityMapper;
+import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -31,12 +32,14 @@ public class TextureEditorClient implements ClientModInitializer {
 
     private static KeyBinding toggleEditorKey;
     private static KeyBinding openEditorKey;
+    private static KeyBinding previewOriginalKey;
 
     public static boolean isEditorModeEnabled() {
         return editorModeEnabled;
     }
 
     public static KeyBinding getOpenEditorKey() { return openEditorKey; }
+    public static KeyBinding getPreviewOriginalKey() { return previewOriginalKey; }
 
     @Override
     public void onInitializeClient() {
@@ -51,6 +54,13 @@ public class TextureEditorClient implements ClientModInitializer {
                 "key.textureeditor.open",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_R,
+                "category.textureeditor"
+        ));
+
+        previewOriginalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.textureeditor.preview",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_Z,
                 "category.textureeditor"
         ));
 
@@ -75,7 +85,21 @@ public class TextureEditorClient implements ClientModInitializer {
                     while (openEditorKey.wasPressed()) {
                         client.currentScreen.close();
                     }
+                    // Handle preview key inside editor (AbstractEditorScreen handles it directly)
+                    while (previewOriginalKey.wasPressed()) { /* consumed */ }
                     return;
+                }
+
+                // Preview original texture (hold key) — world-level preview
+                boolean previewKeyHeld = InputUtil.isKeyPressed(
+                        client.getWindow().getHandle(),
+                        KeyBindingHelper.getBoundKeyOf(previewOriginalKey).getCode()
+                );
+                TextureManager tm = TextureManager.getInstance();
+                if (previewKeyHeld && !tm.isPreviewingOriginals() && tm.hasModifiedTextures()) {
+                    client.execute(() -> tm.setPreviewingOriginals(true));
+                } else if (!previewKeyHeld && tm.isPreviewingOriginals()) {
+                    client.execute(() -> tm.setPreviewingOriginals(false));
                 }
 
                 if (client.currentScreen == null) {

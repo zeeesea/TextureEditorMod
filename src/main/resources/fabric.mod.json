@@ -2,16 +2,17 @@
 	"schemaVersion": 1,
 	"id": "textureeditor",
 	"version": "${version}",
-	"name": "TextureEditor",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"name": "Texture Editor",
+	"description": "Edit block, item, entity, and GUI textures directly in-game. Draw with pencil, brush, fill, line tools, export as resource packs, and see changes live — no restart required.",
 	"authors": [
-		"Me!"
+		"zeee"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "https://modrinth.com/mod/livetextureeditor",
+		"sources": "https://github.com/zeeesea/texture-editor",
+		"issues": "https://github.com/zeeesea/texture-editor/issues"
 	},
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/textureeditor/icon.png",
 	"environment": "*",
 	"entrypoints": {
@@ -23,6 +24,9 @@
 		],
 		"fabric-datagen": [
 			"com.zeeesea.textureeditor.TextureEditorDataGenerator"
+		],
+		"modmenu": [
+			"com.zeeesea.textureeditor.ModMenuIntegration"
 		]
 	},
 	"mixins": [
@@ -37,5 +41,8 @@
 		"minecraft": "~1.21.4",
 		"java": ">=21",
 		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
 	}
 }

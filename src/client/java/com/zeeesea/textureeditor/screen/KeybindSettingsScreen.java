@@ -17,6 +17,7 @@ public class KeybindSettingsScreen extends Screen {
 
     private static final String[][] ACTIONS = {
             {"pencil", "Pencil Tool"},
+            {"brush", "Brush Tool"},
             {"eraser", "Eraser Tool"},
             {"fill", "Fill Tool"},
             {"eyedropper", "Eyedropper Tool"},
@@ -61,6 +62,7 @@ public class KeybindSettingsScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset to Defaults"), btn -> {
             ModSettings settings = ModSettings.getInstance();
             settings.keybinds.put("pencil", GLFW.GLFW_KEY_B);
+            settings.keybinds.put("brush", GLFW.GLFW_KEY_V);
             settings.keybinds.put("eraser", GLFW.GLFW_KEY_E);
             settings.keybinds.put("fill", GLFW.GLFW_KEY_F);
             settings.keybinds.put("eyedropper", GLFW.GLFW_KEY_I);

@@ -39,6 +39,8 @@ public abstract class AbstractEditorScreen extends Screen {
     protected int currentColor = 0xFFFF0000;
     protected int zoom = 12;
     protected boolean showGrid = true;
+    protected int toolSize = 1;
+    protected boolean previewingOriginal = false;
 
     // Canvas rendering position
     protected int canvasBaseX, canvasBaseY;
@@ -84,7 +86,6 @@ public abstract class AbstractEditorScreen extends Screen {
     };
 
     protected TextFieldWidget hexInput;
-    protected int editorTitleXPos = 120;
 
     protected AbstractEditorScreen(Text title) {
         super(title);
@@ -113,28 +114,67 @@ public abstract class AbstractEditorScreen extends Screen {
 
     // --- Scale helpers ---
 
-    /** Grid + Zoom buttons: only shown at scale <= 3 */
-    protected boolean showExtraButtons() {
-        int scale = (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
-        return scale <= 3;
+    /** Get the current GUI scale */
+    protected int getGuiScale() {
+        return (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
     }
 
-    /** Face button: shown at scale <= 4 */
-    protected boolean showFaceButton() {
-        int scale = (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
+    /** Left sidebar width — narrower at high scales */
+    protected int getLeftSidebarWidth() {
+        int scale = getGuiScale();
+        if (scale >= 5) return 70;
+        if (scale >= 4) return 85;
+        return 110;
+    }
+
+    /** Right sidebar width — narrower at high scales */
+    protected int getRightSidebarWidth() {
+        int scale = getGuiScale();
+        if (scale >= 5) return 80;
+        if (scale >= 4) return 95;
+        return 120;
+    }
+
+    /** Tool button width — narrower at high scales */
+    protected int getToolButtonWidth() {
+        int scale = getGuiScale();
+        if (scale >= 5) return 65;
+        if (scale >= 4) return 80;
+        return 100;
+    }
+
+    /** Tool button height */
+    protected int getToolButtonHeight() {
+        int scale = getGuiScale();
+        if (scale >= 4) return 18;
+        return 20;
+    }
+
+    /** Grid + Zoom buttons: shown at scale 1-4, but hidden if scale >= 3 on FHD or smaller */
+    protected boolean showExtraButtons() {
+        int scale = getGuiScale();
+        int height = MinecraftClient.getInstance().getWindow().getHeight();
+        // On FHD (1080p) or smaller, hide these buttons at scale 3+ to save vertical space
+        if (height <= 1080 && scale >= 3) return false;
         return scale <= 4;
     }
 
-    /** Undo/Redo buttons: shown at scale <= 3 */
-    private boolean showUndoRedo() {
-        int scale = (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
-        return scale <= 3;
+    /** Face button: shown at scale 1-4, hidden at 5+ */
+    protected boolean showFaceButton() {
+        return getGuiScale() <= 4;
     }
 
-    /** Color history: shown at scale <= 3 */
+    /** Undo/Redo buttons: shown at scale 1-4, hidden at 5+ */
+    private boolean showUndoRedo() {
+        return getGuiScale() <= 4;
+    }
+
+    /** Color history: shown at scale 1-4, hidden at 5+ */
     private boolean showColorHistory() {
-        int scale = (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
-        return scale <= 3;
+        int scale = getGuiScale();
+        int height = MinecraftClient.getInstance().getWindow().getHeight();
+        if (height <= 1080 && scale >= 3) return false;
+        return scale <= 4;
     }
 
     // --- Tint helpers ---
@@ -169,13 +209,15 @@ public abstract class AbstractEditorScreen extends Screen {
         }
 
         int canvasPixelSize = Math.min(zoom, Math.min(
-                (this.width - 200) / canvas.getWidth(),
+                (this.width - getLeftSidebarWidth() - getRightSidebarWidth() - 20) / canvas.getWidth(),
                 (this.height - 80) / canvas.getHeight()
         ));
         if (canvasPixelSize < getMinZoom()) canvasPixelSize = getMinZoom();
         zoom = canvasPixelSize;
 
-        canvasBaseX = 120 + (this.width - 240 - canvas.getWidth() * zoom) / 2;
+        int lsw = getLeftSidebarWidth();
+        int rsw = getRightSidebarWidth();
+        canvasBaseX = lsw + 10 + (this.width - lsw - rsw - 20 - canvas.getWidth() * zoom) / 2;
         canvasBaseY = 30 + (this.height - 80 - canvas.getHeight() * zoom) / 2;
         canvasScreenX = canvasBaseX + panOffsetX;
         canvasScreenY = canvasBaseY + panOffsetY;
@@ -187,13 +229,15 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Tool buttons
         int toolY = 30;
+        int tbw = getToolButtonWidth();
+        int tbh = getToolButtonHeight();
         for (EditorTool tool : EditorTool.values()) {
             final EditorTool t = tool;
             String keyHint = settings.showToolHints ? getToolKeyHint(tool) : "";
             String label = keyHint.isEmpty() ? tool.getDisplayName() : tool.getDisplayName() + " (" + keyHint + ")";
             addDrawableChild(ButtonWidget.builder(Text.literal(label), btn -> currentTool = t)
-                    .position(5, toolY).size(100, 20).build());
-            toolY += 24;
+                    .position(5, toolY).size(tbw, tbh).build());
+            toolY += tbh + 4;
         }
 
         toolY += 10;
@@ -204,11 +248,12 @@ public abstract class AbstractEditorScreen extends Screen {
             String redoHint = settings.showToolHints ? settings.getKeyName("redo") : "";
             String undoText = undoHint.isEmpty() ? "Undo" : "Undo (" + undoHint + ")";
             String redoText = redoHint.isEmpty() ? "Redo" : "Redo (" + redoHint + ")";
+            int halfBtnW = (tbw - 4) / 2;
             addDrawableChild(ButtonWidget.builder(Text.literal(undoText), btn -> canvas.undo())
-                    .position(5, toolY).size(48, 20).build());
+                    .position(5, toolY).size(halfBtnW, tbh).build());
             addDrawableChild(ButtonWidget.builder(Text.literal(redoText), btn -> canvas.redo())
-                    .position(5 + 48 + 4, toolY).size(48, 20).build());
-            toolY += 24;
+                    .position(5 + halfBtnW + 4, toolY).size(halfBtnW, tbh).build());
+            toolY += tbh + 4;
         }
 
         // Grid + Zoom — only at scale <= 3
@@ -216,58 +261,73 @@ public abstract class AbstractEditorScreen extends Screen {
             String gridHint = settings.showToolHints ? settings.getKeyName("grid") : "";
             String gridText = gridHint.isEmpty() ? "Grid" : "Grid (" + gridHint + ")";
             addDrawableChild(ButtonWidget.builder(Text.literal(gridText), btn -> showGrid = !showGrid)
-                    .position(5, toolY).size(100, 20).build());
-            toolY += 24;
+                    .position(5, toolY).size(tbw, tbh).build());
+            toolY += tbh + 4;
+            int halfBtnW = (tbw - 4) / 2;
             addDrawableChild(ButtonWidget.builder(Text.literal("Zoom +"), btn -> {
                 if (zoom < getMaxZoom()) { zoom += getZoomStep(); recalcCanvasPos(); }
-            }).position(5, toolY).size(48, 20).build());
+            }).position(5, toolY).size(halfBtnW, tbh).build());
             addDrawableChild(ButtonWidget.builder(Text.literal("Zoom -"), btn -> {
                 if (zoom > getMinZoom()) { zoom -= getZoomStep(); recalcCanvasPos(); }
-            }).position(57, toolY).size(48, 20).build());
-            toolY += 30;
+            }).position(5 + halfBtnW + 4, toolY).size(halfBtnW, tbh).build());
+            toolY += tbh + 10;
         }
+
+        // Tool size cycle button
+        addDrawableChild(ButtonWidget.builder(Text.literal("Size: " + toolSize + "px"), btn -> {
+            toolSize = switch (toolSize) {
+                case 1 -> 2;
+                case 2 -> 3;
+                case 3 -> 5;
+                default -> 1;
+            };
+            btn.setMessage(Text.literal("Size: " + toolSize + "px"));
+        }).position(5, toolY).size(tbw, tbh).build());
+        toolY += tbh + 4;
 
         // Extra buttons from subclass (face selector, etc.)
         toolY = addExtraButtons(toolY);
 
         // Reset buttons (bottom-right)
-        int resetX = this.width - 115;
+        int resetBtnW = rsw - 10;
+        int resetX = this.width - rsw + 5;
         int resetBaseY = this.height - 100;
         addDrawableChild(ButtonWidget.builder(Text.literal(getResetCurrentLabel()), btn -> resetCurrent())
-                .position(resetX, resetBaseY).size(110, 20).build());
+                .position(resetX, resetBaseY).size(resetBtnW, tbh).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset All"), btn -> doResetAll())
-                .position(resetX, resetBaseY + 24).size(110, 20).build());
+                .position(resetX, resetBaseY + tbh + 4).size(resetBtnW, tbh).build());
 
         // Bottom-left action buttons
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aApply Live"), btn -> applyLive())
-                .position(5, this.height - 78).size(100, 20).build());
+                .position(5, this.height - 78).size(tbw, tbh).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export Pack"), btn ->
                         MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
-                .position(5, this.height - 54).size(100, 20).build());
+                .position(5, this.height - 54).size(tbw, tbh).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> {
             Screen bs = getBackScreen();
             if (bs != null) MinecraftClient.getInstance().setScreen(bs);
             else MinecraftClient.getInstance().setScreen(new BrowseScreen());
-        }).position(5, this.height - 30).size(100, 20).build());
+        }).position(5, this.height - 30).size(tbw, tbh).build());
 
         // Top-right close
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), btn -> {
             if (settings.autoApplyLive) this.applyLive();
             this.close();
-        }).position(this.width - 65, 5).size(60, 20).build());
+        }).position(this.width - 65, 5).size(60, tbh).build());
 
         // Bottom-right: Picker, Layers
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bPicker"), btn -> {
             currentPanel = currentPanel == PanelType.COLOR_PANEL ? PanelType.NONE : PanelType.COLOR_PANEL;
             setColor(currentColor, false);
-        }).position(this.width - 65, this.height - 26).size(60, 20).build());
+        }).position(this.width - 65, this.height - 26).size(60, tbh).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7eLayers"), btn -> {
             currentPanel = currentPanel == PanelType.LAYER_PANEL ? PanelType.NONE : PanelType.LAYER_PANEL;
-        }).position(this.width - 130, this.height - 26).size(60, 20).build());
+        }).position(this.width - 130, this.height - 26).size(60, tbh).build());
 
         // Hex Input
         int paletteEndY = getPaletteEndY() + 10;
-        hexInput = new TextFieldWidget(this.textRenderer, getPaletteX(), paletteEndY, 110, 18, Text.literal("Hex"));
+        int hexW = Math.min(110, getRightSidebarWidth() - 30);
+        hexInput = new TextFieldWidget(this.textRenderer, getPaletteX(), paletteEndY, hexW, 18, Text.literal("Hex"));
         hexInput.setMaxLength(9);
         hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF));
         hexInput.setChangedListener(text -> {
@@ -284,6 +344,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ModSettings s = ModSettings.getInstance();
         return switch (tool) {
             case PENCIL -> s.getKeyName("pencil");
+            case BRUSH -> s.getKeyName("brush");
             case ERASER -> s.getKeyName("eraser");
             case FILL -> s.getKeyName("fill");
             case EYEDROPPER -> s.getKeyName("eyedropper");
@@ -292,14 +353,16 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     protected void recalcCanvasPos() {
-        canvasBaseX = 120 + (this.width - 240 - canvas.getWidth() * zoom) / 2;
+        int lsw = getLeftSidebarWidth();
+        int rsw = getRightSidebarWidth();
+        canvasBaseX = lsw + 10 + (this.width - lsw - rsw - 20 - canvas.getWidth() * zoom) / 2;
         canvasBaseY = 30 + (this.height - 80 - canvas.getHeight() * zoom) / 2;
         canvasScreenX = canvasBaseX + panOffsetX;
         canvasScreenY = canvasBaseY + panOffsetY;
     }
 
     protected boolean isInUIRegion(double mx, double my) {
-        return mx < 110 || mx > this.width - 120 || my < 28;
+        return mx < getLeftSidebarWidth() || mx > this.width - getRightSidebarWidth() || my < 28;
     }
 
     protected void doResetAll() {
@@ -351,23 +414,27 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         int bg = getBackgroundColor();
+        int lsw = getLeftSidebarWidth();
+        int rsw = getRightSidebarWidth();
         context.fill(0, 0, this.width, this.height, bg);
         drawCanvas(context, mouseX, mouseY);
-        context.fill(0, 0, 110, this.height, bg);
-        context.fill(this.width - 120, 0, this.width, this.height, bg);
-        context.fill(110, 0, this.width - 120, 28, bg);
+        context.fill(0, 0, lsw, this.height, bg);
+        context.fill(this.width - rsw, 0, this.width, this.height, bg);
+        context.fill(lsw, 0, this.width - rsw, 28, bg);
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawText(textRenderer, getEditorTitle(), editorTitleXPos, 8, 0xFFFFFF, true);
+        context.drawText(textRenderer, getEditorTitle(), getLeftSidebarWidth() + 5, 8, 0xFFFFFF, true);
         context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() +
-                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), editorTitleXPos, 20, 0xCCCCCC, false);
+                " | Size: " + toolSize + "px" +
+                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), getLeftSidebarWidth() + 5, 20, 0xCCCCCC, false);
 
         drawPalette(context);
         int paletteX = getPaletteX();
         int paletteEndY = getPaletteEndY() + 10;
         // Current color swatch next to hex input
-        context.fill(paletteX + 114, paletteEndY, paletteX + 114 + 20, paletteEndY + 18, currentColor);
-        drawRectOutline(context, paletteX + 114, paletteEndY, paletteX + 114 + 20, paletteEndY + 18, 0xFFFFFFFF);
+        int hexW = Math.min(110, getRightSidebarWidth() - 30);
+        context.fill(paletteX + hexW + 4, paletteEndY, paletteX + hexW + 24, paletteEndY + 18, currentColor);
+        drawRectOutline(context, paletteX + hexW + 4, paletteEndY, paletteX + hexW + 24, paletteEndY + 18, 0xFFFFFFFF);
 
         if (showColorHistory()) drawColorHistory(context);
         if (currentPanel == PanelType.COLOR_PANEL) drawColorPicker(context);
@@ -384,7 +451,12 @@ public abstract class AbstractEditorScreen extends Screen {
         for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) {
             int sx = canvasScreenX + x * zoom, sy = canvasScreenY + y * zoom;
             ctx.fill(sx, sy, sx + zoom, sy + zoom, ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
-            int c = canvas.getPixel(x, y);
+            int c;
+            if (previewingOriginal && originalPixels != null && x < originalPixels.length && y < originalPixels[x].length) {
+                c = originalPixels[x][y];
+            } else {
+                c = canvas.getPixel(x, y);
+            }
             if (((c >> 24) & 0xFF) > 0) ctx.fill(sx, sy, sx + zoom, sy + zoom, usesTint() ? applyTint(c) : c);
         }
         if (showGrid && zoom >= 4) {
@@ -392,10 +464,22 @@ public abstract class AbstractEditorScreen extends Screen {
             for (int y = 0; y <= h; y++) ctx.fill(canvasScreenX, canvasScreenY + y * zoom, canvasScreenX + w * zoom, canvasScreenY + y * zoom + 1, 0x40FFFFFF);
         }
         drawRectOutline(ctx, canvasScreenX - 1, canvasScreenY - 1, canvasScreenX + w * zoom + 1, canvasScreenY + h * zoom + 1, 0xFFFFFFFF);
+        // Hover highlight with tool size
         int hx = (mx - canvasScreenX) / zoom, hy = (my - canvasScreenY) / zoom;
         if (hx >= 0 && hx < w && hy >= 0 && hy < h) {
-            int sx = canvasScreenX + hx * zoom, sy = canvasScreenY + hy * zoom;
-            drawRectOutline(ctx, sx, sy, sx + zoom, sy + zoom, 0xFFFFFF00);
+            int half = toolSize / 2;
+            for (int dx = -half; dx < toolSize - half; dx++) {
+                for (int dy = -half; dy < toolSize - half; dy++) {
+                    int tx = hx + dx, ty = hy + dy;
+                    if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+                        int sx = canvasScreenX + tx * zoom, sy = canvasScreenY + ty * zoom;
+                        drawRectOutline(ctx, sx, sy, sx + zoom, sy + zoom, 0xFFFFFF00);
+                    }
+                }
+            }
+        }
+        if (previewingOriginal) {
+            ctx.drawCenteredTextWithShadow(textRenderer, "\u00a7e\u00a7lPREVIEW (Original)", canvasScreenX + (w * zoom) / 2, canvasScreenY - 14, 0xFFFF00);
         }
     }
 
@@ -431,7 +515,10 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     private void drawColorPicker(DrawContext ctx) {
-        int cpX = this.width / 2 - 80, cpY = this.height - 90, svW = 120, svH = 80;
+        int lsw = getLeftSidebarWidth();
+        int rsw = getRightSidebarWidth();
+        int canvasAreaCenter = lsw + (this.width - lsw - rsw) / 2;
+        int cpX = canvasAreaCenter - 80, cpY = this.height - 90, svW = 120, svH = 80;
         ctx.fill(cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFF222244);
         drawRectOutline(ctx, cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFFFFFFFF);
         ctx.drawText(textRenderer, "Color Picker", cpX, cpY - 12, 0xFFFFFF, false);
@@ -552,8 +639,17 @@ public abstract class AbstractEditorScreen extends Screen {
         if (canvas != null) {
             int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
-                if (currentTool == EditorTool.PENCIL) canvas.drawPixel(px, py, currentColor);
-                else if (currentTool == EditorTool.ERASER) canvas.erasePixel(px, py);
+                float variation = ModSettings.getInstance().brushVariation;
+                if (currentTool == EditorTool.PENCIL) {
+                    if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor);
+                    else canvas.drawPixel(px, py, currentColor);
+                } else if (currentTool == EditorTool.BRUSH) {
+                    if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation);
+                    else canvas.drawBrushPixel(px, py, currentColor, variation);
+                } else if (currentTool == EditorTool.ERASER) {
+                    if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize);
+                    else canvas.erasePixel(px, py);
+                }
                 return true;
             }
         }
@@ -563,6 +659,12 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public boolean keyPressed(int kc, int sc, int m) {
         if (hexInput != null && hexInput.isFocused()) return super.keyPressed(kc, sc, m);
+        // Preview original texture (hold key)
+        var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
+        if (previewKey != null && previewKey.matchesKey(kc, sc)) {
+            previewingOriginal = true;
+            return true;
+        }
         ModSettings s = ModSettings.getInstance();
         if (kc == s.getKeybind("undo")) { canvas.undo(); return true; }
         if (kc == s.getKeybind("redo")) { canvas.redo(); return true; }
@@ -572,6 +674,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("fill")) { currentTool = EditorTool.FILL; return true; }
         if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
         if (kc == s.getKeybind("line")) { currentTool = EditorTool.LINE; return true; }
+        if (kc == s.getKeybind("brush")) { currentTool = EditorTool.BRUSH; return true; }
         if (kc == s.getKeybind("browse")) { MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
         if (openKey != null && openKey.matchesKey(kc, sc)) {
@@ -585,10 +688,23 @@ public abstract class AbstractEditorScreen extends Screen {
         return super.keyPressed(kc, sc, m);
     }
 
+    @Override
+    public boolean keyReleased(int kc, int sc, int m) {
+        var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
+        if (previewKey != null && previewKey.matchesKey(kc, sc)) {
+            previewingOriginal = false;
+            return true;
+        }
+        return super.keyReleased(kc, sc, m);
+    }
+
     // --- Click handlers ---
 
     private boolean handlePickerClick(double mx, double my) {
-        int cpX = this.width / 2 - 80, cpY = this.height - 90, svW = 120, svH = 80, hueX = cpX + svW + 5, hueW = 20;
+        int lsw = getLeftSidebarWidth();
+        int rsw = getRightSidebarWidth();
+        int canvasAreaCenter = lsw + (this.width - lsw - rsw) / 2;
+        int cpX = canvasAreaCenter - 80, cpY = this.height - 90, svW = 120, svH = 80, hueX = cpX + svW + 5, hueW = 20;
         if (mx >= cpX && mx < cpX + svW && my >= cpY && my < cpY + svH) {
             pickerSat = Math.max(0, Math.min(1, (float) (mx - cpX) / (svW - 1)));
             pickerVal = Math.max(0, Math.min(1, 1f - (float) (my - cpY) / (svH - 1)));
@@ -667,9 +783,25 @@ public abstract class AbstractEditorScreen extends Screen {
 
     protected void handleCanvasClick(int px, int py, int btn) {
         int storeColor = currentColor;
+        float variation = ModSettings.getInstance().brushVariation;
         switch (currentTool) {
-            case PENCIL -> { canvas.saveSnapshot(); canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor); setColor(currentColor, true); }
-            case ERASER -> { canvas.saveSnapshot(); canvas.erasePixel(px, py); }
+            case PENCIL -> {
+                canvas.saveSnapshot();
+                if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, btn == 1 ? 0 : storeColor);
+                else canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor);
+                setColor(currentColor, true);
+            }
+            case BRUSH -> {
+                canvas.saveSnapshot();
+                if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, storeColor, variation);
+                else canvas.drawBrushPixel(px, py, storeColor, variation);
+                setColor(currentColor, true);
+            }
+            case ERASER -> {
+                canvas.saveSnapshot();
+                if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize);
+                else canvas.erasePixel(px, py);
+            }
             case FILL -> { canvas.saveSnapshot(); canvas.floodFill(px, py, storeColor); setColor(currentColor, true); }
             case EYEDROPPER -> {
                 int raw = canvas.pickColorComposited(px, py);
@@ -718,20 +850,20 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     private int getPaletteX() {
-        return this.width - 115;
+        return this.width - getRightSidebarWidth() + 5;
     }
 
     private int getPaletteColumns() {
-        int scale = (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
-        if (scale >= 5) return 9;
-        if (scale >= 4) return 6;
+        int scale = getGuiScale();
+        if (scale >= 5) return 6;
+        if (scale >= 4) return 5;
         return 5;
     }
 
     private int getPaletteCellSize() {
-        int scale = (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
+        int scale = getGuiScale();
         if (scale >= 5) return 10;
-        if (scale >= 4) return 16;
+        if (scale >= 4) return 14;
         return 20;
     }
 

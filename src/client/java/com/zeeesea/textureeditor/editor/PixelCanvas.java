@@ -10,6 +10,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Editable pixel buffer with layers, undo/redo support and drawing tool operations.
@@ -140,6 +141,67 @@ public class PixelCanvas {
      */
     public void drawPixel(int x, int y, int color) {
         setPixel(x, y, color);
+    }
+
+    /**
+     * Draw a pixel with random brightness variation (brush tool).
+     * @param variation brightness variation strength (0.0-1.0, e.g. 0.15 = ±15%)
+     */
+    public void drawBrushPixel(int x, int y, int color, float variation) {
+        int a = (color >> 24) & 0xFF;
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+
+        float offset = (ThreadLocalRandom.current().nextFloat() * 2f - 1f) * variation;
+        r = clamp((int) (r + r * offset), 0, 255);
+        g = clamp((int) (g + g * offset), 0, 255);
+        b = clamp((int) (b + b * offset), 0, 255);
+
+        setPixel(x, y, (a << 24) | (r << 16) | (g << 8) | b);
+    }
+
+    /**
+     * Draw a pixel area (for tool size > 1).
+     */
+    public void drawPixelArea(int cx, int cy, int size, int color) {
+        int half = size / 2;
+        for (int dx = -half; dx < size - half; dx++) {
+            for (int dy = -half; dy < size - half; dy++) {
+                drawPixel(cx + dx, cy + dy, color);
+            }
+        }
+    }
+
+    /**
+     * Erase a pixel area (for tool size > 1).
+     */
+    public void erasePixelArea(int cx, int cy, int size) {
+        int half = size / 2;
+        for (int dx = -half; dx < size - half; dx++) {
+            for (int dy = -half; dy < size - half; dy++) {
+                int x = cx + dx, y = cy + dy;
+                if (x >= 0 && x < width && y >= 0 && y < height) {
+                    setPixel(x, y, 0x00000000);
+                }
+            }
+        }
+    }
+
+    /**
+     * Draw a brush area with variation (for tool size > 1).
+     */
+    public void drawBrushArea(int cx, int cy, int size, int color, float variation) {
+        int half = size / 2;
+        for (int dx = -half; dx < size - half; dx++) {
+            for (int dy = -half; dy < size - half; dy++) {
+                drawBrushPixel(cx + dx, cy + dy, color, variation);
+            }
+        }
+    }
+
+    private static int clamp(int val, int min, int max) {
+        return Math.max(min, Math.min(max, val));
     }
 
     /**

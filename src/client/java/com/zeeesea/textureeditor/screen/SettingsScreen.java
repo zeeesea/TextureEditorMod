@@ -26,20 +26,6 @@ public class SettingsScreen extends Screen {
         int centerX = this.width / 2;
         int y = 40;
 
-        // Title
-        // (rendered in render())
-
-        /*
-        // Default Zoom
-        addDrawableChild(ButtonWidget.builder(Text.literal("Default Zoom: " + s.defaultZoom), btn -> {
-            s.defaultZoom = (s.defaultZoom % 20) + 2;
-            s.save();
-            this.clearChildren();
-            this.init();
-        }).position(centerX - 100, y).size(200, 20).build());
-        y += 28;
-        */
-
         // Auto Apply live
         addDrawableChild(ButtonWidget.builder(Text.literal("Auto Apply Live: " + (s.autoApplyLive ? "ON" : "OFF")), btn -> {
             s.autoApplyLive = !s.autoApplyLive;
@@ -99,11 +85,29 @@ public class SettingsScreen extends Screen {
         // Default Tool
         addDrawableChild(ButtonWidget.builder(Text.literal("Default Tool: " + s.defaultTool), btn -> {
             s.defaultTool = switch (s.defaultTool) {
-                case "Pencil" -> "Eraser";
+                case "Pencil" -> "Brush";
+                case "Brush" -> "Eraser";
                 case "Eraser" -> "Fill";
                 case "Fill" -> "Eyedropper";
                 case "Eyedropper" -> "Line";
                 default -> "Pencil";
+            };
+            s.save();
+            this.clearChildren();
+            this.init();
+        }).position(centerX - 100, y).size(200, 20).build());
+        y += 28;
+
+        // Brush Variation
+        int variationPercent = Math.round(s.brushVariation * 100);
+        addDrawableChild(ButtonWidget.builder(Text.literal("Brush Variation: " + variationPercent + "%"), btn -> {
+            s.brushVariation = switch (variationPercent) {
+                case 5 -> 0.10f;
+                case 10 -> 0.15f;
+                case 15 -> 0.20f;
+                case 20 -> 0.30f;
+                case 30 -> 0.50f;
+                default -> 0.05f;
             };
             s.save();
             this.clearChildren();

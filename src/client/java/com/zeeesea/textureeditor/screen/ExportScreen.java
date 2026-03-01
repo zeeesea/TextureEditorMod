@@ -27,7 +27,7 @@ public class ExportScreen extends Screen {
 
     // Icon canvas settings
     private static final int ICON_SIZE = 64;
-    private static final int ICON_ZOOM = 4;
+    private int iconZoom = 4;
     private int iconScreenX;
     private int iconScreenY;
 
@@ -46,7 +46,7 @@ public class ExportScreen extends Screen {
         this.iconCanvas = new PixelCanvas(ICON_SIZE, ICON_SIZE);
         for (int x = 0; x < ICON_SIZE; x++) {
             for (int y = 0; y < ICON_SIZE; y++) {
-                iconCanvas.setPixel(x, y, 0xFF228B22);
+                iconCanvas.setPixel(x, y, 0x000000);
             }
         }
     }
@@ -74,13 +74,15 @@ public class ExportScreen extends Screen {
         authorInput.setText("");
         addDrawableChild(authorInput);
 
-        // Icon canvas position
-        iconScreenX = centerX - (ICON_SIZE * ICON_ZOOM) / 2;
+        // Icon canvas position — scale-aware zoom
+        int guiScale = (int) net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaleFactor();
+        iconZoom = guiScale >= 4 ? 2 : (guiScale >= 3 ? 3 : 4);
+        iconScreenX = centerX - (ICON_SIZE * iconZoom) / 2;
         iconScreenY = 145;
 
         // Grid toggle
         addDrawableChild(ButtonWidget.builder(Text.literal("Grid"), btn -> showGrid = !showGrid)
-                .position(iconScreenX + ICON_SIZE * ICON_ZOOM + 10, iconScreenY).size(50, 20).build());
+                .position(iconScreenX + ICON_SIZE * iconZoom + 10, iconScreenY).size(50, 20).build());
 
         // Export button
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aExport"), btn -> doExport())
@@ -112,7 +114,7 @@ public class ExportScreen extends Screen {
         drawIconCanvas(context, mouseX, mouseY);
 
         // Draw mini palette next to icon
-        int palX = iconScreenX + ICON_SIZE * ICON_ZOOM + 10;
+        int palX = iconScreenX + ICON_SIZE * iconZoom + 10;
         int palY = iconScreenY + 25;
         for (int i = 0; i < PALETTE.length; i++) {
             int px = palX;
@@ -135,26 +137,26 @@ public class ExportScreen extends Screen {
     private void drawIconCanvas(DrawContext context, int mouseX, int mouseY) {
         for (int x = 0; x < ICON_SIZE; x++) {
             for (int y = 0; y < ICON_SIZE; y++) {
-                int sx = iconScreenX + x * ICON_ZOOM;
-                int sy = iconScreenY + y * ICON_ZOOM;
+                int sx = iconScreenX + x * iconZoom;
+                int sy = iconScreenY + y * iconZoom;
                 int color = iconCanvas.getPixel(x, y);
-                context.fill(sx, sy, sx + ICON_ZOOM, sy + ICON_ZOOM, color);
+                context.fill(sx, sy, sx + iconZoom, sy + iconZoom, color);
             }
         }
 
         if (showGrid) {
             for (int x = 0; x <= ICON_SIZE; x += 8) {
-                int sx = iconScreenX + x * ICON_ZOOM;
-                context.fill(sx, iconScreenY, sx + 1, iconScreenY + ICON_SIZE * ICON_ZOOM, 0x40FFFFFF);
+                int sx = iconScreenX + x * iconZoom;
+                context.fill(sx, iconScreenY, sx + 1, iconScreenY + ICON_SIZE * iconZoom, 0x40FFFFFF);
             }
             for (int y = 0; y <= ICON_SIZE; y += 8) {
-                int sy = iconScreenY + y * ICON_ZOOM;
-                context.fill(iconScreenX, sy, iconScreenX + ICON_SIZE * ICON_ZOOM, sy + 1, 0x40FFFFFF);
+                int sy = iconScreenY + y * iconZoom;
+                context.fill(iconScreenX, sy, iconScreenX + ICON_SIZE * iconZoom, sy + 1, 0x40FFFFFF);
             }
         }
 
-        int endX = iconScreenX + ICON_SIZE * ICON_ZOOM;
-        int endY = iconScreenY + ICON_SIZE * ICON_ZOOM;
+        int endX = iconScreenX + ICON_SIZE * iconZoom;
+        int endY = iconScreenY + ICON_SIZE * iconZoom;
         context.fill(iconScreenX - 1, iconScreenY - 1, endX + 1, iconScreenY, 0xFFFFFFFF);
         context.fill(iconScreenX - 1, endY, endX + 1, endY + 1, 0xFFFFFFFF);
         context.fill(iconScreenX - 1, iconScreenY, iconScreenX, endY, 0xFFFFFFFF);
@@ -164,7 +166,7 @@ public class ExportScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Check palette click
-        int palX = iconScreenX + ICON_SIZE * ICON_ZOOM + 10;
+        int palX = iconScreenX + ICON_SIZE * iconZoom + 10;
         int palY = iconScreenY + 25;
         for (int i = 0; i < PALETTE.length; i++) {
             int py = palY + i * 18;
@@ -185,8 +187,8 @@ public class ExportScreen extends Screen {
     }
 
     private boolean handleIconCanvasClick(double mouseX, double mouseY) {
-        int px = (int) ((mouseX - iconScreenX) / ICON_ZOOM);
-        int py = (int) ((mouseY - iconScreenY) / ICON_ZOOM);
+        int px = (int) ((mouseX - iconScreenX) / iconZoom);
+        int py = (int) ((mouseY - iconScreenY) / iconZoom);
         if (px >= 0 && px < ICON_SIZE && py >= 0 && py < ICON_SIZE) {
             iconCanvas.setPixel(px, py, currentColor);
             return true;

@@ -4,11 +4,13 @@ import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.MobTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.util.EntityMapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.Entity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
@@ -72,6 +74,20 @@ public class MobEditorScreen extends AbstractEditorScreen {
         mobPreview.setPosition(115, 30, 140, 160);
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7d3D"), btn -> {mobPreview.toggleVisible(); mobPreviewActive = mobPreview.isVisible(); })
                 .position(this.width - 195, this.height - 26).size(60, 20).build());
+
+        // "Edit Item" button — switch to item editor for entities with item form
+        if (EntityMapper.hasItemMode(entity)) {
+            int rsw = getRightSidebarWidth();
+            int resetBtnW = rsw - 10;
+            int tbh = getToolButtonHeight();
+            addDrawableChild(ButtonWidget.builder(Text.literal("Edit Item"), btn -> {
+                ItemStack itemStack = EntityMapper.getItemFromEntity(entity);
+                if (itemStack != null) {
+                    MinecraftClient.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
+                }
+            }).position(this.width - rsw + 5, this.height - 148).size(resetBtnW, tbh).build());
+        }
+
         return toolY;
     }
 
@@ -117,6 +133,10 @@ public class MobEditorScreen extends AbstractEditorScreen {
     protected void applyLive() {
         if (textureId == null || canvas == null) return;
         MinecraftClient client = MinecraftClient.getInstance();
+        // Store original for preview support
+        if (originalPixels != null) {
+            TextureManager.getInstance().storeOriginal(textureId, originalPixels, canvas.getWidth(), canvas.getHeight());
+        }
         TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
         client.execute(() -> {
             try (var img = new net.minecraft.client.texture.NativeImage(canvas.getWidth(), canvas.getHeight(), false)) {

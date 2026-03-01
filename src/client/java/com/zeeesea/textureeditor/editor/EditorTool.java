@@ -2,6 +2,7 @@ package com.zeeesea.textureeditor.editor;
 
 public enum EditorTool {
     PENCIL("Pencil", "✏"),
+    BRUSH("Brush", "🖌"),
     ERASER("Eraser", "⌫"),
     FILL("Fill", "🪣"),
     EYEDROPPER("Eyedropper", "💉"),

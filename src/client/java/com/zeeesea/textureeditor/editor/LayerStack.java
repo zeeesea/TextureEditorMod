@@ -15,6 +15,9 @@ public class LayerStack {
     public LayerStack(int width, int height) {
         this.width = width;
         this.height = height;
+        // Always create at least a base layer so getActiveLayer() is never null
+        layers.add(new Layer(width, height, "Base"));
+        layers.add(new Layer(width, height, "Layer 0"));
     }
 
     /**

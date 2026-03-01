@@ -258,6 +258,25 @@ public class BrowseScreen extends Screen {
 
     private List<BrowseEntry> buildNotNormalEntries() {
         List<BrowseEntry> entries = new ArrayList<>();
+
+        // Boats
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/oak.png"), "Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.OAK_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/spruce.png"), "Spruce Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.SPRUCE_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/birch.png"), "Birch Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.BIRCH_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/jungle.png"), "Jungle Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.JUNGLE_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/acacia.png"), "Acacia Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.ACACIA_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/dark_oak.png"), "Dark Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.DARK_OAK_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/mangrove.png"), "Mangrove Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.MANGROVE_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/cherry.png"), "Cherry Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.CHERRY_BOAT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/bamboo.png"), "Bamboo Raft", EntryType.MOB, new ItemStack(net.minecraft.item.Items.BAMBOO_RAFT)));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/pale_oak.png"), "Pale Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.PALE_OAK_BOAT)));
+
+        // Minecart
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/minecart.png"), "Minecart", EntryType.MOB, new ItemStack(net.minecraft.item.Items.MINECART)));
+
+        // Elytra
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/elytra.png"), "Elytra", EntryType.MOB, new ItemStack(net.minecraft.item.Items.ELYTRA)));
+
         // Sheep Fur
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_fur.png"), "Sheep Fur", EntryType.MOB, null));
 
@@ -537,13 +556,19 @@ public class BrowseScreen extends Screen {
             Block block = Registries.BLOCK.get(entry.id);
             client.setScreen(new EditorScreen(block, this));
         } else if (entry.type == EntryType.MOB) {
-            if (entry.stack == null) {
-                // No entity (e.g sheep fur)
+            // If the ID is a direct texture path (e.g. textures/entity/elytra.png), open as GuiTextureEditorScreen
+            if (entry.id.getPath().startsWith("textures/")) {
+                client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+            } else if (entry.stack == null) {
+                // No entity (e.g sheep fur via non-texture path)
                 client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
             } else if (client.world != null) {
                 net.minecraft.entity.Entity entity = com.zeeesea.textureeditor.util.EntityMapper.getEntityFromItem(entry.stack, client.world);
                 if (entity != null) {
                     client.setScreen(new MobEditorScreen(entity, this));
+                } else {
+                    // Entity creation failed (e.g. elytra has no entity), open item editor
+                    client.setScreen(new ItemEditorScreen(entry.stack, this));
                 }
             }
         } else if (entry.type == EntryType.ITEM) {

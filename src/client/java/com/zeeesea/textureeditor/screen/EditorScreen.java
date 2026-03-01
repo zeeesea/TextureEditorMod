@@ -95,6 +95,8 @@ public class EditorScreen extends AbstractEditorScreen {
 
     @Override
     protected int addExtraButtons(int toolY) {
+        int tbw = getToolButtonWidth();
+        int tbh = getToolButtonHeight();
         // Face cycle button — only at scale <= 4
         if (showFaceButton()) {
             addDrawableChild(ButtonWidget.builder(
@@ -105,13 +107,15 @@ public class EditorScreen extends AbstractEditorScreen {
                         btn.setMessage(Text.literal("Face: " + face.getName().toUpperCase()));
                         switchFace(face);
                     }
-            ).position(5, toolY).size(100, 20).build());
-            toolY += 24;
+            ).position(5, toolY).size(tbw, tbh).build());
+            toolY += tbh + 4;
         }
 
         // Reset Block button — always shown
+        int rsw = getRightSidebarWidth();
+        int resetBtnW = rsw - 10;
         addDrawableChild(ButtonWidget.builder(Text.literal("Reset Block"), btn -> resetBlock())
-                .position(this.width - 115, this.height - 124).size(110, 20).build());
+                .position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
 
         return toolY;
     }
@@ -128,8 +132,9 @@ public class EditorScreen extends AbstractEditorScreen {
     @Override
     protected void applyLive() {
         if (spriteId == null || canvas == null) return;
+        final int[][] origCopy = originalPixels;
         MinecraftClient.getInstance().execute(() ->
-                TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight()));
+                TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));
     }
 
     @Override

@@ -30,6 +30,7 @@ public class ModSettings {
     public boolean confirmResetAll = true;
     public int maxUndoSteps = 50;
     public int colorHistorySize = 20;
+    public float brushVariation = 0.15f; // ±15% brightness variation for brush tool
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -40,6 +41,7 @@ public class ModSettings {
         keybinds.put("fill", GLFW.GLFW_KEY_F);
         keybinds.put("eyedropper", GLFW.GLFW_KEY_I);
         keybinds.put("line", GLFW.GLFW_KEY_L);
+        keybinds.put("brush", GLFW.GLFW_KEY_V);
         keybinds.put("undo", GLFW.GLFW_KEY_Z);
         keybinds.put("redo", GLFW.GLFW_KEY_Y);
         keybinds.put("grid", GLFW.GLFW_KEY_G);

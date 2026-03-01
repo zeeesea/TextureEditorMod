@@ -22,6 +22,11 @@ public class TextureManager {
     private final Map<Identifier, int[][]> modifiedTextures = new HashMap<>();
     // Maps texture identifier -> dimensions
     private final Map<Identifier, int[]> textureDimensions = new HashMap<>();
+    // Maps texture identifier -> original (pre-edit) pixel data for preview
+    private final Map<Identifier, int[][]> originalTextures = new HashMap<>();
+
+    // Whether we're currently showing original textures (preview mode)
+    private boolean previewingOriginals = false;
 
     private TextureManager() {}
 
@@ -35,6 +40,87 @@ public class TextureManager {
     public void putTexture(Identifier textureId, int[][] pixels, int width, int height) {
         modifiedTextures.put(textureId, pixels);
         textureDimensions.put(textureId, new int[]{width, height});
+    }
+
+    /**
+     * Store original (pre-edit) pixels for preview comparison.
+     * Only stores if not already stored for that texture.
+     */
+    public void storeOriginal(Identifier textureId, int[][] pixels, int width, int height) {
+        if (!originalTextures.containsKey(textureId)) {
+            int[][] copy = new int[width][height];
+            for (int x = 0; x < width; x++) {
+                System.arraycopy(pixels[x], 0, copy[x], 0, height);
+            }
+            originalTextures.put(textureId, copy);
+        }
+    }
+
+    /**
+     * Get stored original pixels for a texture.
+     */
+    public int[][] getOriginalPixels(Identifier textureId) {
+        return originalTextures.get(textureId);
+    }
+
+    public boolean isPreviewingOriginals() {
+        return previewingOriginals;
+    }
+
+    /**
+     * Toggle previewing original textures. Re-uploads either originals or modified to atlas.
+     */
+    public void setPreviewingOriginals(boolean previewing) {
+        if (previewing == previewingOriginals) return;
+        previewingOriginals = previewing;
+
+        for (Identifier textureId : modifiedTextures.keySet()) {
+            int[] dims = textureDimensions.get(textureId);
+            if (dims == null) continue;
+            int w = dims[0], h = dims[1];
+
+            // Derive spriteId from textureId: remove "textures/" prefix and ".png" suffix
+            String path = textureId.getPath();
+            if (path.startsWith("textures/") && path.endsWith(".png")) {
+                path = path.substring("textures/".length(), path.length() - ".png".length());
+            }
+            Identifier spriteId = Identifier.of(textureId.getNamespace(), path);
+
+            int[][] pixels;
+            if (previewing) {
+                pixels = originalTextures.get(textureId);
+                if (pixels == null) continue; // no original stored, skip
+            } else {
+                pixels = modifiedTextures.get(textureId);
+            }
+            reuploadToAtlas(spriteId, pixels, w, h);
+        }
+    }
+
+    /**
+     * Re-upload pixels to the sprite atlas (used for preview toggling).
+     */
+    private void reuploadToAtlas(Identifier spriteId, int[][] pixels, int width, int height) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(spriteId);
+        if (sprite == null) return;
+
+        int atlasX = sprite.getX();
+        int atlasY = sprite.getY();
+
+        RenderSystem.assertOnRenderThread();
+        SpriteAtlasTexture atlas = (SpriteAtlasTexture) client.getTextureManager()
+                .getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+        atlas.bindTexture();
+
+        try (NativeImage img = new NativeImage(width, height, false)) {
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    img.setColorArgb(x, y, pixels[x][y]);
+                }
+            }
+            img.upload(0, atlasX, atlasY, false);
+        }
     }
 
     /**
@@ -75,10 +161,23 @@ public class TextureManager {
      * Also generates and uploads mipmap levels so the texture remains visible at distance.
      */
     public void applyLive(Identifier spriteId, int[][] pixels, int width, int height) {
+        applyLive(spriteId, pixels, width, height, null);
+    }
+
+    /**
+     * Apply live with optional original pixels for preview support.
+     */
+    public void applyLive(Identifier spriteId, int[][] pixels, int width, int height, int[][] origPixels) {
         MinecraftClient client = MinecraftClient.getInstance();
 
         // Store the modified texture
         Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
+
+        // Store original pixels for preview if provided and not yet stored
+        if (origPixels != null) {
+            storeOriginal(textureId, origPixels, width, height);
+        }
+
         putTexture(textureId, pixels, width, height);
 
         // Find the sprite in the block atlas
@@ -168,5 +267,7 @@ public class TextureManager {
     public void clear() {
         modifiedTextures.clear();
         textureDimensions.clear();
+        originalTextures.clear();
+        previewingOriginals = false;
     }
 }
