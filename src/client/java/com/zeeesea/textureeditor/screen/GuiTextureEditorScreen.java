@@ -158,27 +158,38 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         TextureManager.getInstance().putTexture(fullTextureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
 
         client.execute(() -> {
-            NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
-            for (int x = 0; x < canvas.getWidth(); x++) {
-                for (int y = 0; y < canvas.getHeight(); y++) {
-                    img.setColorArgb(x, y, canvas.getPixels()[x][y]);
-                }
-            }
-
             Identifier spriteId = guiTextureId;
             var atlasAndSprite = findSpriteInAtlases(client, spriteId);
 
             if (atlasAndSprite != null) {
-                net.minecraft.client.texture.SpriteAtlasTexture atlas = atlasAndSprite.getLeft();
+                // Write directly into the sprite's NativeImage via mixin accessor
                 net.minecraft.client.texture.Sprite sprite = atlasAndSprite.getRight();
+                net.minecraft.client.texture.SpriteContents contents = sprite.getContents();
+                NativeImage spriteImage = ((com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor) contents).getImage();
+                if (spriteImage != null) {
+                    int w = Math.min(canvas.getWidth(), spriteImage.getWidth());
+                    int h = Math.min(canvas.getHeight(), spriteImage.getHeight());
+                    for (int x = 0; x < w; x++)
+                        for (int y = 0; y < h; y++)
+                            spriteImage.setColorArgb(x, y, canvas.getPixels()[x][y]);
+                    contents.upload(atlasAndSprite.getLeft().getGlTexture(), 0);
+                }
                 System.out.println("[TextureEditor] Updating sprite in atlas: " + spriteId);
-                atlas.bindTexture();
-                img.upload(0, sprite.getX(), sprite.getY(), false);
             } else {
-                net.minecraft.client.texture.NativeImageBackedTexture dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(img);
-                client.getTextureManager().registerTexture(fullTextureId, dynamicTex);
-                dynamicTex.bindTexture();
-                img.upload(0, 0, 0, false);
+                // Dynamic texture: use NativeImageBackedTexture
+                NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
+                for (int x = 0; x < canvas.getWidth(); x++)
+                    for (int y = 0; y < canvas.getHeight(); y++)
+                        img.setColorArgb(x, y, canvas.getPixels()[x][y]);
+                var existing = client.getTextureManager().getTexture(fullTextureId);
+                if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                    nibt.setImage(img);
+                    nibt.upload();
+                } else {
+                    var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_gui", img);
+                    client.getTextureManager().registerTexture(fullTextureId, dynamicTex);
+                    dynamicTex.upload();
+                }
                 System.out.println("[TextureEditor] Applied live GUI texture: " + fullTextureId);
             }
         });
@@ -186,7 +197,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
     // Utility: Find sprite in block/gui atlases
     private org.apache.commons.lang3.tuple.Pair<net.minecraft.client.texture.SpriteAtlasTexture, net.minecraft.client.texture.Sprite> findSpriteInAtlases(MinecraftClient client, Identifier id) {
-        var blockAtlas = client.getBakedModelManager().getAtlas(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+        var blockAtlas = (net.minecraft.client.texture.SpriteAtlasTexture) client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
         var sprite = blockAtlas.getSprite(id);
         if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
             if (sprite.getContents().getId().equals(id)) {

@@ -14,12 +14,14 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.option.KeyBinding.Category;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -43,25 +45,27 @@ public class TextureEditorClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        Category category = new Category(Identifier.of("textureeditor", "category"));
+
         toggleEditorKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.toggle",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_J,
-                "category.textureeditor"
+                category
         ));
 
         openEditorKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.open",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_R,
-                "category.textureeditor"
+                category
         ));
 
         previewOriginalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.preview",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_Z,
-                "category.textureeditor"
+                category
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -92,7 +96,7 @@ public class TextureEditorClient implements ClientModInitializer {
 
                 // Preview original texture (hold key) — world-level preview
                 boolean previewKeyHeld = InputUtil.isKeyPressed(
-                        client.getWindow().getHandle(),
+                        client.getWindow(),
                         KeyBindingHelper.getBoundKeyOf(previewOriginalKey).getCode()
                 );
                 TextureManager tm = TextureManager.getInstance();

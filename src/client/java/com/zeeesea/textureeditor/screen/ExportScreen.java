@@ -164,7 +164,8 @@ public class ExportScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
+        double mouseX = click.x(); double mouseY = click.y();
         // Check palette click
         int palX = iconScreenX + ICON_SIZE * iconZoom + 10;
         int palY = iconScreenY + 25;
@@ -177,13 +178,14 @@ public class ExportScreen extends Screen {
         }
 
         if (handleIconCanvasClick(mouseX, mouseY)) return true;
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, bl);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(net.minecraft.client.gui.Click click, double deltaX, double deltaY) {
+        double mouseX = click.x(); double mouseY = click.y();
         if (handleIconCanvasClick(mouseX, mouseY)) return true;
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return super.mouseDragged(click, deltaX, deltaY);
     }
 
     private boolean handleIconCanvasClick(double mouseX, double mouseY) {
@@ -221,12 +223,12 @@ public class ExportScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
+        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
             client.setScreen(parent);
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(keyInput);
     }
 
     @Override

@@ -472,12 +472,12 @@ public class BrowseScreen extends Screen {
             int tx = Math.min(mouseX + 10, this.width - tw - 5);
             int ty = mouseY - 18;
             if (ty < 0) ty = mouseY + 15;
-            context.getMatrices().push();
-            context.getMatrices().translate(0, 0, 300);
+            context.getMatrices().pushMatrix();
+            context.getMatrices().translate(0, 0);
             context.fill(tx - 2, ty - 2, tx + tw, ty + 12, 0xEE222244);
             drawRectOutline(context, tx - 2, ty - 2, tx + tw, ty + 12, 0xFFAAAAAA);
             context.drawText(textRenderer, tooltipText, tx + 2, ty, 0xFFFFFF, true);
-            context.getMatrices().pop();
+            context.getMatrices().popMatrix();
         }
 
         // Scrollbar
@@ -521,8 +521,9 @@ public class BrowseScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
+        if (super.mouseClicked(click, bl)) return true;
+        double mouseX = click.x(); double mouseY = click.y(); int button = click.button();
 
         if (button == 0) {
             // Check grid click
@@ -591,12 +592,12 @@ public class BrowseScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
+        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
             this.close();
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(keyInput);
     }
 
     @Override

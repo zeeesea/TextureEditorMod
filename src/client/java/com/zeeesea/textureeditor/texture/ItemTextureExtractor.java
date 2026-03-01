@@ -2,8 +2,8 @@ package com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockModelPart;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
@@ -35,64 +35,43 @@ public class ItemTextureExtractor {
         // Strategy 1: Try to get sprite directly from atlas using item texture path
         // Most items in 1.21.4 have their sprite at "item/<name>" in the block atlas
         Identifier directSpriteId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath());
-        Sprite directSprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(directSpriteId);
+        SpriteAtlasTexture atlas = (SpriteAtlasTexture) client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+        Sprite directSprite = atlas.getSprite(directSpriteId);
 
         if (directSprite != null && !directSprite.getContents().getId().getPath().equals("missingno")) {
             System.out.println("[TextureEditor] Found sprite directly in atlas: " + directSprite.getContents().getId());
             return extractFromSprite(directSprite);
         }
 
-        // Strategy 2: Try via BakedModel quads (for block items etc.)
+        // Strategy 2: Try via block model quads (for block items etc.)
         System.out.println("[TextureEditor] Direct sprite not found, trying BakedModel approach...");
 
         // Try block item first
         net.minecraft.block.Block block = net.minecraft.block.Block.getBlockFromItem(stack.getItem());
         if (block != net.minecraft.block.Blocks.AIR) {
-            BakedModel model = client.getBlockRenderManager().getModel(block.getDefaultState());
+            var model = client.getBlockRenderManager().getModel(block.getDefaultState());
             if (model != null) {
-                // Try null direction first (flat items), then each face
-                List<BakedQuad> quads = model.getQuads(null, null, Random.create());
-                if (quads.isEmpty()) {
+                List<BlockModelPart> parts = model.getParts(Random.create());
+                for (BlockModelPart part : parts) {
                     for (Direction dir : Direction.values()) {
-                        quads = model.getQuads(block.getDefaultState(), dir, Random.create());
-                        if (!quads.isEmpty()) break;
-                    }
-                }
-                if (!quads.isEmpty()) {
-                    Sprite sprite = quads.getFirst().getSprite();
-                    if (!sprite.getContents().getId().getPath().equals("missingno")) {
-                        System.out.println("[TextureEditor] Found sprite via block model: " + sprite.getContents().getId());
-                        return extractFromSprite(sprite);
+                        List<BakedQuad> quads = part.getQuads(dir);
+                        if (quads != null && !quads.isEmpty()) {
+                            Sprite sprite = quads.getFirst().sprite();
+                            if (!sprite.getContents().getId().getPath().equals("missingno")) {
+                                System.out.println("[TextureEditor] Found sprite via block model: " + sprite.getContents().getId());
+                                return extractFromSprite(sprite);
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // Strategy 3: Try model via BakedModelManager
-        Identifier modelId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath());
-        BakedModel model = client.getBakedModelManager().getModel(modelId);
-        if (model != null) {
-            List<BakedQuad> quads = model.getQuads(null, null, Random.create());
-            if (quads.isEmpty()) {
-                for (Direction dir : Direction.values()) {
-                    quads = model.getQuads(null, dir, Random.create());
-                    if (!quads.isEmpty()) break;
-                }
-            }
-            if (!quads.isEmpty()) {
-                Sprite sprite = quads.getFirst().getSprite();
-                if (!sprite.getContents().getId().getPath().equals("missingno")) {
-                    System.out.println("[TextureEditor] Found sprite via model manager: " + sprite.getContents().getId());
-                    return extractFromSprite(sprite);
-                }
-            }
-        }
-
-        // Strategy 4: Fallback to Particle Sprite (fixes Leaves and other complex blocks)
+        // Strategy 3: Fallback to Particle Sprite (fixes Leaves and other complex blocks)
         if (block != net.minecraft.block.Blocks.AIR) {
-            BakedModel blockModel = client.getBlockRenderManager().getModel(block.getDefaultState());
+            var blockModel = client.getBlockRenderManager().getModel(block.getDefaultState());
             if (blockModel != null) {
-                Sprite particle = blockModel.getParticleSprite();
+                Sprite particle = blockModel.particleSprite();
                 if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
                     System.out.println("[TextureEditor] Found sprite via particle texture: " + particle.getContents().getId());
                     return extractFromSprite(particle);
@@ -102,7 +81,7 @@ public class ItemTextureExtractor {
 
         System.out.println("[TextureEditor] FAILED to find valid sprite for item: " + itemId);
 
-        // Strategy 5: Try loading entity/special texture paths directly from resources
+        // Strategy 4: Try loading entity/special texture paths directly from resources
         // This handles items like elytra, shields, signs, banners, etc. that use entity textures
         Identifier entityTexture = getSpecialItemTexturePath(itemId);
         if (entityTexture != null) {

@@ -142,9 +142,9 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int kc, int sc, int m) {
-        if (kc == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
-        return super.keyPressed(kc, sc, m);
+    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
+        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
+        return super.keyPressed(keyInput);
     }
 
     @Override

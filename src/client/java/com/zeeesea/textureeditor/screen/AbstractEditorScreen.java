@@ -593,8 +593,9 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mx, double my, int btn) {
-        if (super.mouseClicked(mx, my, btn)) return true;
+    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
+        double mx = click.x(); double my = click.y(); int btn = click.button();
+        if (super.mouseClicked(click, bl)) return true;
         if (handleExtraClick(mx, my, btn)) return true;
         if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
         if (currentPanel == PanelType.LAYER_PANEL && btn == 0 && handleLayerPanelClick(mx, my)) return true;
@@ -618,14 +619,16 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(double mx, double my, int btn) {
+    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+        double mx = click.x(); double my = click.y(); int btn = click.button();
         if (handleExtraRelease(mx, my, btn)) return true;
         if (btn == 1) { isPanning = false; return true; }
-        return super.mouseReleased(mx, my, btn);
+        return super.mouseReleased(click);
     }
 
     @Override
-    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
+    public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
+        double mx = click.x(); double my = click.y(); int btn = click.button();
         if (btn == 1 && isPanning) {
             panOffsetX = panStartOffsetX + (int) (mx - panStartMouseX);
             panOffsetY = panStartOffsetY + (int) (my - panStartMouseY);
@@ -635,7 +638,7 @@ public abstract class AbstractEditorScreen extends Screen {
         }
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
         if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
-        if (isInUIRegion(mx, my)) return super.mouseDragged(mx, my, btn, dx, dy);
+        if (isInUIRegion(mx, my)) return super.mouseDragged(click, dx, dy);
         if (canvas != null) {
             int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
@@ -653,15 +656,16 @@ public abstract class AbstractEditorScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseDragged(mx, my, btn, dx, dy);
+        return super.mouseDragged(click, dx, dy);
     }
 
     @Override
-    public boolean keyPressed(int kc, int sc, int m) {
-        if (hexInput != null && hexInput.isFocused()) return super.keyPressed(kc, sc, m);
+    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
+        int kc = keyInput.key(); int sc = keyInput.scancode(); int m = keyInput.modifiers();
+        if (hexInput != null && hexInput.isFocused()) return super.keyPressed(keyInput);
         // Preview original texture (hold key)
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
-        if (previewKey != null && previewKey.matchesKey(kc, sc)) {
+        if (previewKey != null && previewKey.matchesKey(keyInput)) {
             previewingOriginal = true;
             return true;
         }
@@ -677,7 +681,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("brush")) { currentTool = EditorTool.BRUSH; return true; }
         if (kc == s.getKeybind("browse")) { MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
-        if (openKey != null && openKey.matchesKey(kc, sc)) {
+        if (openKey != null && openKey.matchesKey(keyInput)) {
             if (s.autoApplyLive) this.applyLive();
             this.close(); return true;
         }
@@ -685,17 +689,17 @@ public abstract class AbstractEditorScreen extends Screen {
             if (s.autoApplyLive) this.applyLive();
             this.close(); return true;
         }
-        return super.keyPressed(kc, sc, m);
+        return super.keyPressed(keyInput);
     }
 
     @Override
-    public boolean keyReleased(int kc, int sc, int m) {
+    public boolean keyReleased(net.minecraft.client.input.KeyInput keyInput) {
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
-        if (previewKey != null && previewKey.matchesKey(kc, sc)) {
+        if (previewKey != null && previewKey.matchesKey(keyInput)) {
             previewingOriginal = false;
             return true;
         }
-        return super.keyReleased(kc, sc, m);
+        return super.keyReleased(keyInput);
     }
 
     // --- Click handlers ---

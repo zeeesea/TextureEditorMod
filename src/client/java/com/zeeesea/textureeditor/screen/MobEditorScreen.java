@@ -123,8 +123,8 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
-        boolean b = super.mouseDragged(mx, my, btn, dx, dy);
+    public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
+        boolean b = super.mouseDragged(click, dx, dy);
         if (mobPreviewActive) applyLive();
         return b;
     }
@@ -139,12 +139,18 @@ public class MobEditorScreen extends AbstractEditorScreen {
         }
         TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
         client.execute(() -> {
-            try (var img = new net.minecraft.client.texture.NativeImage(canvas.getWidth(), canvas.getHeight(), false)) {
-                for (int x = 0; x < canvas.getWidth(); x++)
-                    for (int y = 0; y < canvas.getHeight(); y++)
-                        img.setColorArgb(x, y, canvas.getPixels()[x][y]);
-                var tex = client.getTextureManager().getTexture(textureId);
-                if (tex != null) { tex.bindTexture(); img.upload(0, 0, 0, false); }
+            var img = new net.minecraft.client.texture.NativeImage(canvas.getWidth(), canvas.getHeight(), false);
+            for (int x = 0; x < canvas.getWidth(); x++)
+                for (int y = 0; y < canvas.getHeight(); y++)
+                    img.setColorArgb(x, y, canvas.getPixels()[x][y]);
+            var existing = client.getTextureManager().getTexture(textureId);
+            if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                nibt.setImage(img);
+                nibt.upload();
+            } else {
+                var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_mob", img);
+                client.getTextureManager().registerTexture(textureId, dynamicTex);
+                dynamicTex.upload();
             }
         });
     }

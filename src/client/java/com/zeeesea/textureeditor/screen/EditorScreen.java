@@ -84,7 +84,7 @@ public class EditorScreen extends AbstractEditorScreen {
     protected String getEditorTitle() {
         String name = block != null ? block.getName().getString() : (blockState != null ? blockState.getBlock().getName().getString() : "Unknown");
         String tintLabel = isTinted ? " \u00a7a[Tinted]" : "";
-        return "Block Editor - " + name + " (" + face.getName() + ")" + tintLabel;
+        return "Block Editor - " + name + " (" + face.asString() + ")" + tintLabel;
     }
 
     @Override
@@ -100,11 +100,11 @@ public class EditorScreen extends AbstractEditorScreen {
         // Face cycle button — only at scale <= 4
         if (showFaceButton()) {
             addDrawableChild(ButtonWidget.builder(
-                    Text.literal("Face: " + face.getName().toUpperCase()),
+                    Text.literal("Face: " + face.asString().toUpperCase()),
                     btn -> {
                         Direction[] dirs = Direction.values();
                         face = dirs[(face.ordinal() + 1) % dirs.length];
-                        btn.setMessage(Text.literal("Face: " + face.getName().toUpperCase()));
+                        btn.setMessage(Text.literal("Face: " + face.asString().toUpperCase()));
                         switchFace(face);
                     }
             ).position(5, toolY).size(tbw, tbh).build());

@@ -64,7 +64,7 @@ public class BlockBrowseEditorScreen extends AbstractEditorScreen {
     protected String getEditorTitle() {
         String name = block.getName().getString();
         String tintLabel = isTinted ? " \u00a7a[Tinted]" : "";
-        return "Block Editor - " + name + " (" + currentFace.getName() + ")" + tintLabel;
+        return "Block Editor - " + name + " (" + currentFace.asString() + ")" + tintLabel;
     }
 
     @Override

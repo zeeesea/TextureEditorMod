@@ -3,8 +3,8 @@ package com.zeeesea.textureeditor.texture;
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockModelPart;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteContents;
@@ -26,32 +26,36 @@ public class TextureExtractor {
      */
     public static BlockFaceTexture extract(BlockState state, Direction face) {
         MinecraftClient client = MinecraftClient.getInstance();
-        BakedModel model = client.getBlockRenderManager().getModel(state);
+        var model = client.getBlockRenderManager().getModel(state);
 
-        // Get quads for the specific face
-        List<BakedQuad> quads = model.getQuads(state, face, Random.create());
-        if (quads.isEmpty()) {
-            // Try null direction (for full-cube models that use null direction quads)
-            quads = model.getQuads(state, null, Random.create());
-        }
-        if (quads.isEmpty()) {
-            // Try any face
-            for (Direction dir : Direction.values()) {
-                quads = model.getQuads(state, dir, Random.create());
-                if (!quads.isEmpty()) break;
+        // In 1.21.11, BlockStateModel.getParts() returns List<BlockModelPart>
+        // Each BlockModelPart has getQuads(Direction) to get the actual BakedQuads
+        List<BlockModelPart> parts = model.getParts(Random.create());
+
+        // Search for a matching quad for the requested face
+        for (BlockModelPart part : parts) {
+            List<BakedQuad> faceQuads = part.getQuads(face);
+            if (faceQuads != null && !faceQuads.isEmpty()) {
+                Sprite sprite = faceQuads.get(0).sprite();
+                if (!sprite.getContents().getId().getPath().equals("missingno")) {
+                    return extractFromSprite(sprite);
+                }
             }
         }
 
-        if (!quads.isEmpty()) {
-            BakedQuad quad = quads.get(0);
-            Sprite sprite = quad.getSprite();
-            if (!sprite.getContents().getId().getPath().equals("missingno")) {
-                return extractFromSprite(sprite);
+        // Try null direction (general quads)
+        for (BlockModelPart part : parts) {
+            List<BakedQuad> generalQuads = part.getQuads(null);
+            if (generalQuads != null && !generalQuads.isEmpty()) {
+                Sprite sprite = generalQuads.get(0).sprite();
+                if (!sprite.getContents().getId().getPath().equals("missingno")) {
+                    return extractFromSprite(sprite);
+                }
             }
         }
 
         // Fallback: particle sprite (works for leaves, signs, etc.)
-        Sprite particle = model.getParticleSprite();
+        Sprite particle = model.particleSprite();
         if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
             return extractFromSprite(particle);
         }

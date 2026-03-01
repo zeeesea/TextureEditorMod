@@ -95,7 +95,8 @@ public class KeybindSettingsScreen extends Screen {
     public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
+        int keyCode = keyInput.key();
         if (waitingForKey != null) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 // Cancel rebind
@@ -109,7 +110,7 @@ public class KeybindSettingsScreen extends Screen {
             return true;
         }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(keyInput);
     }
 
     @Override
