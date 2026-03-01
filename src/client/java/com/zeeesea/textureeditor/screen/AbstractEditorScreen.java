@@ -150,13 +150,13 @@ public abstract class AbstractEditorScreen extends Screen {
         return 20;
     }
 
-    /** Grid + Zoom buttons: shown at scale 1-4, but hidden if scale >= 3 on FHD or smaller */
+    /** Grid + Zoom buttons: hidden at scale 4+, and hidden at scale 3+ on FHD (1080p) or smaller */
     protected boolean showExtraButtons() {
         int scale = getGuiScale();
+        if (scale >= 4) return false;
         int height = MinecraftClient.getInstance().getWindow().getHeight();
-        // On FHD (1080p) or smaller, hide these buttons at scale 3+ to save vertical space
-        if (height <= 1080 && scale >= 3) return false;
-        return scale <= 4;
+        if (scale >= 3 && height <= 1080) return false;
+        return true;
     }
 
     /** Face button: shown at scale 1-4, hidden at 5+ */
@@ -169,12 +169,12 @@ public abstract class AbstractEditorScreen extends Screen {
         return getGuiScale() <= 4;
     }
 
-    /** Color history: shown at scale 1-4, hidden at 5+ */
+    /** Color history: shown at scale 1-3, hidden at 4+ */
     private boolean showColorHistory() {
         int scale = getGuiScale();
         int height = MinecraftClient.getInstance().getWindow().getHeight();
         if (height <= 1080 && scale >= 3) return false;
-        return scale <= 4;
+        return scale <= 3;
     }
 
     // --- Tint helpers ---
@@ -503,7 +503,8 @@ public abstract class AbstractEditorScreen extends Screen {
         int sy = getPaletteEndY() + 50;
         ctx.drawText(textRenderer, "History:", px0, sy, 0x999999, false);
         sy += 12;
-        int cols = 5, cs = 18;
+        int cols = getPaletteColumns();
+        int cs = getPaletteCellSize();
         List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) {
             int c = i % cols, r = i / cols;
@@ -725,7 +726,8 @@ public abstract class AbstractEditorScreen extends Screen {
         if (hist.size() == 0) return false;
         int px0 = getPaletteX();
         int sy = getPaletteEndY() + 50 + 12;
-        int cols = 5, cs = 18;
+        int cols = getPaletteColumns();
+        int cs = getPaletteCellSize();
         List<Integer> colors = hist.getColors();
         for (int i = 0; i < colors.size(); i++) {
             int c = i % cols, r = i / cols;
@@ -855,7 +857,7 @@ public abstract class AbstractEditorScreen extends Screen {
 
     private int getPaletteColumns() {
         int scale = getGuiScale();
-        if (scale >= 5) return 6;
+        if (scale >= 5) return 5;
         if (scale >= 4) return 5;
         return 5;
     }
@@ -863,7 +865,7 @@ public abstract class AbstractEditorScreen extends Screen {
     private int getPaletteCellSize() {
         int scale = getGuiScale();
         if (scale >= 5) return 10;
-        if (scale >= 4) return 14;
+        if (scale >= 4) return 12;
         return 20;
     }
 

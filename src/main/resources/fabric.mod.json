@@ -9,8 +9,8 @@
 	],
 	"contact": {
 		"homepage": "https://modrinth.com/mod/livetextureeditor",
-		"sources": "https://github.com/zeeesea/texture-editor",
-		"issues": "https://github.com/zeeesea/texture-editor/issues"
+		"sources": "https://github.com/zeeesea/TextureEditorMod",
+		"issues": "https://github.com/zeeesea/TextureEditorMod/issues"
 	},
 	"license": "MIT",
 	"icon": "assets/textureeditor/icon.png",
