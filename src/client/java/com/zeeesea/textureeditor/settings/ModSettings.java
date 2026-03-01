@@ -32,6 +32,11 @@ public class ModSettings {
     public int colorHistorySize = 20;
     public float brushVariation = 0.15f; // ±15% brightness variation for brush tool
 
+    // External editor
+    public boolean useExternalEditor = false;
+    public String selectedEditorName = ""; // name from auto-detected list
+    public String externalEditorCustomPath = ""; // custom path overrides auto-detect
+
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private ModSettings() {
@@ -42,9 +47,10 @@ public class ModSettings {
         keybinds.put("eyedropper", GLFW.GLFW_KEY_I);
         keybinds.put("line", GLFW.GLFW_KEY_L);
         keybinds.put("brush", GLFW.GLFW_KEY_V);
-        keybinds.put("undo", GLFW.GLFW_KEY_Z);
+        keybinds.put("undo", GLFW.GLFW_KEY_Y);
         keybinds.put("redo", GLFW.GLFW_KEY_U);
         keybinds.put("grid", GLFW.GLFW_KEY_G);
+        keybinds.put("browse", GLFW.GLFW_KEY_LEFT_CONTROL);
     }
 
     public static ModSettings getInstance() {

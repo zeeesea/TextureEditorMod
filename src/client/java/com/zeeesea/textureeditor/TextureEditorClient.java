@@ -5,6 +5,11 @@ import com.zeeesea.textureeditor.screen.EditorScreen;
 import com.zeeesea.textureeditor.screen.ItemEditorScreen;
 import com.zeeesea.textureeditor.screen.MobEditorScreen;
 import com.zeeesea.textureeditor.screen.AbstractEditorScreen;
+import com.zeeesea.textureeditor.editor.ExternalEditorManager;
+import com.zeeesea.textureeditor.settings.ModSettings;
+import com.zeeesea.textureeditor.texture.TextureExtractor;
+import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
+import com.zeeesea.textureeditor.texture.MobTextureExtractor;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import com.zeeesea.textureeditor.util.EntityMapper;
 import com.zeeesea.textureeditor.texture.TextureManager;
@@ -20,6 +25,7 @@ import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -106,12 +112,19 @@ public class TextureEditorClient implements ClientModInitializer {
                     while (openEditorKey.wasPressed()) {
                         if (client.player == null) continue;
 
+                        ExternalEditorManager extMgr = ExternalEditorManager.getInstance();
+                        boolean useExternal = extMgr.isExternalEditorEnabled();
+
                         // Priority 1: Holding a spawn egg -> mob editor
                         ItemStack heldItem = client.player.getMainHandStack();
                         if (!heldItem.isEmpty() && heldItem.getItem() instanceof SpawnEggItem) {
                             Entity entity = EntityMapper.getEntityFromItem(heldItem, client.world);
                             if (entity != null) {
-                                client.execute(() -> client.setScreen(new MobEditorScreen(entity, null)));
+                                if (useExternal) {
+                                    client.execute(() -> openExternalForMob(entity));
+                                } else {
+                                    client.execute(() -> client.setScreen(new MobEditorScreen(entity, null)));
+                                }
                             }
                             continue;
                         }
@@ -119,14 +132,22 @@ public class TextureEditorClient implements ClientModInitializer {
                         // Priority 2: Holding a block item -> block editor
                         if (!heldItem.isEmpty() && heldItem.getItem() instanceof BlockItem blockItem) {
                             if (BlockFilter.isEditableBlock(blockItem.getBlock().getDefaultState())) {
-                                client.execute(() -> client.setScreen(new EditorScreen(blockItem.getBlock(), null)));
+                                if (useExternal) {
+                                    client.execute(() -> openExternalForBlock(blockItem.getBlock()));
+                                } else {
+                                    client.execute(() -> client.setScreen(new EditorScreen(blockItem.getBlock(), null)));
+                                }
                                 continue;
                             }
                         }
 
                         // Priority 3: Holding any other item -> item editor
                         if (!heldItem.isEmpty()) {
-                            client.execute(() -> client.setScreen(new ItemEditorScreen(heldItem, null)));
+                            if (useExternal) {
+                                client.execute(() -> openExternalForItem(heldItem));
+                            } else {
+                                client.execute(() -> client.setScreen(new ItemEditorScreen(heldItem, null)));
+                            }
                             continue;
                         }
 
@@ -134,7 +155,11 @@ public class TextureEditorClient implements ClientModInitializer {
                         if (client.crosshairTarget != null && client.crosshairTarget.getType() == HitResult.Type.ENTITY) {
                             EntityHitResult entityHit = (EntityHitResult) client.crosshairTarget;
                             Entity entity = entityHit.getEntity();
-                            client.execute(() -> client.setScreen(new MobEditorScreen(entity, null)));
+                            if (useExternal) {
+                                client.execute(() -> openExternalForMob(entity));
+                            } else {
+                                client.execute(() -> client.setScreen(new MobEditorScreen(entity, null)));
+                            }
                             continue;
                         }
 
@@ -143,16 +168,76 @@ public class TextureEditorClient implements ClientModInitializer {
                             BlockHitResult hitResult = (BlockHitResult) client.crosshairTarget;
                             BlockState state = client.world != null ? client.world.getBlockState(hitResult.getBlockPos()) : null;
                             if (state != null && BlockFilter.isEditableBlock(state)) {
-                                client.execute(() -> client.setScreen(new EditorScreen(hitResult)));
+                                if (useExternal) {
+                                    client.execute(() -> openExternalForBlockFace(state.getBlock(), hitResult.getSide()));
+                                } else {
+                                    client.execute(() -> client.setScreen(new EditorScreen(hitResult)));
+                                }
                                 continue;
                             }
                         }
 
-                        // Priority 6: Nothing -> browse
+                        // Priority 6: Nothing -> browse (always in-game)
                         client.execute(() -> client.setScreen(new BrowseScreen()));
                     }
                 }
             }
         });
+    }
+
+    // --- External editor helpers ---
+
+    private static void openExternalForBlock(net.minecraft.block.Block block) {
+        openExternalForBlockFace(block, net.minecraft.util.math.Direction.UP);
+    }
+
+    private static void openExternalForBlockFace(net.minecraft.block.Block block, net.minecraft.util.math.Direction face) {
+        TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), face);
+        if (tex == null) {
+            // Try other faces as fallback
+            for (net.minecraft.util.math.Direction dir : net.minecraft.util.math.Direction.values()) {
+                tex = TextureExtractor.extract(block.getDefaultState(), dir);
+                if (tex != null) break;
+            }
+        }
+        if (tex != null) {
+            Identifier spriteId = Identifier.of(tex.textureId().getNamespace(),
+                    tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+            int[][] origCopy = new int[tex.width()][tex.height()];
+            for (int x = 0; x < tex.width(); x++)
+                System.arraycopy(tex.pixels()[x], 0, origCopy[x], 0, tex.height());
+            ExternalEditorManager.getInstance().startAtlasSession(
+                    tex.textureId(), spriteId, tex.pixels(), origCopy, tex.width(), tex.height());
+        }
+    }
+
+    private static void openExternalForItem(ItemStack stack) {
+        ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(stack);
+        if (tex != null) {
+            int[][] origCopy = new int[tex.width()][tex.height()];
+            for (int x = 0; x < tex.width(); x++)
+                System.arraycopy(tex.pixels()[x], 0, origCopy[x], 0, tex.height());
+
+            if (tex.spriteId() != null && !tex.textureId().getPath().startsWith("textures/entity/")) {
+                // Atlas-based item
+                ExternalEditorManager.getInstance().startAtlasSession(
+                        tex.textureId(), tex.spriteId(), tex.pixels(), origCopy, tex.width(), tex.height());
+            } else {
+                // Entity-based item (e.g., elytra, shield)
+                ExternalEditorManager.getInstance().startEntitySession(
+                        tex.textureId(), tex.pixels(), origCopy, tex.width(), tex.height());
+            }
+        }
+    }
+
+    private static void openExternalForMob(Entity entity) {
+        MobTextureExtractor.MobTexture tex = MobTextureExtractor.extract(entity);
+        if (tex != null) {
+            int[][] origCopy = new int[tex.width()][tex.height()];
+            for (int x = 0; x < tex.width(); x++)
+                System.arraycopy(tex.pixels()[x], 0, origCopy[x], 0, tex.height());
+            ExternalEditorManager.getInstance().startEntitySession(
+                    tex.textureId(), tex.pixels(), origCopy, tex.width(), tex.height());
+        }
     }
 }

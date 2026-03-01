@@ -67,8 +67,8 @@ public class KeybindSettingsScreen extends Screen {
             settings.keybinds.put("fill", GLFW.GLFW_KEY_F);
             settings.keybinds.put("eyedropper", GLFW.GLFW_KEY_I);
             settings.keybinds.put("line", GLFW.GLFW_KEY_L);
-            settings.keybinds.put("undo", GLFW.GLFW_KEY_Z);
-            settings.keybinds.put("redo", GLFW.GLFW_KEY_Y);
+            settings.keybinds.put("undo", GLFW.GLFW_KEY_Y);
+            settings.keybinds.put("redo", GLFW.GLFW_KEY_U);
             settings.keybinds.put("grid", GLFW.GLFW_KEY_G);
             settings.keybinds.put("browse", GLFW.GLFW_KEY_LEFT_CONTROL);
             settings.save();
