@@ -43,7 +43,7 @@ public class ModSettings {
         keybinds.put("line", GLFW.GLFW_KEY_L);
         keybinds.put("brush", GLFW.GLFW_KEY_V);
         keybinds.put("undo", GLFW.GLFW_KEY_Z);
-        keybinds.put("redo", GLFW.GLFW_KEY_Y);
+        keybinds.put("redo", GLFW.GLFW_KEY_U);
         keybinds.put("grid", GLFW.GLFW_KEY_G);
     }
 
