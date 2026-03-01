@@ -64,7 +64,7 @@ public class TextureEditorClient implements ClientModInitializer {
         previewOriginalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.preview",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_Z,
+                GLFW.GLFW_KEY_Y,
                 category
         ));
 
