@@ -2,7 +2,6 @@
 
 ![Fabric](https://img.shields.io/badge/Loader-Fabric-beige?style=for-the-badge&logo=fabric)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-green?style=for-the-badge&logo=minecraft)
-![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
 **Stop closing Minecraft to edit a single pixel.**
 
