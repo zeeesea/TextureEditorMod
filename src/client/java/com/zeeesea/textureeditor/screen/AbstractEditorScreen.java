@@ -59,6 +59,9 @@ public abstract class AbstractEditorScreen extends Screen {
     protected PanelType currentPanel = PanelType.NONE;
     protected enum PanelType { NONE, COLOR_PANEL, LAYER_PANEL }
     private float pickerHue = 0f, pickerSat = 1f, pickerVal = 1f;
+    private float cachedPickerHue = -1f;
+    private int[] cachedPickerPixels = null;
+    private static final int PICKER_SV_W = 120, PICKER_SV_H = 80;
 
 //    protected static final int[] PALETTE = {
 //            0xFF000000, 0xFF404040, 0xFF808080, 0xFFC0C0C0, 0xFFFFFFFF,
@@ -423,10 +426,10 @@ public abstract class AbstractEditorScreen extends Screen {
         context.fill(lsw, 0, this.width - rsw, 28, bg);
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawText(textRenderer, getEditorTitle(), getLeftSidebarWidth() + 5, 8, 0xFFFFFF, true);
+        context.drawText(textRenderer, getEditorTitle(), getLeftSidebarWidth() + 5, 8, 0xFFFFFFFF, true);
         context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() +
                 " | Size: " + toolSize + "px" +
-                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), getLeftSidebarWidth() + 5, 20, 0xCCCCCC, false);
+                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), getLeftSidebarWidth() + 5, 20, 0xFFCCCCCC, false);
 
         drawPalette(context);
         int paletteX = getPaletteX();
@@ -440,7 +443,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (currentPanel == PanelType.COLOR_PANEL) drawColorPicker(context);
         if (currentPanel == PanelType.LAYER_PANEL) drawLayerPanel(context);
         if (currentTool == EditorTool.LINE && lineFirstClick)
-            context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFF00, false);
+            context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFFFF00, false);
 
         renderExtra(context, mouseX, mouseY);
     }
@@ -479,7 +482,7 @@ public abstract class AbstractEditorScreen extends Screen {
             }
         }
         if (previewingOriginal) {
-            ctx.drawCenteredTextWithShadow(textRenderer, "\u00a7e\u00a7lPREVIEW (Original)", canvasScreenX + (w * zoom) / 2, canvasScreenY - 14, 0xFFFF00);
+            ctx.drawCenteredTextWithShadow(textRenderer, "\u00a7e\u00a7lPREVIEW (Original)", canvasScreenX + (w * zoom) / 2, canvasScreenY - 14, 0xFFFFFF00);
         }
     }
 
@@ -501,7 +504,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (hist.size() == 0) return;
         int px0 = getPaletteX();
         int sy = getPaletteEndY() + 50;
-        ctx.drawText(textRenderer, "History:", px0, sy, 0x999999, false);
+        ctx.drawText(textRenderer, "History:", px0, sy, 0xFF999999, false);
         sy += 12;
         int cols = 5, cs = 18;
         List<Integer> colors = hist.getColors();
@@ -518,14 +521,32 @@ public abstract class AbstractEditorScreen extends Screen {
         int lsw = getLeftSidebarWidth();
         int rsw = getRightSidebarWidth();
         int canvasAreaCenter = lsw + (this.width - lsw - rsw) / 2;
-        int cpX = canvasAreaCenter - 80, cpY = this.height - 90, svW = 120, svH = 80;
+        int cpX = canvasAreaCenter - 80, cpY = this.height - 90;
+        int svW = PICKER_SV_W, svH = PICKER_SV_H;
         ctx.fill(cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFF222244);
         drawRectOutline(ctx, cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, "Color Picker", cpX, cpY - 12, 0xFFFFFF, false);
-        for (int x = 0; x < svW; x++) for (int y = 0; y < svH; y++) {
-            float s = x / (float) (svW - 1), v = 1f - y / (float) (svH - 1);
-            ctx.fill(cpX + x, cpY + y, cpX + x + 1, cpY + y + 1, hsvToRgb(pickerHue, s, v));
+        ctx.drawText(textRenderer, "Color Picker", cpX, cpY - 12, 0xFFFFFFFF, false);
+
+        // Cache the SV gradient — only recompute when hue changes
+        if (cachedPickerPixels == null || cachedPickerHue != pickerHue) {
+            cachedPickerHue = pickerHue;
+            cachedPickerPixels = new int[svW * svH];
+            for (int y = 0; y < svH; y++) {
+                float v = 1f - y / (float) (svH - 1);
+                for (int x = 0; x < svW; x++) {
+                    float s = x / (float) (svW - 1);
+                    cachedPickerPixels[y * svW + x] = hsvToRgb(pickerHue, s, v);
+                }
+            }
         }
+
+        // Draw SV gradient using horizontal lines (svH calls instead of svW*svH)
+        for (int y = 0; y < svH; y++) {
+            for (int x = 0; x < svW; x++) {
+                ctx.fill(cpX + x, cpY + y, cpX + x + 1, cpY + y + 1, cachedPickerPixels[y * svW + x]);
+            }
+        }
+
         int scx = cpX + (int) (pickerSat * (svW - 1)), scy = cpY + (int) ((1f - pickerVal) * (svH - 1));
         drawRectOutline(ctx, scx - 2, scy - 2, scx + 3, scy + 3, 0xFFFFFFFF);
         int hueX = cpX + svW + 5, hueW = 20;
@@ -546,7 +567,7 @@ public abstract class AbstractEditorScreen extends Screen {
         int panelY = this.height - panelH - 30;
         ctx.fill(panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, 0xEE222244);
         drawRectOutline(ctx, panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, "\u00a7eLayers", panelX + 4, panelY + 2, 0xFFFFFF, false);
+        ctx.drawText(textRenderer, "\u00a7eLayers", panelX + 4, panelY + 2, 0xFFFFFFFF, false);
         int listY = panelY + 16;
         for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
             var layer = stack.getLayers().get(i);
@@ -554,22 +575,22 @@ public abstract class AbstractEditorScreen extends Screen {
             int bg = (i == stack.getActiveIndex()) ? 0xFF444488 : 0xFF333355;
             ctx.fill(panelX, rowY, panelX + panelW, rowY + rowH - 1, bg);
             String eye = layer.isVisible() ? "\u00a7a\u25CF" : "\u00a7c\u25CB";
-            ctx.drawText(textRenderer, eye, panelX + 3, rowY + 5, 0xFFFFFF, false);
+            ctx.drawText(textRenderer, eye, panelX + 3, rowY + 5, 0xFFFFFFFF, false);
             String name = layer.getName();
             if (name.length() > 14) name = name.substring(0, 14) + "..";
-            ctx.drawText(textRenderer, name, panelX + 16, rowY + 5, 0xDDDDDD, false);
+            ctx.drawText(textRenderer, name, panelX + 16, rowY + 5, 0xFFDDDDDD, false);
             if (i == stack.getActiveIndex())
-                ctx.drawText(textRenderer, "\u25B6", panelX + panelW - 12, rowY + 5, 0xFFFF00, false);
+                ctx.drawText(textRenderer, "\u25B6", panelX + panelW - 12, rowY + 5, 0xFFFFFF00, false);
         }
         int btnY = listY + stack.getLayerCount() * rowH + 4;
         ctx.fill(panelX, btnY, panelX + 34, btnY + 18, 0xFF335533);
-        ctx.drawText(textRenderer, "+ Add", panelX + 3, btnY + 4, 0xAAFFAA, false);
+        ctx.drawText(textRenderer, "+ Add", panelX + 3, btnY + 4, 0xFFAAFFAA, false);
         ctx.fill(panelX + 38, btnY, panelX + 76, btnY + 18, 0xFF553333);
-        ctx.drawText(textRenderer, "- Del", panelX + 41, btnY + 4, 0xFFAAAA, false);
+        ctx.drawText(textRenderer, "- Del", panelX + 41, btnY + 4, 0xFFFFAAAA, false);
         ctx.fill(panelX + 80, btnY, panelX + 110, btnY + 18, 0xFF333355);
-        ctx.drawText(textRenderer, "\u25B2 Up", panelX + 83, btnY + 4, 0xAAAAFF, false);
+        ctx.drawText(textRenderer, "\u25B2 Up", panelX + 83, btnY + 4, 0xFFAAAAFF, false);
         ctx.fill(panelX + 114, btnY, panelX + panelW, btnY + 18, 0xFF333355);
-        ctx.drawText(textRenderer, "\u25BC Dn", panelX + 117, btnY + 4, 0xAAAAFF, false);
+        ctx.drawText(textRenderer, "\u25BC Dn", panelX + 117, btnY + 4, 0xFFAAAAFF, false);
     }
 
     // --- Input handling ---

@@ -37,8 +37,15 @@ public class MobEditorScreen extends AbstractEditorScreen {
     protected void loadTexture() {
         MobTextureExtractor.MobTexture tex = MobTextureExtractor.extract(entity);
         if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
             textureId = tex.textureId();
+
+            // Use stored originals if available (texture may already be modified)
+            int[][] storedOriginals = TextureManager.getInstance().getOriginalPixels(textureId);
+            if (storedOriginals != null) {
+                originalPixels = copyPixels(storedOriginals, tex.width(), tex.height());
+            } else {
+                originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
+            }
 
             int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
             int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
@@ -139,28 +146,79 @@ public class MobEditorScreen extends AbstractEditorScreen {
         }
         TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
         client.execute(() -> {
-            var img = new net.minecraft.client.texture.NativeImage(canvas.getWidth(), canvas.getHeight(), false);
-            for (int x = 0; x < canvas.getWidth(); x++)
-                for (int y = 0; y < canvas.getHeight(); y++)
-                    img.setColorArgb(x, y, canvas.getPixels()[x][y]);
+            System.out.println("[TextureEditor] MobEditor applyLive for " + textureId);
+            int w = canvas.getWidth();
+            int h = canvas.getHeight();
+            int[][] pixels = canvas.getPixels();
+
+            // Create NativeImage from canvas
+            var img = new net.minecraft.client.texture.NativeImage(w, h, false);
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    img.setColorArgb(x, y, pixels[x][y]);
+
             var existing = client.getTextureManager().getTexture(textureId);
-            if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
-                nibt.setImage(img);
-                nibt.upload();
-            } else {
-                var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_mob", img);
-                client.getTextureManager().registerTexture(textureId, dynamicTex);
-                dynamicTex.upload();
+            System.out.println("[TextureEditor] Existing texture type: " + (existing != null ? existing.getClass().getSimpleName() : "NULL"));
+
+            if (existing != null) {
+                try {
+                    // Try to get the GpuTexture and write directly to it
+                    var gpuTex = existing.getGlTexture();
+                    if (gpuTex != null) {
+                        int texW = gpuTex.getWidth(0);
+                        int texH = gpuTex.getHeight(0);
+                        System.out.println("[TextureEditor] GPU texture size: " + texW + "x" + texH + ", image size: " + w + "x" + h);
+
+                        if (texW == w && texH == h) {
+                            // Same size: direct upload
+                            com.mojang.blaze3d.systems.RenderSystem.getDevice()
+                                .createCommandEncoder()
+                                .writeToTexture(gpuTex, img);
+                            System.out.println("[TextureEditor] Mob texture uploaded via writeToTexture");
+                            img.close();
+                            return;
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("[TextureEditor] Direct upload failed: " + e.getMessage());
+                }
             }
+
+            // Fallback: create new NativeImageBackedTexture (this also handles first-time registration)
+            System.out.println("[TextureEditor] Creating new NativeImageBackedTexture for " + textureId);
+            try {
+                if (existing != null) {
+                    existing.close();
+                }
+            } catch (Exception e) {
+                System.out.println("[TextureEditor] Failed to close old texture: " + e.getMessage());
+            }
+            var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_mob", img);
+            client.getTextureManager().registerTexture(textureId, dynamicTex);
+            System.out.println("[TextureEditor] Registered new mob texture");
         });
     }
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null || textureId == null) return;
+        if (canvas == null || textureId == null) return;
+
+        // Get true originals
+        int[][] trueOriginals = TextureManager.getInstance().getOriginalPixels(textureId);
+        if (trueOriginals == null) trueOriginals = originalPixels;
+        if (trueOriginals == null) return;
+
+        originalPixels = copyPixels(trueOriginals, canvas.getWidth(), canvas.getHeight());
+
+        // Reset canvas: delete all layers, create fresh base layer
         canvas.saveSnapshot();
-        canvas.setLayerStack(new LayerStack(canvas.getWidth(),canvas.getHeight(), originalPixels));
+        canvas.setLayerStack(new LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels));
         canvas.invalidateCache();
+
+        // Remove stored modifications
+        TextureManager.getInstance().removeTexture(textureId);
+        TextureManager.getInstance().removeOriginal(textureId);
+
         applyLive();
     }
 }

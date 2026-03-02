@@ -65,10 +65,17 @@ public class EditorScreen extends AbstractEditorScreen {
         if (blockState == null) return;
         TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, face);
         if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
             textureId = tex.textureId();
             spriteId = Identifier.of(tex.textureId().getNamespace(),
                     tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+
+            // Use stored originals if available (atlas may already be modified)
+            int[][] storedOriginals = TextureManager.getInstance().getOriginalPixels(textureId);
+            if (storedOriginals != null) {
+                originalPixels = copyPixels(storedOriginals, tex.width(), tex.height());
+            } else {
+                originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
+            }
 
             int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
             int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
@@ -139,25 +146,57 @@ public class EditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null || spriteId == null) return;
+        if (spriteId == null || canvas == null) return;
+
+        // Get the true originals from TextureManager (stored before any modification)
+        int[][] trueOriginals = null;
+        if (textureId != null) {
+            trueOriginals = TextureManager.getInstance().getOriginalPixels(textureId);
+        }
+        if (trueOriginals == null) {
+            trueOriginals = originalPixels;
+        }
+        if (trueOriginals == null) return;
+
+        // Update our originalPixels to the true originals
+        originalPixels = copyPixels(trueOriginals, canvas.getWidth(), canvas.getHeight());
+
+        // Reset canvas: delete all layers, create fresh base layer with original pixels
         canvas.saveSnapshot();
         canvas.setLayerStack(new LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels));
         canvas.invalidateCache();
-        applyLive();
+
+        // Remove stored modifications so this face is no longer "modified"
+        if (textureId != null) {
+            TextureManager.getInstance().removeTexture(textureId);
+            TextureManager.getInstance().removeOriginal(textureId);
+        }
+
+        // Apply original pixels back to the atlas
+        final int[][] origCopy = copyPixels(originalPixels, canvas.getWidth(), canvas.getHeight());
+        MinecraftClient.getInstance().execute(() ->
+                TextureManager.getInstance().applyLive(spriteId, origCopy, canvas.getWidth(), canvas.getHeight()));
     }
 
     private void resetBlock() {
         if (blockState == null) return;
         for (Direction dir : Direction.values()) {
             TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, dir);
-            if (tex != null) {
-                Identifier sid = Identifier.of(tex.textureId().getNamespace(),
-                        tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
-                TextureManager.getInstance().removeTexture(tex.textureId());
-                MinecraftClient.getInstance().execute(() ->
-                        TextureManager.getInstance().applyLive(sid, tex.pixels(), tex.width(), tex.height()));
-            }
+            if (tex == null) continue;
+            Identifier tid = tex.textureId();
+            Identifier sid = Identifier.of(tid.getNamespace(),
+                    tid.getPath().replace("textures/", "").replace(".png", ""));
+            // Use stored originals (the true unmodified pixels)
+            int[][] origPx = TextureManager.getInstance().getOriginalPixels(tid);
+            if (origPx == null) continue; // not modified, skip
+            int w = tex.width(), h = tex.height();
+            TextureManager.getInstance().removeTexture(tid);
+            TextureManager.getInstance().removeOriginal(tid);
+            final int[][] px = copyPixels(origPx, w, h);
+            MinecraftClient.getInstance().execute(() ->
+                    TextureManager.getInstance().applyLive(sid, px, w, h));
         }
+        // Reset the current face canvas
         resetCurrent();
     }
 }

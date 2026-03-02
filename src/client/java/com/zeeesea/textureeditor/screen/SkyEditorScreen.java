@@ -138,12 +138,16 @@ public class SkyEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null) return;
+        if (originalPixels == null || canvas == null) return;
+
+        // Reset canvas: delete all layers, fresh base layer
         canvas.saveSnapshot();
-        for (int x = 0; x < canvas.getWidth(); x++)
-            for (int y = 0; y < canvas.getHeight(); y++)
-                canvas.setPixel(x, y, originalPixels[x][y]);
-        TextureManager.getInstance().removeTexture(textureId);
+        canvas.setLayerStack(new com.zeeesea.textureeditor.editor.LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels));
+        canvas.invalidateCache();
+
+        if (textureId != null) {
+            TextureManager.getInstance().removeTexture(textureId);
+        }
         applyLive();
     }
 }

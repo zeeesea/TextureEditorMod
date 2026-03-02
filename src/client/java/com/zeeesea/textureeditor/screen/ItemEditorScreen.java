@@ -32,9 +32,16 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     protected void loadTexture() {
         ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(itemStack);
         if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
             textureId = tex.textureId();
             spriteId = tex.spriteId();
+
+            // Use stored originals if available (atlas may already be modified)
+            int[][] storedOriginals = TextureManager.getInstance().getOriginalPixels(textureId);
+            if (storedOriginals != null) {
+                originalPixels = copyPixels(storedOriginals, tex.width(), tex.height());
+            } else {
+                originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
+            }
 
             int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
             int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
@@ -92,12 +99,24 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null) return;
+        if (canvas == null) return;
+
+        // Get true originals
+        int[][] trueOriginals = textureId != null ? TextureManager.getInstance().getOriginalPixels(textureId) : null;
+        if (trueOriginals == null) trueOriginals = originalPixels;
+        if (trueOriginals == null) return;
+
+        originalPixels = copyPixels(trueOriginals, canvas.getWidth(), canvas.getHeight());
+
+        // Reset canvas: delete all layers, fresh base layer
         canvas.saveSnapshot();
-        for (int x = 0; x < canvas.getWidth(); x++)
-            for (int y = 0; y < canvas.getHeight(); y++)
-                canvas.setPixel(x, y, originalPixels[x][y]);
-        if (textureId != null) TextureManager.getInstance().removeTexture(textureId);
+        canvas.setLayerStack(new com.zeeesea.textureeditor.editor.LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels));
+        canvas.invalidateCache();
+
+        if (textureId != null) {
+            TextureManager.getInstance().removeTexture(textureId);
+            TextureManager.getInstance().removeOriginal(textureId);
+        }
         applyLive();
     }
 }

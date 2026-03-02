@@ -404,7 +404,7 @@ public class BrowseScreen extends Screen {
 
         // Title info
         String entriesText = filteredEntries.size() + " entries";
-        context.drawText(textRenderer, entriesText, this.width - textRenderer.getWidth(entriesText) - 5, 36, 0x999999, false);
+        context.drawText(textRenderer, entriesText, this.width - textRenderer.getWidth(entriesText) - 5, 36, 0xFF999999, false);
 
         // Render grid
         renderGrid(context, mouseX, mouseY);
@@ -473,10 +473,9 @@ public class BrowseScreen extends Screen {
             int ty = mouseY - 18;
             if (ty < 0) ty = mouseY + 15;
             context.getMatrices().pushMatrix();
-            context.getMatrices().translate(0, 0);
             context.fill(tx - 2, ty - 2, tx + tw, ty + 12, 0xEE222244);
             drawRectOutline(context, tx - 2, ty - 2, tx + tw, ty + 12, 0xFFAAAAAA);
-            context.drawText(textRenderer, tooltipText, tx + 2, ty, 0xFFFFFF, true);
+            context.drawText(textRenderer, tooltipText, tx + 2, ty, 0xFFFFFFFF, true);
             context.getMatrices().popMatrix();
         }
 

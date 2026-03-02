@@ -45,10 +45,16 @@ public class BlockBrowseEditorScreen extends AbstractEditorScreen {
     protected void loadTexture() {
         TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, currentFace);
         if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
             textureId = tex.textureId();
             spriteId = Identifier.of(tex.textureId().getNamespace(),
                     tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+
+            int[][] storedOriginals = TextureManager.getInstance().getOriginalPixels(textureId);
+            if (storedOriginals != null) {
+                originalPixels = copyPixels(storedOriginals, tex.width(), tex.height());
+            } else {
+                originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
+            }
 
             int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
             int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
@@ -111,30 +117,40 @@ public class BlockBrowseEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null || spriteId == null) return;
+        if (spriteId == null || canvas == null) return;
+
+        int[][] trueOriginals = textureId != null ? TextureManager.getInstance().getOriginalPixels(textureId) : null;
+        if (trueOriginals == null) trueOriginals = originalPixels;
+        if (trueOriginals == null) return;
+
+        originalPixels = copyPixels(trueOriginals, canvas.getWidth(), canvas.getHeight());
         canvas.saveSnapshot();
-        for (int x = 0; x < canvas.getWidth(); x++)
-            for (int y = 0; y < canvas.getHeight(); y++)
-                canvas.setPixel(x, y, originalPixels[x][y]);
+        canvas.setLayerStack(new com.zeeesea.textureeditor.editor.LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels));
+        canvas.invalidateCache();
+
+        if (textureId != null) {
+            TextureManager.getInstance().removeTexture(textureId);
+            TextureManager.getInstance().removeOriginal(textureId);
+        }
         applyLive();
     }
 
     private void resetBlock() {
         for (Direction dir : Direction.values()) {
             TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, dir);
-            if (tex != null) {
-                Identifier sid = Identifier.of(tex.textureId().getNamespace(),
-                        tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
-                TextureManager.getInstance().removeTexture(tex.textureId());
-                MinecraftClient.getInstance().execute(() ->
-                        TextureManager.getInstance().applyLive(sid, tex.pixels(), tex.width(), tex.height()));
-            }
+            if (tex == null) continue;
+            Identifier tid = tex.textureId();
+            Identifier sid = Identifier.of(tid.getNamespace(),
+                    tid.getPath().replace("textures/", "").replace(".png", ""));
+            int[][] origPx = TextureManager.getInstance().getOriginalPixels(tid);
+            if (origPx == null) continue;
+            int w = tex.width(), h = tex.height();
+            TextureManager.getInstance().removeTexture(tid);
+            TextureManager.getInstance().removeOriginal(tid);
+            final int[][] px = copyPixels(origPx, w, h);
+            MinecraftClient.getInstance().execute(() ->
+                    TextureManager.getInstance().applyLive(sid, px, w, h));
         }
-        if (originalPixels != null) {
-            canvas.saveSnapshot();
-            for (int x = 0; x < canvas.getWidth(); x++)
-                for (int y = 0; y < canvas.getHeight(); y++)
-                    canvas.setPixel(x, y, originalPixels[x][y]);
-        }
+        resetCurrent();
     }
 }

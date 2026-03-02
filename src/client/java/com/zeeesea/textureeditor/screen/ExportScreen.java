@@ -102,13 +102,13 @@ public class ExportScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawCenteredTextWithShadow(textRenderer, "Export Texture Pack", this.width / 2, 10, 0xFFFFFF);
-        context.drawText(textRenderer, "Pack Name:", this.width / 2 - 100, 30, 0xCCCCCC, false);
-        context.drawText(textRenderer, "Description:", this.width / 2 - 100, 65, 0xCCCCCC, false);
-        context.drawText(textRenderer, "Author:", this.width / 2 - 100, 100, 0xCCCCCC, false);
+        context.drawCenteredTextWithShadow(textRenderer, "Export Texture Pack", this.width / 2, 10, 0xFFFFFFFF);
+        context.drawText(textRenderer, "Pack Name:", this.width / 2 - 100, 30, 0xFFCCCCCC, false);
+        context.drawText(textRenderer, "Description:", this.width / 2 - 100, 65, 0xFFCCCCCC, false);
+        context.drawText(textRenderer, "Author:", this.width / 2 - 100, 100, 0xFFCCCCCC, false);
 
         // Draw "Pack Icon (optional):" label
-        context.drawText(textRenderer, "Pack Icon (draw below):", iconScreenX, 135, 0xCCCCCC, false);
+        context.drawText(textRenderer, "Pack Icon (draw below):", iconScreenX, 135, 0xFFCCCCCC, false);
 
         // Draw icon canvas
         drawIconCanvas(context, mouseX, mouseY);

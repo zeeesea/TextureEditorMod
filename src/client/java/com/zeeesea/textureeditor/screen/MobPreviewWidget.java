@@ -52,7 +52,7 @@ public class MobPreviewWidget {
 
         // Title
         MinecraftClient client = MinecraftClient.getInstance();
-        context.drawText(client.textRenderer, "\u00a7b3D Preview", x + 2, y - 13, 0xFFFFFF, false);
+        context.drawText(client.textRenderer, "\u00a7b3D Preview", x + 2, y - 13, 0xFFFFFFFF, false);
 
         // Render entity
         if (entity instanceof LivingEntity livingEntity) {
@@ -85,11 +85,11 @@ public class MobPreviewWidget {
                 );
             } catch (Exception e) {
                 // If rendering fails, show error text
-                context.drawText(client.textRenderer, "Preview N/A", x + 10, y + height / 2, 0xFF5555, false);
+                context.drawText(client.textRenderer, "Preview N/A", x + 10, y + height / 2, 0xFFFF5555, false);
             }
         } else {
             MinecraftClient client2 = MinecraftClient.getInstance();
-            context.drawText(client2.textRenderer, "Non-living entity", x + 5, y + height / 2, 0xAAAAAA, false);
+            context.drawText(client2.textRenderer, "Non-living entity", x + 5, y + height / 2, 0xFFAAAAAA, false);
         }
 
         // Instructions

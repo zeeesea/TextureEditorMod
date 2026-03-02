@@ -9,4 +9,10 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface SpriteContentsAccessor {
     @Accessor("image")
     NativeImage getImage();
+
+    @Accessor("mipmapLevelsImages")
+    NativeImage[] getMipmapLevelsImages();
+
+    @Accessor("mipmapLevelsImages")
+    void setMipmapLevelsImages(NativeImage[] images);
 }

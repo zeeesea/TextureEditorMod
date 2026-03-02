@@ -129,7 +129,7 @@ public class SettingsScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
-        context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a76Texture Editor Settings", this.width / 2, 15, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a76Texture Editor Settings", this.width / 2, 15, 0xFFFFFFFF);
         super.render(context, mouseX, mouseY, delta);
     }
 
