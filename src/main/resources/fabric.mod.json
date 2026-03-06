@@ -12,7 +12,7 @@
 		"sources": "https://github.com/zeeesea/TextureEditorMod",
 		"issues": "https://github.com/zeeesea/TextureEditorMod/issues"
 	},
-	"license": "MIT",
+	"license": "CC-BY-NC-4.0",
 	"icon": "assets/textureeditor/icon.png",
 	"environment": "*",
 	"entrypoints": {
