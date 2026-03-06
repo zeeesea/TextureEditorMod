@@ -52,31 +52,16 @@ public class KeybindSettingsScreen extends Screen {
                 waitingForKey = aid;
                 this.clearChildren();
                 this.init();
-            }).position(centerX - 130, y).size(260, 20).build());
+            }).position(centerX - 100, y).size(200, 20).build());
             y += 24;
         }
 
-        y += 20;
-
-        // Reset all keybinds
+        y += 10;
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset to Defaults"), btn -> {
-            ModSettings settings = ModSettings.getInstance();
-            settings.keybinds.put("pencil", GLFW.GLFW_KEY_B);
-            settings.keybinds.put("brush", GLFW.GLFW_KEY_V);
-            settings.keybinds.put("eraser", GLFW.GLFW_KEY_E);
-            settings.keybinds.put("fill", GLFW.GLFW_KEY_F);
-            settings.keybinds.put("eyedropper", GLFW.GLFW_KEY_I);
-            settings.keybinds.put("line", GLFW.GLFW_KEY_L);
-            settings.keybinds.put("undo", GLFW.GLFW_KEY_Z);
-            settings.keybinds.put("redo", GLFW.GLFW_KEY_Y);
-            settings.keybinds.put("grid", GLFW.GLFW_KEY_G);
-            settings.keybinds.put("browse", GLFW.GLFW_KEY_LEFT_CONTROL);
-            settings.save();
-            waitingForKey = null;
+            s.resetKeybinds();
             this.clearChildren();
             this.init();
-        }).position(centerX - 80, y).size(160, 20).build());
-
+        }).position(centerX - 100, y).size(200, 20).build());
         y += 30;
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> this.close())

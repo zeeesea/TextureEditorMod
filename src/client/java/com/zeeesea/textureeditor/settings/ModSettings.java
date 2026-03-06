@@ -35,7 +35,18 @@ public class ModSettings {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private ModSettings() {
-        // Default keybinds
+        resetKeybinds();
+    }
+
+    public static ModSettings getInstance() {
+        if (instance == null) {
+            instance = load();
+        }
+        return instance;
+    }
+
+    public void resetKeybinds() {
+        keybinds.clear();
         keybinds.put("pencil", GLFW.GLFW_KEY_B);
         keybinds.put("eraser", GLFW.GLFW_KEY_E);
         keybinds.put("fill", GLFW.GLFW_KEY_F);
@@ -45,13 +56,7 @@ public class ModSettings {
         keybinds.put("undo", GLFW.GLFW_KEY_Z);
         keybinds.put("redo", GLFW.GLFW_KEY_Y);
         keybinds.put("grid", GLFW.GLFW_KEY_G);
-    }
-
-    public static ModSettings getInstance() {
-        if (instance == null) {
-            instance = load();
-        }
-        return instance;
+        save();
     }
 
     public int getKeybind(String action) {

@@ -14,7 +14,6 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.option.KeyBinding.Category;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.BlockItem;
@@ -45,7 +44,7 @@ public class TextureEditorClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        Category category = new Category(Identifier.of("textureeditor", "category"));
+        KeyBinding.Category category = KeyBinding.Category.create(Identifier.of("textureeditor", "category"));
 
         toggleEditorKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.toggle",
@@ -64,7 +63,7 @@ public class TextureEditorClient implements ClientModInitializer {
         previewOriginalKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.preview",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_Y,
+                GLFW.GLFW_KEY_X,
                 category
         ));
 
