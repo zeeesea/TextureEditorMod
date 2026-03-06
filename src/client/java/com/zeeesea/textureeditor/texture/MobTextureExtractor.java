@@ -9,6 +9,7 @@ import net.minecraft.util.Identifier;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,39 +32,151 @@ public class MobTextureExtractor {
 
         System.out.println("[TextureEditor] Extracting mob texture for: " + entityId);
 
-        // Build candidate texture paths
+        // Step 1: Try to extract texture path from entity variant (1.21.2+ variant system)
+        Identifier variantTexture = tryExtractVariantTexture(entity);
+        if (variantTexture != null) {
+            System.out.println("[TextureEditor] Variant texture detected: " + variantTexture);
+            MobTexture result = tryLoadTexture(client, variantTexture, name);
+            if (result != null) return result;
+        }
+
+        // Step 2: Build candidate texture paths from hardcoded list
         List<Identifier> candidates = buildTexturePaths(entityId);
 
         for (Identifier textureId : candidates) {
             System.out.println("[TextureEditor] Trying texture path: " + textureId);
-            var optResource = client.getResourceManager().getResource(textureId);
-            if (optResource.isPresent()) {
-                try {
-                    InputStream stream = optResource.get().getInputStream();
-                    NativeImage image = NativeImage.read(stream);
-                    int w = image.getWidth();
-                    int h = image.getHeight();
-
-                    int[][] pixels = new int[w][h];
-                    for (int x = 0; x < w; x++) {
-                        for (int y = 0; y < h; y++) {
-                            pixels[x][y] = image.getColorArgb(x, y);
-                        }
-                    }
-
-                    image.close();
-                    stream.close();
-
-                    System.out.println("[TextureEditor] Found mob texture: " + textureId + " size=" + w + "x" + h);
-                    return new MobTexture(textureId, pixels, w, h, name);
-
-                } catch (IOException e) {
-                    System.out.println("[TextureEditor] Failed to read texture: " + textureId + " - " + e.getMessage());
-                }
-            }
+            MobTexture result = tryLoadTexture(client, textureId, name);
+            if (result != null) return result;
         }
 
         System.out.println("[TextureEditor] FAILED to find texture for entity: " + entityId);
+        System.out.println("[TextureEditor] Total candidates tried: " + (candidates.size() + (variantTexture != null ? 1 : 0)));
+        return null;
+    }
+
+    /**
+     * Try to extract texture path from entity's variant system via reflection.
+     * In 1.21.2+, entities like Cow, Pig, Chicken use data-driven variants
+     * (CowVariant, PigVariant, ChickenVariant) that contain the texture path.
+     */
+    private static Identifier tryExtractVariantTexture(Entity entity) {
+        try {
+            // Try getVariant() -> RegistryEntry -> value() -> modelAndTexture() -> asset() -> texturePath()
+            // This works for CowEntity, PigEntity, ChickenEntity etc. in 1.21.2+
+            Method getVariant = null;
+            for (Method m : entity.getClass().getMethods()) {
+                if (m.getName().equals("getVariant") && m.getParameterCount() == 0) {
+                    getVariant = m;
+                    break;
+                }
+            }
+            if (getVariant == null) {
+                System.out.println("[TextureEditor] No getVariant() method found on " + entity.getClass().getSimpleName());
+                return null;
+            }
+
+            Object variantEntry = getVariant.invoke(entity);
+            System.out.println("[TextureEditor] getVariant() returned: " + (variantEntry != null ? variantEntry.getClass().getSimpleName() : "null"));
+            if (variantEntry == null) return null;
+
+            // RegistryEntry.value()
+            Object variant = null;
+            for (Method m : variantEntry.getClass().getMethods()) {
+                if (m.getName().equals("value") && m.getParameterCount() == 0) {
+                    variant = m.invoke(variantEntry);
+                    break;
+                }
+            }
+            if (variant == null) {
+                System.out.println("[TextureEditor] variant.value() returned null");
+                return null;
+            }
+            System.out.println("[TextureEditor] Variant value: " + variant.getClass().getSimpleName());
+
+            // Try modelAndTexture() -> asset() -> texturePath()
+            Object modelAndTexture = null;
+            for (Method m : variant.getClass().getMethods()) {
+                if (m.getName().equals("modelAndTexture") && m.getParameterCount() == 0) {
+                    modelAndTexture = m.invoke(variant);
+                    break;
+                }
+            }
+            if (modelAndTexture != null) {
+                System.out.println("[TextureEditor] modelAndTexture: " + modelAndTexture.getClass().getSimpleName());
+                Object asset = null;
+                for (Method m : modelAndTexture.getClass().getMethods()) {
+                    if (m.getName().equals("asset") && m.getParameterCount() == 0) {
+                        asset = m.invoke(modelAndTexture);
+                        break;
+                    }
+                }
+                if (asset != null) {
+                    System.out.println("[TextureEditor] asset: " + asset.getClass().getSimpleName());
+                    for (Method m : asset.getClass().getMethods()) {
+                        if (m.getName().equals("texturePath") && m.getParameterCount() == 0) {
+                            Object result = m.invoke(asset);
+                            if (result instanceof Identifier texId) {
+                                System.out.println("[TextureEditor] Found variant texturePath: " + texId);
+                                return texId;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Alternative: try texture() directly on variant (some variants use this pattern)
+            for (Method m : variant.getClass().getMethods()) {
+                if ((m.getName().equals("texture") || m.getName().equals("texturePath"))
+                        && m.getParameterCount() == 0
+                        && Identifier.class.isAssignableFrom(m.getReturnType())) {
+                    Identifier texId = (Identifier) m.invoke(variant);
+                    if (texId != null) {
+                        System.out.println("[TextureEditor] Found variant texture directly: " + texId);
+                        return texId;
+                    }
+                }
+            }
+
+            // Log all methods on the variant for debugging
+            System.out.println("[TextureEditor] Variant methods on " + variant.getClass().getSimpleName() + ":");
+            for (Method m : variant.getClass().getMethods()) {
+                if (m.getDeclaringClass() != Object.class) {
+                    System.out.println("[TextureEditor]   " + m.getName() + "() -> " + m.getReturnType().getSimpleName());
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] Variant extraction failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static MobTexture tryLoadTexture(MinecraftClient client, Identifier textureId, String name) {
+        var optResource = client.getResourceManager().getResource(textureId);
+        if (optResource.isPresent()) {
+            try {
+                InputStream stream = optResource.get().getInputStream();
+                NativeImage image = NativeImage.read(stream);
+                int w = image.getWidth();
+                int h = image.getHeight();
+
+                int[][] pixels = new int[w][h];
+                for (int x = 0; x < w; x++) {
+                    for (int y = 0; y < h; y++) {
+                        pixels[x][y] = image.getColorArgb(x, y);
+                    }
+                }
+
+                image.close();
+                stream.close();
+
+                System.out.println("[TextureEditor] Found mob texture: " + textureId + " size=" + w + "x" + h);
+                return new MobTexture(textureId, pixels, w, h, name);
+
+            } catch (IOException e) {
+                System.out.println("[TextureEditor] Failed to read texture: " + textureId + " - " + e.getMessage());
+            }
+        }
         return null;
     }
 
@@ -150,11 +263,32 @@ public class MobTextureExtractor {
             case "dolphin" -> paths.add(0, Identifier.of(ns, "textures/entity/dolphin.png"));
             case "turtle" -> paths.add(0, Identifier.of(ns, "textures/entity/turtle/big_sea_turtle.png"));
             case "ocelot" -> paths.add(0, Identifier.of(ns, "textures/entity/cat/ocelot.png"));
-            case "mooshroom" -> paths.add(0, Identifier.of(ns, "textures/entity/cow/red_mooshroom.png"));
-            case "cow" -> paths.add(0, Identifier.of(ns, "textures/entity/cow/cow.png"));
-            case "pig" -> paths.add(0, Identifier.of(ns, "textures/entity/pig/pig.png"));
+            case "mooshroom" -> {
+                paths.add(0, Identifier.of(ns, "textures/entity/cow/red_mooshroom.png"));
+                paths.add(Identifier.of(ns, "textures/entity/cow/brown_mooshroom.png"));
+            }
+            case "cow" -> {
+                paths.add(0, Identifier.of(ns, "textures/entity/cow/temperate_cow.png"));
+                paths.add(Identifier.of(ns, "textures/entity/cow/cold_cow.png"));
+                paths.add(Identifier.of(ns, "textures/entity/cow/warm_cow.png"));
+                paths.add(Identifier.of(ns, "textures/entity/cow/temperate.png"));
+                paths.add(Identifier.of(ns, "textures/entity/cow/cow.png"));
+            }
+            case "pig" -> {
+                paths.add(0, Identifier.of(ns, "textures/entity/pig/temperate_pig.png"));
+                paths.add(Identifier.of(ns, "textures/entity/pig/cold_pig.png"));
+                paths.add(Identifier.of(ns, "textures/entity/pig/warm_pig.png"));
+                paths.add(Identifier.of(ns, "textures/entity/pig/temperate.png"));
+                paths.add(Identifier.of(ns, "textures/entity/pig/pig.png"));
+            }
             case "sheep" -> paths.add(0, Identifier.of(ns, "textures/entity/sheep/sheep.png"));
-            case "chicken" -> paths.add(0, Identifier.of(ns, "textures/entity/chicken/chicken.png"));
+            case "chicken" -> {
+                paths.add(0, Identifier.of(ns, "textures/entity/chicken/temperate_chicken.png"));
+                paths.add(Identifier.of(ns, "textures/entity/chicken/cold_chicken.png"));
+                paths.add(Identifier.of(ns, "textures/entity/chicken/warm_chicken.png"));
+                paths.add(Identifier.of(ns, "textures/entity/chicken/temperate.png"));
+                paths.add(Identifier.of(ns, "textures/entity/chicken/chicken.png"));
+            }
             case "creeper" -> paths.add(0, Identifier.of(ns, "textures/entity/creeper/creeper.png"));
             case "skeleton" -> paths.add(0, Identifier.of(ns, "textures/entity/skeleton/skeleton.png"));
             case "wither_skeleton" -> paths.add(0, Identifier.of(ns, "textures/entity/skeleton/wither_skeleton.png"));

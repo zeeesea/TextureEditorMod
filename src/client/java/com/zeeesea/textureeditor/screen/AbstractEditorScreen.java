@@ -60,8 +60,16 @@ public abstract class AbstractEditorScreen extends Screen {
     protected enum PanelType { NONE, COLOR_PANEL, LAYER_PANEL }
     private float pickerHue = 0f, pickerSat = 1f, pickerVal = 1f;
     private float cachedPickerHue = -1f;
-    private int[] cachedPickerPixels = null;
     private static final int PICKER_SV_W = 120, PICKER_SV_H = 80;
+    // Cached picker textures for performance (avoids thousands of fill() calls per frame)
+    private net.minecraft.client.texture.NativeImageBackedTexture pickerSvTexture = null;
+    private net.minecraft.client.texture.NativeImageBackedTexture pickerHueTexture = null;
+    private static final Identifier PICKER_SV_TEX_ID = Identifier.of("textureeditor", "picker_sv");
+    private static final Identifier PICKER_HUE_TEX_ID = Identifier.of("textureeditor", "picker_hue");
+    private boolean pickerHueBarBuilt = false;
+
+    // Continuous drawing: track last drawn pixel for line interpolation
+    private int lastDrawX = -1, lastDrawY = -1;
 
 //    protected static final int[] PALETTE = {
 //            0xFF000000, 0xFF404040, 0xFF808080, 0xFFC0C0C0, 0xFFFFFFFF,
@@ -204,7 +212,30 @@ public abstract class AbstractEditorScreen extends Screen {
     // --- Init ---
 
     @Override
+    public void removed() {
+        super.removed();
+        // Clean up cached canvas texture
+        if (canvasTexture != null) {
+            canvasTexture.close();
+            canvasTexture = null;
+        }
+        // Clean up picker textures
+        if (pickerSvTexture != null) {
+            pickerSvTexture.close();
+            pickerSvTexture = null;
+        }
+        if (pickerHueTexture != null) {
+            pickerHueTexture.close();
+            pickerHueTexture = null;
+        }
+    }
+
+    @Override
     protected void init() {
+        // Reset cached textures on re-init (screen resize, etc.)
+        canvasTextureDirty = true;
+        pickerHueBarBuilt = false;
+
         loadTexture();
         if (canvas == null) {
             canvas = new PixelCanvas(16, 16);
@@ -362,6 +393,7 @@ public abstract class AbstractEditorScreen extends Screen {
         canvasBaseY = 30 + (this.height - 80 - canvas.getHeight() * zoom) / 2;
         canvasScreenX = canvasBaseX + panOffsetX;
         canvasScreenY = canvasBaseY + panOffsetY;
+        canvasTextureDirty = true;
     }
 
     protected boolean isInUIRegion(double mx, double my) {
@@ -440,31 +472,136 @@ public abstract class AbstractEditorScreen extends Screen {
         drawRectOutline(context, paletteX + hexW + 4, paletteEndY, paletteX + hexW + 24, paletteEndY + 18, 0xFFFFFFFF);
 
         if (showColorHistory()) drawColorHistory(context);
-        if (currentPanel == PanelType.COLOR_PANEL) drawColorPicker(context);
-        if (currentPanel == PanelType.LAYER_PANEL) drawLayerPanel(context);
+        if (currentPanel == PanelType.COLOR_PANEL) {
+            context.createNewRootLayer();
+            drawColorPicker(context);
+        }
+        if (currentPanel == PanelType.LAYER_PANEL) {
+            context.createNewRootLayer();
+            drawLayerPanel(context);
+        }
         if (currentTool == EditorTool.LINE && lineFirstClick)
             context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFFFF00, false);
 
         renderExtra(context, mouseX, mouseY);
     }
 
+    // Cached canvas texture for performance on large textures
+    private net.minecraft.client.texture.NativeImageBackedTexture canvasTexture = null;
+    private static final Identifier CANVAS_TEX_ID = Identifier.of("textureeditor", "canvas_preview");
+    private long lastCanvasHash = 0;
+    private boolean canvasTextureDirty = true;
+
     private void drawCanvas(DrawContext ctx, int mx, int my) {
         if (canvas == null) return;
+        try {
+            drawCanvasInternal(ctx, mx, my);
+        } catch (Throwable t) {
+            System.out.println("[TextureEditor] ERROR in drawCanvas: " + t.getClass().getName() + ": " + t.getMessage());
+            t.printStackTrace();
+        }
+    }
+
+    private void drawCanvasInternal(DrawContext ctx, int mx, int my) {
+        if (canvas == null) return;
         int w = canvas.getWidth(), h = canvas.getHeight();
-        for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) {
-            int sx = canvasScreenX + x * zoom, sy = canvasScreenY + y * zoom;
-            ctx.fill(sx, sy, sx + zoom, sy + zoom, ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
-            int c;
-            if (previewingOriginal && originalPixels != null && x < originalPixels.length && y < originalPixels[x].length) {
-                c = originalPixels[x][y];
-            } else {
-                c = canvas.getPixel(x, y);
+
+        // Calculate visible pixel range (cull off-screen pixels for performance)
+        int visMinX = Math.max(0, (-canvasScreenX) / zoom);
+        int visMinY = Math.max(0, (-canvasScreenY) / zoom);
+        int visMaxX = Math.min(w, (this.width - canvasScreenX + zoom - 1) / zoom);
+        int visMaxY = Math.min(h, (this.height - canvasScreenY + zoom - 1) / zoom);
+
+        int visW = visMaxX - visMinX;
+        int visH = visMaxY - visMinY;
+
+        // For large textures (>32x32), use cached texture rendering (1 draw call vs thousands of fill calls)
+        // Always use cached texture for large textures regardless of zoom level to prevent watchdog crashes
+        if (w * h > 1024) {
+            // Check if canvas changed
+            long hash = canvas.getVersion();
+            if (hash != lastCanvasHash || canvasTextureDirty || canvasTexture == null) {
+                lastCanvasHash = hash;
+                canvasTextureDirty = false;
+
+                // Build a 1:1 pixel image (NOT zoomed - let drawTexture handle scaling)
+                if (w > 0 && h > 0) {
+                    var canvasImage = new net.minecraft.client.texture.NativeImage(w, h, false);
+                    for (int x = 0; x < w; x++) {
+                        for (int y = 0; y < h; y++) {
+                            int c;
+                            if (previewingOriginal && originalPixels != null && x < originalPixels.length && y < originalPixels[x].length) {
+                                c = originalPixels[x][y];
+                            } else {
+                                c = canvas.getPixel(x, y);
+                            }
+                            int alpha = (c >> 24) & 0xFF;
+                            int display;
+                            if (alpha == 0) {
+                                display = ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
+                            } else if (alpha < 255) {
+                                int checker = ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
+                                int fc = usesTint() ? applyTint(c) : c;
+                                float a = alpha / 255f;
+                                int cr = (int)(((fc >> 16) & 0xFF) * a + ((checker >> 16) & 0xFF) * (1 - a));
+                                int cg = (int)(((fc >> 8) & 0xFF) * a + ((checker >> 8) & 0xFF) * (1 - a));
+                                int cb = (int)((fc & 0xFF) * a + (checker & 0xFF) * (1 - a));
+                                display = 0xFF000000 | (cr << 16) | (cg << 8) | cb;
+                            } else {
+                                display = usesTint() ? applyTint(c) : c;
+                            }
+                            canvasImage.setColorArgb(x, y, display);
+                        }
+                    }
+                    if (canvasTexture != null) {
+                        var oldTex = canvasTexture.getGlTexture();
+                        if (oldTex != null && (oldTex.getWidth(0) != w || oldTex.getHeight(0) != h)) {
+                            canvasTexture.close();
+                            canvasTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "canvas_preview", canvasImage);
+                            MinecraftClient.getInstance().getTextureManager().registerTexture(CANVAS_TEX_ID, canvasTexture);
+                        } else {
+                            canvasTexture.setImage(canvasImage);
+                            canvasTexture.upload();
+                        }
+                    } else {
+                        canvasTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "canvas_preview", canvasImage);
+                        MinecraftClient.getInstance().getTextureManager().registerTexture(CANVAS_TEX_ID, canvasTexture);
+                    }
+                }
             }
-            if (((c >> 24) & 0xFF) > 0) ctx.fill(sx, sy, sx + zoom, sy + zoom, usesTint() ? applyTint(c) : c);
+
+            // Draw the canvas texture scaled by zoom
+            // Use regionWidth=w, regionHeight=h to sample the entire texture once,
+            // and width=w*zoom, height=h*zoom to scale it up on screen
+            int drawX = canvasScreenX;
+            int drawY = canvasScreenY;
+            int drawW = w * zoom;
+            int drawH = h * zoom;
+            if (drawW > 0 && drawH > 0) {
+                ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, CANVAS_TEX_ID,
+                    drawX, drawY, 0, 0, drawW, drawH, w, h, w, h);
+            }
+        } else {
+            // Small textures: use original fill-based rendering (fine for <=32x32)
+            for (int x = visMinX; x < visMaxX; x++) for (int y = visMinY; y < visMaxY; y++) {
+                int sx = canvasScreenX + x * zoom, sy = canvasScreenY + y * zoom;
+                int c;
+                if (previewingOriginal && originalPixels != null && x < originalPixels.length && y < originalPixels[x].length) {
+                    c = originalPixels[x][y];
+                } else {
+                    c = canvas.getPixel(x, y);
+                }
+                int alpha = (c >> 24) & 0xFF;
+                if (alpha < 255) {
+                    ctx.fill(sx, sy, sx + zoom, sy + zoom, ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
+                }
+                if (alpha > 0) ctx.fill(sx, sy, sx + zoom, sy + zoom, usesTint() ? applyTint(c) : c);
+            }
         }
         if (showGrid && zoom >= 4) {
-            for (int x = 0; x <= w; x++) ctx.fill(canvasScreenX + x * zoom, canvasScreenY, canvasScreenX + x * zoom + 1, canvasScreenY + h * zoom, 0x40FFFFFF);
-            for (int y = 0; y <= h; y++) ctx.fill(canvasScreenX, canvasScreenY + y * zoom, canvasScreenX + w * zoom, canvasScreenY + y * zoom + 1, 0x40FFFFFF);
+            // Only draw grid lines in visible range
+            for (int x = visMinX; x <= visMaxX; x++) ctx.fill(canvasScreenX + x * zoom, canvasScreenY + visMinY * zoom, canvasScreenX + x * zoom + 1, canvasScreenY + visMaxY * zoom, 0x40FFFFFF);
+            for (int y = visMinY; y <= visMaxY; y++) ctx.fill(canvasScreenX + visMinX * zoom, canvasScreenY + y * zoom, canvasScreenX + visMaxX * zoom, canvasScreenY + y * zoom + 1, 0x40FFFFFF);
         }
         drawRectOutline(ctx, canvasScreenX - 1, canvasScreenY - 1, canvasScreenX + w * zoom + 1, canvasScreenY + h * zoom + 1, 0xFFFFFFFF);
         // Hover highlight with tool size
@@ -523,37 +660,64 @@ public abstract class AbstractEditorScreen extends Screen {
         int canvasAreaCenter = lsw + (this.width - lsw - rsw) / 2;
         int cpX = canvasAreaCenter - 80, cpY = this.height - 90;
         int svW = PICKER_SV_W, svH = PICKER_SV_H;
+
         ctx.fill(cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFF222244);
         drawRectOutline(ctx, cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, "Color Picker", cpX, cpY - 12, 0xFFFFFFFF, false);
+        ctx.drawText(textRenderer, "Color Picker", cpX, cpY - 12, 0xFFFFFFFF, true);
 
-        // Cache the SV gradient — only recompute when hue changes
-        if (cachedPickerPixels == null || cachedPickerHue != pickerHue) {
+        // Build/update SV gradient texture when hue changes
+        if (cachedPickerHue != pickerHue || pickerSvTexture == null) {
             cachedPickerHue = pickerHue;
-            cachedPickerPixels = new int[svW * svH];
+            var svImage = new net.minecraft.client.texture.NativeImage(svW, svH, false);
             for (int y = 0; y < svH; y++) {
                 float v = 1f - y / (float) (svH - 1);
                 for (int x = 0; x < svW; x++) {
                     float s = x / (float) (svW - 1);
-                    cachedPickerPixels[y * svW + x] = hsvToRgb(pickerHue, s, v);
+                    svImage.setColorArgb(x, y, hsvToRgb(pickerHue, s, v));
                 }
             }
-        }
-
-        // Draw SV gradient using horizontal lines (svH calls instead of svW*svH)
-        for (int y = 0; y < svH; y++) {
-            for (int x = 0; x < svW; x++) {
-                ctx.fill(cpX + x, cpY + y, cpX + x + 1, cpY + y + 1, cachedPickerPixels[y * svW + x]);
+            if (pickerSvTexture != null) {
+                pickerSvTexture.setImage(svImage);
+                pickerSvTexture.upload();
+            } else {
+                pickerSvTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_sv", svImage);
+                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_SV_TEX_ID, pickerSvTexture);
+                pickerSvTexture.upload();
             }
         }
 
+        // Build hue bar texture once
+        if (!pickerHueBarBuilt || pickerHueTexture == null) {
+            int hueW = 20;
+            var hueImage = new net.minecraft.client.texture.NativeImage(hueW, svH, false);
+            for (int y = 0; y < svH; y++) {
+                float h = y / (float) (svH - 1);
+                int c = hsvToRgb(h, 1f, 1f);
+                for (int x = 0; x < hueW; x++) {
+                    hueImage.setColorArgb(x, y, c);
+                }
+            }
+            if (pickerHueTexture != null) {
+                pickerHueTexture.setImage(hueImage);
+                pickerHueTexture.upload();
+            } else {
+                pickerHueTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_hue", hueImage);
+                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_HUE_TEX_ID, pickerHueTexture);
+                pickerHueTexture.upload();
+            }
+            pickerHueBarBuilt = true;
+        }
+
+        // Draw SV gradient as single texture (1 draw call instead of ~9600 fill calls!)
+        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_TEX_ID, cpX, cpY, 0, 0, svW, svH, svW, svH);
+
+        // Draw hue bar as single texture
+        int hueX = cpX + svW + 5, hueW = 20;
+        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_HUE_TEX_ID, hueX, cpY, 0, 0, hueW, svH, hueW, svH);
+
+        // Cursors
         int scx = cpX + (int) (pickerSat * (svW - 1)), scy = cpY + (int) ((1f - pickerVal) * (svH - 1));
         drawRectOutline(ctx, scx - 2, scy - 2, scx + 3, scy + 3, 0xFFFFFFFF);
-        int hueX = cpX + svW + 5, hueW = 20;
-        for (int y = 0; y < svH; y++) {
-            float h = y / (float) (svH - 1);
-            ctx.fill(hueX, cpY + y, hueX + hueW, cpY + y + 1, hsvToRgb(h, 1f, 1f));
-        }
         int hcy = cpY + (int) (pickerHue * (svH - 1));
         ctx.fill(hueX - 1, hcy - 1, hueX + hueW + 1, hcy + 2, 0xFFFFFFFF);
     }
@@ -565,32 +729,34 @@ public abstract class AbstractEditorScreen extends Screen {
         int panelH = 30 + stack.getLayerCount() * rowH + 30;
         int panelX = this.width / 2 - panelW / 2;
         int panelY = this.height - panelH - 30;
+
         ctx.fill(panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, 0xEE222244);
         drawRectOutline(ctx, panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, "\u00a7eLayers", panelX + 4, panelY + 2, 0xFFFFFFFF, false);
+        ctx.drawText(textRenderer, "Layers", panelX + 4, panelY + 2, 0xFFFFFF00, true);
         int listY = panelY + 16;
         for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
             var layer = stack.getLayers().get(i);
             int rowY = listY + (stack.getLayerCount() - 1 - i) * rowH;
             int bg = (i == stack.getActiveIndex()) ? 0xFF444488 : 0xFF333355;
             ctx.fill(panelX, rowY, panelX + panelW, rowY + rowH - 1, bg);
-            String eye = layer.isVisible() ? "\u00a7a\u25CF" : "\u00a7c\u25CB";
-            ctx.drawText(textRenderer, eye, panelX + 3, rowY + 5, 0xFFFFFFFF, false);
+            String eye = layer.isVisible() ? "\u25CF" : "\u25CB";
+            int eyeColor = layer.isVisible() ? 0xFF55FF55 : 0xFFFF5555;
+            ctx.drawText(textRenderer, eye, panelX + 3, rowY + 5, eyeColor, true);
             String name = layer.getName();
             if (name.length() > 14) name = name.substring(0, 14) + "..";
-            ctx.drawText(textRenderer, name, panelX + 16, rowY + 5, 0xFFDDDDDD, false);
+            ctx.drawText(textRenderer, name, panelX + 16, rowY + 5, 0xFFDDDDDD, true);
             if (i == stack.getActiveIndex())
-                ctx.drawText(textRenderer, "\u25B6", panelX + panelW - 12, rowY + 5, 0xFFFFFF00, false);
+                ctx.drawText(textRenderer, "\u25B6", panelX + panelW - 12, rowY + 5, 0xFFFFFF00, true);
         }
         int btnY = listY + stack.getLayerCount() * rowH + 4;
         ctx.fill(panelX, btnY, panelX + 34, btnY + 18, 0xFF335533);
-        ctx.drawText(textRenderer, "+ Add", panelX + 3, btnY + 4, 0xFFAAFFAA, false);
+        ctx.drawText(textRenderer, "+ Add", panelX + 3, btnY + 4, 0xFFAAFFAA, true);
         ctx.fill(panelX + 38, btnY, panelX + 76, btnY + 18, 0xFF553333);
-        ctx.drawText(textRenderer, "- Del", panelX + 41, btnY + 4, 0xFFFFAAAA, false);
+        ctx.drawText(textRenderer, "- Del", panelX + 41, btnY + 4, 0xFFFFAAAA, true);
         ctx.fill(panelX + 80, btnY, panelX + 110, btnY + 18, 0xFF333355);
-        ctx.drawText(textRenderer, "\u25B2 Up", panelX + 83, btnY + 4, 0xFFAAAAFF, false);
+        ctx.drawText(textRenderer, "\u25B2 Up", panelX + 83, btnY + 4, 0xFFAAAAFF, true);
         ctx.fill(panelX + 114, btnY, panelX + panelW, btnY + 18, 0xFF333355);
-        ctx.drawText(textRenderer, "\u25BC Dn", panelX + 117, btnY + 4, 0xFFAAAAFF, false);
+        ctx.drawText(textRenderer, "\u25BC Dn", panelX + 117, btnY + 4, 0xFFAAAAFF, true);
     }
 
     // --- Input handling ---
@@ -609,6 +775,7 @@ public abstract class AbstractEditorScreen extends Screen {
             canvasScreenY = (int) (my - ry * canvas.getHeight() * zoom);
             panOffsetX = canvasScreenX - canvasBaseX;
             panOffsetY = canvasScreenY - canvasBaseY;
+            canvasTextureDirty = true;
         }
         return true;
     }
@@ -632,6 +799,8 @@ public abstract class AbstractEditorScreen extends Screen {
         if (btn == 0 && canvas != null) {
             int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
+                lastDrawX = px;
+                lastDrawY = py;
                 handleCanvasClick(px, py, btn);
                 return true;
             }
@@ -644,6 +813,8 @@ public abstract class AbstractEditorScreen extends Screen {
         double mx = click.x(); double my = click.y(); int btn = click.button();
         if (handleExtraRelease(mx, my, btn)) return true;
         if (btn == 1) { isPanning = false; return true; }
+        lastDrawX = -1;
+        lastDrawY = -1;
         return super.mouseReleased(click);
     }
 
@@ -655,6 +826,7 @@ public abstract class AbstractEditorScreen extends Screen {
             panOffsetY = panStartOffsetY + (int) (my - panStartMouseY);
             canvasScreenX = canvasBaseX + panOffsetX;
             canvasScreenY = canvasBaseY + panOffsetY;
+            canvasTextureDirty = true;
             return true;
         }
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
@@ -664,16 +836,26 @@ public abstract class AbstractEditorScreen extends Screen {
             int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
                 float variation = ModSettings.getInstance().brushVariation;
-                if (currentTool == EditorTool.PENCIL) {
-                    if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor);
-                    else canvas.drawPixel(px, py, currentColor);
-                } else if (currentTool == EditorTool.BRUSH) {
-                    if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation);
-                    else canvas.drawBrushPixel(px, py, currentColor, variation);
-                } else if (currentTool == EditorTool.ERASER) {
-                    if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize);
-                    else canvas.erasePixel(px, py);
+                // Interpolate between last and current position for continuous lines
+                int startX = (lastDrawX >= 0) ? lastDrawX : px;
+                int startY = (lastDrawY >= 0) ? lastDrawY : py;
+                java.util.List<int[]> points = bresenhamLine(startX, startY, px, py);
+                for (int[] pt : points) {
+                    int ix = pt[0], iy = pt[1];
+                    if (ix < 0 || ix >= canvas.getWidth() || iy < 0 || iy >= canvas.getHeight()) continue;
+                    if (currentTool == EditorTool.PENCIL) {
+                        if (toolSize > 1) canvas.drawPixelArea(ix, iy, toolSize, currentColor);
+                        else canvas.drawPixel(ix, iy, currentColor);
+                    } else if (currentTool == EditorTool.BRUSH) {
+                        if (toolSize > 1) canvas.drawBrushArea(ix, iy, toolSize, currentColor, variation);
+                        else canvas.drawBrushPixel(ix, iy, currentColor, variation);
+                    } else if (currentTool == EditorTool.ERASER) {
+                        if (toolSize > 1) canvas.erasePixelArea(ix, iy, toolSize);
+                        else canvas.erasePixel(ix, iy);
+                    }
                 }
+                lastDrawX = px;
+                lastDrawY = py;
                 return true;
             }
         }
@@ -852,6 +1034,22 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(x1, y2 - 1, x2, y2, c);
         ctx.fill(x1, y1, x1 + 1, y2, c);
         ctx.fill(x2 - 1, y1, x2, y2, c);
+    }
+
+    /** Bresenham line algorithm — returns list of [x,y] points between (x0,y0) and (x1,y1) */
+    private static java.util.List<int[]> bresenhamLine(int x0, int y0, int x1, int y1) {
+        java.util.List<int[]> points = new java.util.ArrayList<>();
+        int dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy;
+        while (true) {
+            points.add(new int[]{x0, y0});
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
+        return points;
     }
 
     protected static int hsvToRgb(float h, float s, float v) {

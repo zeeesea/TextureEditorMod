@@ -18,6 +18,7 @@ import net.minecraft.world.World;
 public class EntityMapper {
 
     public static Entity getEntityFromItem(ItemStack stack, World world) {
+        if (world == null) return null;
         Item item = stack.getItem();
 
         if (item instanceof SpawnEggItem) {
@@ -30,21 +31,32 @@ public class EntityMapper {
 
                 // Pig is default if not found, so check if name matches
                 if (type != EntityType.PIG || entityName.equals("pig")) {
-                   return type.create(world, null);
+                    try {
+                        return type.create(world, SpawnReason.COMMAND);
+                    } catch (Exception e) {
+                        System.out.println("[TextureEditor] Failed to create entity from spawn egg: " + entityId + " - " + e.getMessage());
+                        return null;
+                    }
                 }
             }
         }
 
         if (item instanceof BoatItem) {
-            return EntityType.OAK_BOAT.create(world, null);
+            try {
+                return EntityType.OAK_BOAT.create(world, SpawnReason.COMMAND);
+            } catch (Exception e) { return null; }
         }
 
         if (item instanceof MinecartItem) {
-            return EntityType.MINECART.create(world, null);
+            try {
+                return EntityType.MINECART.create(world, SpawnReason.COMMAND);
+            } catch (Exception e) { return null; }
         }
 
         if (item instanceof ArmorStandItem) {
-            return EntityType.ARMOR_STAND.create(world, null);
+            try {
+                return EntityType.ARMOR_STAND.create(world, SpawnReason.COMMAND);
+            } catch (Exception e) { return null; }
         }
 
         // Elytra -> no entity, but we support it via item
@@ -52,7 +64,11 @@ public class EntityMapper {
     }
 
     public static boolean hasEntityMode(ItemStack stack) {
-        return getEntityFromItem(stack, MinecraftClient.getInstance().world) != null;
+        try {
+            return getEntityFromItem(stack, MinecraftClient.getInstance().world) != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

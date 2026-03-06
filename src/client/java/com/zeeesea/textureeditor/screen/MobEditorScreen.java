@@ -145,57 +145,48 @@ public class MobEditorScreen extends AbstractEditorScreen {
             TextureManager.getInstance().storeOriginal(textureId, originalPixels, canvas.getWidth(), canvas.getHeight());
         }
         TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
+        final int w = canvas.getWidth();
+        final int h = canvas.getHeight();
+        final int[][] pixelsCopy = copyPixels(canvas.getPixels(), w, h);
+        final Identifier texId = textureId;
         client.execute(() -> {
-            System.out.println("[TextureEditor] MobEditor applyLive for " + textureId);
-            int w = canvas.getWidth();
-            int h = canvas.getHeight();
-            int[][] pixels = canvas.getPixels();
-
             // Create NativeImage from canvas
             var img = new net.minecraft.client.texture.NativeImage(w, h, false);
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h; y++)
-                    img.setColorArgb(x, y, pixels[x][y]);
+                    img.setColorArgb(x, y, pixelsCopy[x][y]);
 
-            var existing = client.getTextureManager().getTexture(textureId);
-            System.out.println("[TextureEditor] Existing texture type: " + (existing != null ? existing.getClass().getSimpleName() : "NULL"));
+            var existing = client.getTextureManager().getTexture(texId);
 
             if (existing != null) {
                 try {
-                    // Try to get the GpuTexture and write directly to it
                     var gpuTex = existing.getGlTexture();
                     if (gpuTex != null) {
                         int texW = gpuTex.getWidth(0);
                         int texH = gpuTex.getHeight(0);
-                        System.out.println("[TextureEditor] GPU texture size: " + texW + "x" + texH + ", image size: " + w + "x" + h);
 
                         if (texW == w && texH == h) {
-                            // Same size: direct upload
                             com.mojang.blaze3d.systems.RenderSystem.getDevice()
                                 .createCommandEncoder()
                                 .writeToTexture(gpuTex, img);
-                            System.out.println("[TextureEditor] Mob texture uploaded via writeToTexture");
                             img.close();
                             return;
                         }
                     }
                 } catch (Exception e) {
-                    System.out.println("[TextureEditor] Direct upload failed: " + e.getMessage());
+                    System.out.println("[TextureEditor] Direct mob upload failed: " + e.getMessage());
                 }
             }
 
-            // Fallback: create new NativeImageBackedTexture (this also handles first-time registration)
-            System.out.println("[TextureEditor] Creating new NativeImageBackedTexture for " + textureId);
+            // Fallback: create new NativeImageBackedTexture
             try {
                 if (existing != null) {
                     existing.close();
                 }
-            } catch (Exception e) {
-                System.out.println("[TextureEditor] Failed to close old texture: " + e.getMessage());
-            }
+            } catch (Exception ignored) {}
             var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_mob", img);
-            client.getTextureManager().registerTexture(textureId, dynamicTex);
-            System.out.println("[TextureEditor] Registered new mob texture");
+            client.getTextureManager().registerTexture(texId, dynamicTex);
+            dynamicTex.upload();
         });
     }
 

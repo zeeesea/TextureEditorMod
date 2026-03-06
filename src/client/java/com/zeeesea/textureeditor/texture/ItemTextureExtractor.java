@@ -9,6 +9,7 @@ import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
@@ -32,21 +33,50 @@ public class ItemTextureExtractor {
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
         System.out.println("[TextureEditor] Extracting item texture for: " + itemId);
 
-        // Strategy 1: Try to get sprite directly from atlas using item texture path
-        // Most items in 1.21.4 have their sprite at "item/<name>" in the block atlas
-        Identifier directSpriteId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath());
-        SpriteAtlasTexture atlas = (SpriteAtlasTexture) client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        Sprite directSprite = atlas.getSprite(directSpriteId);
+        // Strategy 1: Handle spawn eggs specially — they share the 'item/spawn_egg' sprite with tints
+        if (stack.getItem() instanceof SpawnEggItem) {
+            System.out.println("[TextureEditor] Spawn egg detected: " + itemId);
+            // Try items atlas first, then block atlas
+            Identifier spawnEggSpriteId = Identifier.of("minecraft", "item/spawn_egg");
+            Sprite eggSprite = findSpriteInAnyAtlas(client, spawnEggSpriteId);
+            if (eggSprite != null) {
+                System.out.println("[TextureEditor] Found spawn egg sprite in atlas: " + eggSprite.getContents().getId());
+                return extractFromSprite(eggSprite);
+            }
+            // Also try loading from resources directly
+            Identifier eggTexId = Identifier.of("minecraft", "textures/item/spawn_egg.png");
+            Identifier eggSprId = Identifier.of("minecraft", "item/spawn_egg");
+            ItemTexture eggResult = tryLoadFromResource(client, eggTexId, eggSprId);
+            if (eggResult != null) return eggResult;
+            System.out.println("[TextureEditor] Spawn egg sprite not found in any atlas");
+        }
 
+        // Strategy 2: Try to get sprite directly from ITEMS atlas (1.21.11+ has separate items atlas)
+        Identifier directSpriteId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath());
+        try {
+            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
+            if (tex instanceof SpriteAtlasTexture sat) {
+                Sprite directSprite = sat.getSprite(directSpriteId);
+                if (directSprite != null && !directSprite.getContents().getId().getPath().equals("missingno")) {
+                    System.out.println("[TextureEditor] Found sprite in ITEMS atlas: " + directSprite.getContents().getId());
+                    return extractFromSprite(directSprite);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] Items atlas lookup failed: " + e.getMessage());
+        }
+
+        // Strategy 3: Try block atlas (for block items)
+        SpriteAtlasTexture blockAtlas = (SpriteAtlasTexture) client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+        Sprite directSprite = blockAtlas.getSprite(directSpriteId);
         if (directSprite != null && !directSprite.getContents().getId().getPath().equals("missingno")) {
-            System.out.println("[TextureEditor] Found sprite directly in atlas: " + directSprite.getContents().getId());
+            System.out.println("[TextureEditor] Found sprite in BLOCK atlas: " + directSprite.getContents().getId());
             return extractFromSprite(directSprite);
         }
 
-        // Strategy 2: Try via block model quads (for block items etc.)
-        System.out.println("[TextureEditor] Direct sprite not found, trying BakedModel approach...");
+        // Strategy 3: Try via block model quads (for block items etc.)
+        System.out.println("[TextureEditor] Direct sprite not found in either atlas, trying BakedModel approach...");
 
-        // Try block item first
         net.minecraft.block.Block block = net.minecraft.block.Block.getBlockFromItem(stack.getItem());
         if (block != net.minecraft.block.Blocks.AIR) {
             var model = client.getBlockRenderManager().getModel(block.getDefaultState());
@@ -67,7 +97,7 @@ public class ItemTextureExtractor {
             }
         }
 
-        // Strategy 3: Fallback to Particle Sprite (fixes Leaves and other complex blocks)
+        // Strategy 4: Fallback to Particle Sprite
         if (block != net.minecraft.block.Blocks.AIR) {
             var blockModel = client.getBlockRenderManager().getModel(block.getDefaultState());
             if (blockModel != null) {
@@ -79,34 +109,51 @@ public class ItemTextureExtractor {
             }
         }
 
+        // Strategy 5: Try loading texture directly from resources (textures/item/<name>.png)
+        Identifier resourceTexId = Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
+        System.out.println("[TextureEditor] Trying resource manager for: " + resourceTexId);
+        ItemTexture resourceResult = tryLoadFromResource(client, resourceTexId, directSpriteId);
+        if (resourceResult != null) return resourceResult;
+
         System.out.println("[TextureEditor] FAILED to find valid sprite for item: " + itemId);
 
-        // Strategy 4: Try loading entity/special texture paths directly from resources
-        // This handles items like elytra, shields, signs, banners, etc. that use entity textures
+        // Strategy 6: Try loading entity/special texture paths directly from resources
         Identifier entityTexture = getSpecialItemTexturePath(itemId);
         if (entityTexture != null) {
-            try {
-                var optResource = client.getResourceManager().getResource(entityTexture);
-                if (optResource.isPresent()) {
-                    java.io.InputStream stream = optResource.get().getInputStream();
-                    net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(stream);
-                    int w = image.getWidth();
-                    int h = image.getHeight();
-                    int[][] pixels = new int[w][h];
-                    for (int x = 0; x < w; x++)
-                        for (int y = 0; y < h; y++)
-                            pixels[x][y] = image.getColorArgb(x, y);
-                    image.close();
-                    stream.close();
-                    // Use the entity texture path itself as both IDs (not atlas-based)
-                    Identifier spriteId = Identifier.of(entityTexture.getNamespace(),
-                            entityTexture.getPath().replace("textures/", "").replace(".png", ""));
-                    System.out.println("[TextureEditor] Found special item texture: " + entityTexture);
-                    return new ItemTexture(entityTexture, spriteId, pixels, w, h);
-                }
-            } catch (Exception e) {
-                System.out.println("[TextureEditor] Failed to load special texture: " + entityTexture + " - " + e.getMessage());
+            Identifier sprId = Identifier.of(entityTexture.getNamespace(),
+                    entityTexture.getPath().replace("textures/", "").replace(".png", ""));
+            ItemTexture specialResult = tryLoadFromResource(client, entityTexture, sprId);
+            if (specialResult != null) {
+                System.out.println("[TextureEditor] Found special item texture: " + entityTexture);
+                return specialResult;
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * Try to load a texture from the resource manager at the given path.
+     */
+    private static ItemTexture tryLoadFromResource(MinecraftClient client, Identifier textureId, Identifier spriteId) {
+        try {
+            var optResource = client.getResourceManager().getResource(textureId);
+            if (optResource.isPresent()) {
+                java.io.InputStream stream = optResource.get().getInputStream();
+                NativeImage image = NativeImage.read(stream);
+                int w = image.getWidth();
+                int h = image.getHeight();
+                int[][] pixels = new int[w][h];
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                        pixels[x][y] = image.getColorArgb(x, y);
+                image.close();
+                stream.close();
+                System.out.println("[TextureEditor] Loaded from resource: " + textureId + " size=" + w + "x" + h);
+                return new ItemTexture(textureId, spriteId, pixels, w, h);
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] Failed to load resource: " + textureId + " - " + e.getMessage());
         }
 
         return null;
@@ -169,6 +216,27 @@ public class ItemTextureExtractor {
                 yield null;
             }
         };
+    }
+
+    /**
+     * Find a sprite in either the ITEMS or BLOCK atlas.
+     */
+    private static Sprite findSpriteInAnyAtlas(MinecraftClient client, Identifier spriteId) {
+        // Try items atlas
+        try {
+            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
+            if (tex instanceof SpriteAtlasTexture sat) {
+                Sprite s = sat.getSprite(spriteId);
+                if (s != null && !s.getContents().getId().getPath().equals("missingno")) return s;
+            }
+        } catch (Exception ignored) {}
+        // Try block atlas
+        try {
+            SpriteAtlasTexture blockAtlas = (SpriteAtlasTexture) client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+            Sprite s = blockAtlas.getSprite(spriteId);
+            if (s != null && !s.getContents().getId().getPath().equals("missingno")) return s;
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private static ItemTexture extractFromSprite(Sprite sprite) {

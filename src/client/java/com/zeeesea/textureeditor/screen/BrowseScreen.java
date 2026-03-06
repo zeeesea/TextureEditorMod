@@ -250,7 +250,9 @@ public class BrowseScreen extends Screen {
         addGUIEntry(entries, "gui/container/smithing", "Smithing Table");
         addGUIEntry(entries, "gui/container/creative_inventory/tabs", "Creative Tabs");
         // General GUI
-        addGUIEntry(entries, "gui/widgets", "Widgets (Buttons)");
+        addGUIEntry(entries, "gui/sprites/widget/button", "Button Widget");
+        addGUIEntry(entries, "gui/sprites/widget/button_disabled", "Button (Disabled)");
+        addGUIEntry(entries, "gui/sprites/widget/button_highlighted", "Button (Highlighted)");
         addGUIEntry(entries, "gui/title/minecraft", "Title Logo");
         addGUIEntry(entries, "gui/title/edition", "Edition Badge");
         return entries;
@@ -277,8 +279,25 @@ public class BrowseScreen extends Screen {
         // Elytra
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/elytra.png"), "Elytra", EntryType.MOB, new ItemStack(net.minecraft.item.Items.ELYTRA)));
 
-        // Sheep Fur
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_fur.png"), "Sheep Fur", EntryType.MOB, null));
+        // Sheep Wool (1.21.11 uses sheep_wool.png, older used sheep_fur.png)
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_wool.png"), "Sheep Wool", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_wool_undercoat.png"), "Sheep Wool Undercoat", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_fur.png"), "Sheep Fur (Legacy)", EntryType.MOB, null));
+
+        // Cow variants (1.21.2+)
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cow/temperate_cow.png"), "Cow (Temperate)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cow/cold_cow.png"), "Cow (Cold)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cow/warm_cow.png"), "Cow (Warm)", EntryType.MOB, null));
+
+        // Pig variants (1.21.2+)
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/pig/temperate_pig.png"), "Pig (Temperate)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/pig/cold_pig.png"), "Pig (Cold)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/pig/warm_pig.png"), "Pig (Warm)", EntryType.MOB, null));
+
+        // Chicken variants (1.21.2+)
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/chicken/temperate_chicken.png"), "Chicken (Temperate)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/chicken/cold_chicken.png"), "Chicken (Cold)", EntryType.MOB, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/chicken/warm_chicken.png"), "Chicken (Warm)", EntryType.MOB, null));
 
         // Wolf
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf.png"), "Wolf", EntryType.MOB, null));
@@ -466,17 +485,16 @@ public class BrowseScreen extends Screen {
             }
         }
 
-        // Draw tooltip (with z-offset so it renders in front of items)
+        // Draw tooltip — use createNewRootLayer to render above item icons
         if (tooltipText != null) {
+            context.createNewRootLayer();
             int tw = textRenderer.getWidth(tooltipText) + 8;
             int tx = Math.min(mouseX + 10, this.width - tw - 5);
             int ty = mouseY - 18;
             if (ty < 0) ty = mouseY + 15;
-            context.getMatrices().pushMatrix();
             context.fill(tx - 2, ty - 2, tx + tw, ty + 12, 0xEE222244);
             drawRectOutline(context, tx - 2, ty - 2, tx + tw, ty + 12, 0xFFAAAAAA);
             context.drawText(textRenderer, tooltipText, tx + 2, ty, 0xFFFFFFFF, true);
-            context.getMatrices().popMatrix();
         }
 
         // Scrollbar
@@ -504,9 +522,15 @@ public class BrowseScreen extends Screen {
                 }
             }
         } else if (entry.type == EntryType.ITEM && entry.stack != null) {
-            ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(entry.stack);
-            if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
-                return true;
+            // Don't call ItemTextureExtractor.extract() here — it's expensive and called every frame.
+            // Instead check common texture path patterns.
+            Identifier itemId = Registries.ITEM.getId(entry.stack.getItem());
+            Identifier texId = Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
+            if (TextureManager.getInstance().getPixels(texId) != null) return true;
+        } else if (entry.type == EntryType.MOB || entry.type == EntryType.GUI) {
+            // For mob/GUI entries that have a direct texture path
+            if (entry.id.getPath().startsWith("textures/")) {
+                if (TextureManager.getInstance().getPixels(entry.id) != null) return true;
             }
         }
         return false;

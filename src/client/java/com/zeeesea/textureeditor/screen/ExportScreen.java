@@ -2,11 +2,15 @@ package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ResourcePackExporter;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.texture.NativeImage;
+import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
@@ -33,6 +37,14 @@ public class ExportScreen extends Screen {
 
     private int currentColor = 0xFFFF0000;
     private boolean showGrid = true;
+
+    // Cached icon texture for performance (avoids 4096 fill() calls per frame)
+    private NativeImageBackedTexture iconTexture = null;
+    private static final Identifier ICON_TEX_ID = Identifier.of("textureeditor", "export_icon");
+    private long lastIconVersion = -1;
+
+    // Continuous drawing: track last drawn pixel for line interpolation
+    private int lastDrawX = -1, lastDrawY = -1;
 
     // Simple palette for icon
     private static final int[] PALETTE = {
@@ -135,28 +147,48 @@ public class ExportScreen extends Screen {
     }
 
     private void drawIconCanvas(DrawContext context, int mouseX, int mouseY) {
-        for (int x = 0; x < ICON_SIZE; x++) {
-            for (int y = 0; y < ICON_SIZE; y++) {
-                int sx = iconScreenX + x * iconZoom;
-                int sy = iconScreenY + y * iconZoom;
-                int color = iconCanvas.getPixel(x, y);
-                context.fill(sx, sy, sx + iconZoom, sy + iconZoom, color);
+        // Use cached texture rendering (1 draw call instead of 4096 fill calls)
+        long version = iconCanvas.getVersion();
+        if (version != lastIconVersion || iconTexture == null) {
+            lastIconVersion = version;
+            NativeImage img = new NativeImage(ICON_SIZE, ICON_SIZE, false);
+            for (int x = 0; x < ICON_SIZE; x++) {
+                for (int y = 0; y < ICON_SIZE; y++) {
+                    int c = iconCanvas.getPixel(x, y);
+                    int alpha = (c >> 24) & 0xFF;
+                    if (alpha == 0) {
+                        c = ((x / 4 + y / 4) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
+                    }
+                    img.setColorArgb(x, y, c);
+                }
+            }
+            if (iconTexture != null) {
+                iconTexture.setImage(img);
+                iconTexture.upload();
+            } else {
+                iconTexture = new NativeImageBackedTexture(() -> "export_icon", img);
+                MinecraftClient.getInstance().getTextureManager().registerTexture(ICON_TEX_ID, iconTexture);
             }
         }
+
+        int drawW = ICON_SIZE * iconZoom;
+        int drawH = ICON_SIZE * iconZoom;
+        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, ICON_TEX_ID,
+            iconScreenX, iconScreenY, 0, 0, drawW, drawH, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 
         if (showGrid) {
             for (int x = 0; x <= ICON_SIZE; x += 8) {
                 int sx = iconScreenX + x * iconZoom;
-                context.fill(sx, iconScreenY, sx + 1, iconScreenY + ICON_SIZE * iconZoom, 0x40FFFFFF);
+                context.fill(sx, iconScreenY, sx + 1, iconScreenY + drawH, 0x40FFFFFF);
             }
             for (int y = 0; y <= ICON_SIZE; y += 8) {
                 int sy = iconScreenY + y * iconZoom;
-                context.fill(iconScreenX, sy, iconScreenX + ICON_SIZE * iconZoom, sy + 1, 0x40FFFFFF);
+                context.fill(iconScreenX, sy, iconScreenX + drawW, sy + 1, 0x40FFFFFF);
             }
         }
 
-        int endX = iconScreenX + ICON_SIZE * iconZoom;
-        int endY = iconScreenY + ICON_SIZE * iconZoom;
+        int endX = iconScreenX + drawW;
+        int endY = iconScreenY + drawH;
         context.fill(iconScreenX - 1, iconScreenY - 1, endX + 1, iconScreenY, 0xFFFFFFFF);
         context.fill(iconScreenX - 1, endY, endX + 1, endY + 1, 0xFFFFFFFF);
         context.fill(iconScreenX - 1, iconScreenY, iconScreenX, endY, 0xFFFFFFFF);
@@ -166,6 +198,10 @@ public class ExportScreen extends Screen {
     @Override
     public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
         double mouseX = click.x(); double mouseY = click.y();
+        // Reset line interpolation on new click
+        lastDrawX = -1;
+        lastDrawY = -1;
+
         // Check palette click
         int palX = iconScreenX + ICON_SIZE * iconZoom + 10;
         int palY = iconScreenY + 25;
@@ -192,7 +228,26 @@ public class ExportScreen extends Screen {
         int px = (int) ((mouseX - iconScreenX) / iconZoom);
         int py = (int) ((mouseY - iconScreenY) / iconZoom);
         if (px >= 0 && px < ICON_SIZE && py >= 0 && py < ICON_SIZE) {
-            iconCanvas.setPixel(px, py, currentColor);
+            if (lastDrawX >= 0 && lastDrawY >= 0 && (lastDrawX != px || lastDrawY != py)) {
+                // Bresenham line interpolation between last point and current point
+                int x0 = lastDrawX, y0 = lastDrawY, x1 = px, y1 = py;
+                int dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+                int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+                int err = dx - dy;
+                while (true) {
+                    if (x0 >= 0 && x0 < ICON_SIZE && y0 >= 0 && y0 < ICON_SIZE) {
+                        iconCanvas.setPixel(x0, y0, currentColor);
+                    }
+                    if (x0 == x1 && y0 == y1) break;
+                    int e2 = 2 * err;
+                    if (e2 > -dy) { err -= dy; x0 += sx; }
+                    if (e2 < dx) { err += dx; y0 += sy; }
+                }
+            } else {
+                iconCanvas.setPixel(px, py, currentColor);
+            }
+            lastDrawX = px;
+            lastDrawY = py;
             return true;
         }
         return false;

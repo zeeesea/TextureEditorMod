@@ -24,6 +24,7 @@ public class PixelCanvas {
     private final Deque<LayerSnapshot> redoStack = new ArrayDeque<>();
     private static int MAX_UNDO = 50;
     private boolean dirty = false;
+    private long version = 0;
 
     // Cached flattened pixels (invalidated on changes)
     private int[][] flattenedCache;
@@ -80,7 +81,7 @@ public class PixelCanvas {
         if (active == null || x < 0 || x >= width || y < 0 || y >= height) return;
         active.setPixel(x, y, color);
         dirty = true;
-        cacheValid = false;
+        invalidateCache();
     }
 
     /**
@@ -120,7 +121,7 @@ public class PixelCanvas {
             layer.setPixels(snapshot.pixels());
         }
         dirty = true;
-        cacheValid = false;
+        invalidateCache();
     }
 
     public void redo() {
@@ -133,7 +134,7 @@ public class PixelCanvas {
             layer.setPixels(snapshot.pixels());
         }
         dirty = true;
-        cacheValid = false;
+        invalidateCache();
     }
 
     /**
@@ -248,7 +249,7 @@ public class PixelCanvas {
             queue.add(new int[]{px, py - 1});
         }
         dirty = true;
-        cacheValid = false;
+        invalidateCache();
     }
 
     /**
@@ -291,5 +292,9 @@ public class PixelCanvas {
      */
     public void invalidateCache() {
         cacheValid = false;
+        version++;
     }
+
+    /** Returns a version counter that increments on any change. */
+    public long getVersion() { return version; }
 }

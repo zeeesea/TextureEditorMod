@@ -111,8 +111,10 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
                     if (savedPixels != null && savedDims != null && savedDims[0] == w && savedDims[1] == h) {
                         canvas = new PixelCanvas(savedDims[0], savedDims[1], savedPixels);
+                        System.out.println("[TextureEditor] Loaded saved pixels for " + fullTextureId + " (" + savedDims[0] + "x" + savedDims[1] + ")");
                     } else {
                         canvas = new PixelCanvas(w, h, originalPixels);
+                        System.out.println("[TextureEditor] Created fresh canvas for " + fullTextureId + " (" + w + "x" + h + ")");
                     }
                     return; // Success!
                 }
@@ -158,70 +160,89 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         TextureManager.getInstance().putTexture(fullTextureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
 
         client.execute(() -> {
-            Identifier spriteId = guiTextureId;
-            var atlasAndSprite = findSpriteInAtlases(client, spriteId);
+            try {
+                System.out.println("[TextureEditor] GUI applyLive: fullTextureId=" + fullTextureId + ", guiTextureId=" + guiTextureId + ", isSpriteTexture=" + isSpriteTexture);
+                Identifier spriteId = guiTextureId;
+                var atlasAndSprite = findSpriteInAtlases(client, spriteId);
 
-            if (atlasAndSprite != null) {
-                // Write directly into the sprite's NativeImage via mixin accessor
-                net.minecraft.client.texture.Sprite sprite = atlasAndSprite.getRight();
-                net.minecraft.client.texture.SpriteContents contents = sprite.getContents();
-                NativeImage spriteImage = ((com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor) contents).getImage();
-                if (spriteImage != null) {
-                    int w = Math.min(canvas.getWidth(), spriteImage.getWidth());
-                    int h = Math.min(canvas.getHeight(), spriteImage.getHeight());
-                    for (int x = 0; x < w; x++)
-                        for (int y = 0; y < h; y++)
-                            spriteImage.setColorArgb(x, y, canvas.getPixels()[x][y]);
-                    contents.upload(atlasAndSprite.getLeft().getGlTexture(), 0);
-                }
-                System.out.println("[TextureEditor] Updating sprite in atlas: " + spriteId);
-            } else {
-                // Dynamic texture: use NativeImageBackedTexture
-                NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
-                for (int x = 0; x < canvas.getWidth(); x++)
-                    for (int y = 0; y < canvas.getHeight(); y++)
-                        img.setColorArgb(x, y, canvas.getPixels()[x][y]);
-                var existing = client.getTextureManager().getTexture(fullTextureId);
-                if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
-                    nibt.setImage(img);
-                    nibt.upload();
+                if (atlasAndSprite != null) {
+                    // Use the proper sprite ID that was found in the atlas
+                    net.minecraft.client.texture.Sprite sprite = atlasAndSprite.getRight();
+                    Identifier foundSpriteId = sprite.getContents().getId();
+                    System.out.println("[TextureEditor] Updating sprite in atlas: " + foundSpriteId + " (atlas: " + atlasAndSprite.getLeft() + ")");
+                    // Use TextureManager's proper RenderPass blit to write at correct atlas position
+                    TextureManager.getInstance().applyLive(foundSpriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
                 } else {
-                    var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_gui", img);
-                    client.getTextureManager().registerTexture(fullTextureId, dynamicTex);
-                    dynamicTex.upload();
+                    System.out.println("[TextureEditor] No atlas sprite found, using dynamic texture for: " + fullTextureId);
+                    // Non-atlas texture: use NativeImageBackedTexture (for container textures etc.)
+                    NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
+                    for (int x = 0; x < canvas.getWidth(); x++)
+                        for (int y = 0; y < canvas.getHeight(); y++)
+                            img.setColorArgb(x, y, canvas.getPixels()[x][y]);
+                    var existing = client.getTextureManager().getTexture(fullTextureId);
+                    System.out.println("[TextureEditor] Existing texture type: " + (existing != null ? existing.getClass().getSimpleName() : "null"));
+                    if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                        nibt.setImage(img);
+                        nibt.upload();
+                        System.out.println("[TextureEditor] Updated existing NativeImageBackedTexture for: " + fullTextureId);
+                    } else {
+                        var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_gui", img);
+                        client.getTextureManager().registerTexture(fullTextureId, dynamicTex);
+                        dynamicTex.upload();
+                        System.out.println("[TextureEditor] Registered new NativeImageBackedTexture for: " + fullTextureId);
+                    }
                 }
-                System.out.println("[TextureEditor] Applied live GUI texture: " + fullTextureId);
+            } catch (Throwable t) {
+                System.out.println("[TextureEditor] ERROR in GUI applyLive: " + t.getClass().getName() + ": " + t.getMessage());
+                t.printStackTrace();
             }
         });
     }
 
-    // Utility: Find sprite in block/gui atlases
+    // Utility: Find sprite in block/gui/items atlases
     private org.apache.commons.lang3.tuple.Pair<net.minecraft.client.texture.SpriteAtlasTexture, net.minecraft.client.texture.Sprite> findSpriteInAtlases(MinecraftClient client, Identifier id) {
-        var blockAtlas = (net.minecraft.client.texture.SpriteAtlasTexture) client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        var sprite = blockAtlas.getSprite(id);
-        if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-            if (sprite.getContents().getId().equals(id)) {
+        // Check block atlas
+        try {
+            var blockAtlas = (net.minecraft.client.texture.SpriteAtlasTexture) client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+            var sprite = blockAtlas.getSprite(id);
+            if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
                 return org.apache.commons.lang3.tuple.Pair.of(blockAtlas, sprite);
             }
-        }
-        Identifier guiAtlasId = Identifier.of("textures/atlas/gui.png");
-        var tex = client.getTextureManager().getTexture(guiAtlasId);
-        if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture guiAtlas) {
-            sprite = guiAtlas.getSprite(id);
-            if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                if (sprite.getContents().getId().equals(id)) {
-                    return org.apache.commons.lang3.tuple.Pair.of(guiAtlas, sprite);
+        } catch (Exception ignored) {}
+
+        // Check items atlas
+        try {
+            var tex = client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
+            if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture itemsAtlas) {
+                var sprite = itemsAtlas.getSprite(id);
+                if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
+                    return org.apache.commons.lang3.tuple.Pair.of(itemsAtlas, sprite);
                 }
             }
-            if (id.getPath().startsWith("gui/sprites/")) {
-                String shortPath = id.getPath().substring("gui/sprites/".length());
-                Identifier shortId = Identifier.of(id.getNamespace(), shortPath);
-                sprite = guiAtlas.getSprite(shortId);
+        } catch (Exception ignored) {}
+
+        // Check GUI atlas (used for HUD sprites)
+        Identifier guiAtlasId = Identifier.ofVanilla("textures/atlas/gui.png");
+        try {
+            var tex = client.getTextureManager().getTexture(guiAtlasId);
+            if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture guiAtlas) {
+                // Try full path first
+                var sprite = guiAtlas.getSprite(id);
                 if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
                     return org.apache.commons.lang3.tuple.Pair.of(guiAtlas, sprite);
                 }
+                // Try without gui/sprites/ prefix (HUD sprites use short IDs like hud/hotbar)
+                if (id.getPath().startsWith("gui/sprites/")) {
+                    String shortPath = id.getPath().substring("gui/sprites/".length());
+                    Identifier shortId = Identifier.of(id.getNamespace(), shortPath);
+                    sprite = guiAtlas.getSprite(shortId);
+                    if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
+                        return org.apache.commons.lang3.tuple.Pair.of(guiAtlas, sprite);
+                    }
+                }
             }
-        }
+        } catch (Exception ignored) {}
+
         return null;
     }
 

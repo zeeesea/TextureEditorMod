@@ -1,8 +1,10 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.google.gson.JsonObject;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
+import net.minecraft.resource.ResourceType;
 import net.minecraft.util.Identifier;
 
 import java.io.File;
@@ -59,7 +61,17 @@ public class ResourcePackExporter {
             // Write pack.mcmeta
             JsonObject packMcmeta = new JsonObject();
             JsonObject pack = new JsonObject();
-            pack.addProperty("pack_format", 46); // 1.21.4
+            pack.addProperty("pack_format", 75); // 1.21.11
+            // For pack_format > 64, Minecraft requires min_format and max_format as
+            // top-level fields in the pack object (not inside supported_formats)
+            pack.addProperty("min_format", 1);
+            pack.addProperty("max_format", 9999);
+            // supported_formats for older versions (1.20.2 - 1.21.4) that use this field instead
+            JsonObject supportedFormats = new JsonObject();
+            supportedFormats.addProperty("min_inclusive", 1);
+            supportedFormats.addProperty("max_inclusive", 9999);
+            pack.add("supported_formats", supportedFormats);
+
             // Build description with author if provided
             String desc = description != null && !description.isEmpty() ? description : packName;
             if (author != null && !author.isEmpty()) {
