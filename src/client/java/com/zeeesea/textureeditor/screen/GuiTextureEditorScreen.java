@@ -210,16 +210,6 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
             }
         } catch (Exception ignored) {}
 
-        // Check items atlas
-        try {
-            var tex = client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
-            if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture itemsAtlas) {
-                var sprite = itemsAtlas.getSprite(id);
-                if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                    return org.apache.commons.lang3.tuple.Pair.of(itemsAtlas, sprite);
-                }
-            }
-        } catch (Exception ignored) {}
 
         // Check GUI atlas (used for HUD sprites)
         Identifier guiAtlasId = Identifier.ofVanilla("textures/atlas/gui.png");

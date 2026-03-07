@@ -1,37 +1,22 @@
 package com.zeeesea.textureeditor.texture;
 
-import com.zeeesea.textureeditor.mixin.client.SpriteAccessor;
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GpuSampler;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.systems.RenderPass;
 
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.OptionalInt;
 import java.util.Set;
-import org.joml.Matrix4f;
-import org.lwjgl.system.MemoryUtil;
 
 /**
  * Manages modified textures and applies them live by uploading to the block atlas.
- * In 1.21.11, direct GL texture access is abstracted away via GpuTexture.
- * We modify sprite NativeImages directly via mixin accessor instead.
+ * In 1.21.10, we use CommandEncoder.writeToTexture() to upload directly to the atlas GPU texture.
  */
 public class TextureManager {
     private static final TextureManager INSTANCE = new TextureManager();
@@ -109,13 +94,13 @@ public class TextureManager {
     /**
      * Write pixel data into a sprite's NativeImage and re-upload to the block atlas.
      *
-     * In 1.21.11 the atlas uses RenderPass + ANIMATE_SPRITE_BLIT shader to position sprites.
-     * We replicate that approach: create temp texture, upload pixels, blit to atlas via RenderPass.
+     * In 1.21.10, we use CommandEncoder.writeToTexture() to upload each mip level
+     * directly to the atlas GpuTexture at the sprite's position.
      */
     private void writeSpritePixels(Identifier spriteId, int[][] pixels, int width, int height) {
         MinecraftClient client = MinecraftClient.getInstance();
 
-        // Try block atlas first, then items atlas, then GUI atlas
+        // In 1.21.10, items are in the block atlas (no separate items atlas)
         SpriteAtlasTexture atlas = null;
         Sprite sprite = null;
 
@@ -126,22 +111,6 @@ public class TextureManager {
                 atlas = blockAtlas;
             } else {
                 sprite = null;
-            }
-        }
-
-        if (sprite == null) {
-            try {
-                var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
-                if (tex instanceof SpriteAtlasTexture itemsAtlas) {
-                    sprite = itemsAtlas.getSprite(spriteId);
-                    if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                        atlas = itemsAtlas;
-                    } else {
-                        sprite = null;
-                    }
-                }
-            } catch (Exception e) {
-                // Items atlas not available
             }
         }
 
@@ -186,14 +155,6 @@ public class TextureManager {
             return;
         }
 
-        // Debug: log which atlas and usage flags
-        GpuTexture atlasTex = atlas.getGlTexture();
-        int usage = atlasTex.usage();
-        System.out.println("[TextureEditor] writeSpritePixels: " + spriteId + " in atlas " +
-            atlasTex.getWidth(0) + "x" + atlasTex.getHeight(0) +
-            " usage=0x" + Integer.toHexString(usage) +
-            " RENDER_ATTACHMENT=" + ((usage & 8) != 0));
-
         SpriteContents contents = sprite.getContents();
         SpriteContentsAccessor contentsAccessor = (SpriteContentsAccessor) contents;
         NativeImage image = contentsAccessor.getImage();
@@ -202,9 +163,6 @@ public class TextureManager {
             return;
         }
 
-        int padding = ((SpriteAccessor) sprite).getPadding();
-        int spriteX = sprite.getX();
-        int spriteY = sprite.getY();
         int imgW = image.getWidth();
         int imgH = image.getHeight();
         int writeW = Math.min(width, imgW);
@@ -228,98 +186,38 @@ public class TextureManager {
         NativeImage[] mipmaps = contentsAccessor.getMipmapLevelsImages();
         int spriteMipLevels = mipmaps.length;
 
-        // Step 3: Upload via RenderPass blit (same approach as SpriteAtlasTexture.upload())
+        // Step 3: Upload each mip level directly to the atlas texture using writeToTexture
         try {
             GpuTexture atlasTexture = atlas.getGlTexture();
-            int atlasW = atlasTexture.getWidth(0);
-            int atlasH = atlasTexture.getHeight(0);
-            // Use the atlas's mip level count, not the sprite's — GUI atlas may have fewer mip levels than block atlas
             int atlasMipLevels = atlasTexture.getMipLevels();
             int numMipLevels = Math.min(spriteMipLevels, atlasMipLevels);
             if (numMipLevels <= 0) numMipLevels = 1;
 
-            System.out.println("[TextureEditor] Blitting " + spriteId + ": atlasMips=" + atlasMipLevels + " spriteMips=" + spriteMipLevels + " using=" + numMipLevels);
+            int spriteX = sprite.getX();
+            int spriteY = sprite.getY();
 
-            // Create temp GpuTexture for the sprite
-            GpuTexture tempTexture = RenderSystem.getDevice().createTexture(
-                () -> "TextureEditor temp " + spriteId,
-                5, // COPY_DST(1) | TEXTURE_BINDING(4)
-                TextureFormat.RGBA8,
-                contents.getWidth(),
-                contents.getHeight(),
-                1,
-                numMipLevels
-            );
+            System.out.println("[TextureEditor] Uploading " + spriteId + ": atlasMips=" + atlasMipLevels +
+                " spriteMips=" + spriteMipLevels + " using=" + numMipLevels + " pos=" + spriteX + "," + spriteY);
 
-            // Upload each mip level to the temp texture at (0,0)
             for (int mip = 0; mip < numMipLevels; mip++) {
                 int mipW = contents.getWidth() >> mip;
                 int mipH = contents.getHeight() >> mip;
                 if (mipW <= 0 || mipH <= 0) break;
-                RenderSystem.getDevice()
-                    .createCommandEncoder()
-                    .writeToTexture(tempTexture, mipmaps[mip], mip, 0, 0, 0, mipW, mipH, 0, 0);
-            }
 
-            // Build the sprite info uniform buffer (same layout as Sprite.putSpriteInfo)
-            int uniformAlignment = RenderSystem.getDevice().getUniformOffsetAlignment();
-            int spriteInfoSize = SpriteContents.SPRITE_INFO_SIZE;
-            int stride = MathHelper.roundUpToMultiple(spriteInfoSize, uniformAlignment);
-            int totalSize = stride * numMipLevels;
-            ByteBuffer buffer = MemoryUtil.memAlloc(totalSize);
+                int mipX = spriteX >> mip;
+                int mipY = spriteY >> mip;
 
-            // Fill uniform data for each mip level (replicating Sprite.putSpriteInfo)
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                int bufOffset = mip * stride;
-                Std140Builder.intoBuffer(MemoryUtil.memSlice(buffer, bufOffset, stride))
-                    .putMat4f(new Matrix4f().ortho2D(0.0F, atlasW >> mip, 0.0F, atlasH >> mip))
-                    .putMat4f(new Matrix4f()
-                        .translate(spriteX >> mip, spriteY >> mip, 0.0F)
-                        .scale(contents.getWidth() + padding * 2 >> mip, contents.getHeight() + padding * 2 >> mip, 1.0F))
-                    .putFloat((float) padding / contents.getWidth())
-                    .putFloat((float) padding / contents.getHeight())
-                    .putInt(mip);
-            }
-
-            GpuBuffer uniformBuffer = RenderSystem.getDevice().createBuffer(
-                () -> "TextureEditor uniform",
-                GpuBuffer.USAGE_UNIFORM,
-                buffer
-            );
-            MemoryUtil.memFree(buffer);
-
-            GpuSampler sampler = RenderSystem.getSamplerCache().get(FilterMode.NEAREST, true);
-
-            GpuTextureView[] atlasMipViews = new GpuTextureView[numMipLevels];
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                atlasMipViews[mip] = RenderSystem.getDevice().createTextureView(atlasTexture, mip, 1);
-            }
-
-            GpuTextureView[] tempViews = new GpuTextureView[numMipLevels];
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                tempViews[mip] = RenderSystem.getDevice().createTextureView(tempTexture);
-            }
-
-            // Blit via RenderPass (same as SpriteAtlasTexture.upload)
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                try (RenderPass renderPass = RenderSystem.getDevice()
+                try {
+                    RenderSystem.getDevice()
                         .createCommandEncoder()
-                        .createRenderPass(
-                            () -> "TextureEditor blit " + spriteId,
-                            atlasMipViews[mip],
-                            OptionalInt.empty())) {
-                    renderPass.setPipeline(RenderPipelines.ANIMATE_SPRITE_BLIT);
-                    renderPass.bindTexture("Sprite", tempViews[mip], sampler);
-                    renderPass.setUniform("SpriteAnimationInfo", uniformBuffer.slice((long)mip * stride, spriteInfoSize));
-                    renderPass.draw(0, 6);
+                        .writeToTexture(atlasTexture, mipmaps[mip], mip, 0, mipX, mipY, mipW, mipH, 0, 0);
+                    System.out.println("[TextureEditor] Uploaded mip " + mip + " (" + mipW + "x" + mipH + " -> " + mipX + "," + mipY + ")");
+                } catch (Throwable t) {
+                    System.out.println("[TextureEditor] ERROR uploading mip " + mip + ": " + t.getMessage());
                 }
             }
 
-            // Cleanup
-            for (GpuTextureView v : atlasMipViews) v.close();
-            for (GpuTextureView v : tempViews) v.close();
-            tempTexture.close();
-            uniformBuffer.close();
+            System.out.println("[TextureEditor] === Upload COMPLETE for " + spriteId + " ===");
         } catch (Throwable t) {
             System.out.println("[TextureEditor] ERROR during upload: " + t.getClass().getName() + ": " + t.getMessage());
             t.printStackTrace();

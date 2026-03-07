@@ -51,19 +51,19 @@ public class ItemTextureExtractor {
             System.out.println("[TextureEditor] Spawn egg sprite not found in any atlas");
         }
 
-        // Strategy 2: Try to get sprite directly from ITEMS atlas (1.21.11+ has separate items atlas)
+        // Strategy 2: Try to get sprite directly from block atlas (in 1.21.10, items are in block atlas)
         Identifier directSpriteId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath());
         try {
-            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
+            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
             if (tex instanceof SpriteAtlasTexture sat) {
                 Sprite directSprite = sat.getSprite(directSpriteId);
                 if (directSprite != null && !directSprite.getContents().getId().getPath().equals("missingno")) {
-                    System.out.println("[TextureEditor] Found sprite in ITEMS atlas: " + directSprite.getContents().getId());
+                    System.out.println("[TextureEditor] Found sprite in block atlas: " + directSprite.getContents().getId());
                     return extractFromSprite(directSprite);
                 }
             }
         } catch (Exception e) {
-            System.out.println("[TextureEditor] Items atlas lookup failed: " + e.getMessage());
+            System.out.println("[TextureEditor] Block atlas item lookup failed: " + e.getMessage());
         }
 
         // Strategy 3: Try block atlas (for block items)
@@ -219,18 +219,10 @@ public class ItemTextureExtractor {
     }
 
     /**
-     * Find a sprite in either the ITEMS or BLOCK atlas.
+     * Find a sprite in the BLOCK atlas (in 1.21.10, items are also in the block atlas).
      */
     private static Sprite findSpriteInAnyAtlas(MinecraftClient client, Identifier spriteId) {
-        // Try items atlas
-        try {
-            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
-            if (tex instanceof SpriteAtlasTexture sat) {
-                Sprite s = sat.getSprite(spriteId);
-                if (s != null && !s.getContents().getId().getPath().equals("missingno")) return s;
-            }
-        } catch (Exception ignored) {}
-        // Try block atlas
+        // Try block atlas (contains both block and item sprites in 1.21.10)
         try {
             SpriteAtlasTexture blockAtlas = (SpriteAtlasTexture) client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
             Sprite s = blockAtlas.getSprite(spriteId);
