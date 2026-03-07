@@ -1,7 +1,7 @@
 # 🎨 In-Game Texture Editor Mod
 
 ![Fabric](https://img.shields.io/badge/Loader-Fabric-beige?style=for-the-badge&logo=fabric)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-green?style=for-the-badge&logo=minecraft)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.10-green?style=for-the-badge&logo=minecraft)
 
 **Stop closing Minecraft to edit a single pixel.**
 
@@ -75,7 +75,7 @@ The **Texture Editor Mod** allows you to edit blocks, items, entities, and GUI e
 
 ## ⚙️ Compatibility
 
-- **Minecraft Version**: 1.21.11
+- **Minecraft Version**: 1.21.10
 - **Mod Loader**: Fabric Loader
 - **Dependencies**: Fabric API
 
@@ -90,7 +90,6 @@ This mod works seamlessly with other resource packs.
 ## 🚧 Current Limitations & Known Issues
 
 - **Complex Models**: Blocks with complex non-cube models (Beds, Chests, Stairs, Slabs, Fences) are currently filtered out of the editor to prevent texture mapping errors. Support is planned for future updates.
-- **Leaf Cull**: When editing leaves, verify "Fast/Fancy" graphics settings if transparency updates look unexpected.
 
 ---
 
