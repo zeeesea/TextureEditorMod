@@ -90,8 +90,7 @@ This mod works seamlessly with other resource packs.
 ## 🚧 Current Limitations & Known Issues
 
 - **Complex Models**: Blocks with complex non-cube models (Beds, Chests, Stairs, Slabs, Fences) are currently filtered out of the editor to prevent texture mapping errors. Support is planned for future updates.
-- **Leaf Cull**: When editing leaves, verify "Fast/Fancy" graphics settings if transparency updates look unexpected.
-
+  
 ---
 
 ## 📥 Installation
