@@ -25,6 +25,10 @@ public class EditorScreen extends AbstractEditorScreen {
     private Direction face;
     private final Screen parent;
 
+    // Multiple textures per face (e.g. base + overlay)
+    private java.util.List<TextureExtractor.BlockFaceTexture> faceTextures = new java.util.ArrayList<>();
+    private int faceTextureIndex = 0;
+
     // World block constructor
     public EditorScreen(BlockHitResult hitResult) {
         super(Text.literal("Texture Editor"));
@@ -63,20 +67,24 @@ public class EditorScreen extends AbstractEditorScreen {
     @Override
     protected void loadTexture() {
         if (blockState == null) return;
-        TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, face);
-        if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
-            textureId = tex.textureId();
-            spriteId = Identifier.of(tex.textureId().getNamespace(),
-                    tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+        faceTextures = TextureExtractor.extractAll(blockState, face);
+        if (faceTextures.isEmpty()) return;
+        if (faceTextureIndex >= faceTextures.size()) faceTextureIndex = 0;
 
-            int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
-            int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
-            if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
-                canvas = new com.zeeesea.textureeditor.editor.PixelCanvas(savedDims[0], savedDims[1], savedPixels);
-            } else {
-                canvas = new com.zeeesea.textureeditor.editor.PixelCanvas(tex.width(), tex.height(), tex.pixels());
-            }
+        TextureExtractor.BlockFaceTexture tex = faceTextures.get(faceTextureIndex);
+        originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
+        textureId = tex.textureId();
+        spriteId = Identifier.of(tex.textureId().getNamespace(),
+                tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+
+        System.out.println("[TextureEditor] loadTexture: face=" + face + " layer=" + (faceTextureIndex + 1) + "/" + faceTextures.size() + " texture=" + textureId);
+
+        int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
+        int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
+        if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
+            canvas = new com.zeeesea.textureeditor.editor.PixelCanvas(savedDims[0], savedDims[1], savedPixels);
+        } else {
+            canvas = new com.zeeesea.textureeditor.editor.PixelCanvas(tex.width(), tex.height(), tex.pixels());
         }
     }
 
@@ -84,7 +92,16 @@ public class EditorScreen extends AbstractEditorScreen {
     protected String getEditorTitle() {
         String name = block != null ? block.getName().getString() : (blockState != null ? blockState.getBlock().getName().getString() : "Unknown");
         String tintLabel = isTinted ? " \u00a7a[Tinted]" : "";
-        return "Block Editor - " + name + " (" + face.getName() + ")" + tintLabel;
+        String layerLabel = "";
+        if (faceTextures.size() > 1) {
+            // Show a short sprite name for clarity
+            String spriteName = spriteId != null ? spriteId.getPath() : "";
+            // Extract last path segment as short name
+            int lastSlash = spriteName.lastIndexOf('/');
+            if (lastSlash >= 0) spriteName = spriteName.substring(lastSlash + 1);
+            layerLabel = " \u00a7b[" + spriteName + " " + (faceTextureIndex + 1) + "/" + faceTextures.size() + "]";
+        }
+        return "Block Editor - " + name + " (" + face.getName() + ")" + tintLabel + layerLabel;
     }
 
     @Override
@@ -105,7 +122,29 @@ public class EditorScreen extends AbstractEditorScreen {
                         Direction[] dirs = Direction.values();
                         face = dirs[(face.ordinal() + 1) % dirs.length];
                         btn.setMessage(Text.literal("Face: " + face.getName().toUpperCase()));
+                        faceTextureIndex = 0; // Reset layer index on face switch
                         switchFace(face);
+                    }
+            ).position(5, toolY).size(tbw, tbh).build());
+            toolY += tbh + 4;
+        }
+
+        // Texture layer cycle button — only shown when there are multiple textures per face (e.g. grass overlay)
+        if (faceTextures.size() > 1) {
+            String currentLayerName = getCurrentLayerShortName();
+            addDrawableChild(ButtonWidget.builder(
+                    Text.literal("Tex: " + currentLayerName + " (" + (faceTextureIndex + 1) + "/" + faceTextures.size() + ")"),
+                    btn -> {
+                        // Save current work before switching
+                        if (textureId != null && canvas != null) {
+                            TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
+                        }
+                        applyLive();
+                        faceTextureIndex = (faceTextureIndex + 1) % faceTextures.size();
+                        panOffsetX = 0; panOffsetY = 0;
+                        canvas = null;
+                        this.clearChildren();
+                        this.init();
                     }
             ).position(5, toolY).size(tbw, tbh).build());
             toolY += tbh + 4;
@@ -120,7 +159,18 @@ public class EditorScreen extends AbstractEditorScreen {
         return toolY;
     }
 
+    private String getCurrentLayerShortName() {
+        if (spriteId == null) return "?";
+        String path = spriteId.getPath();
+        int lastSlash = path.lastIndexOf('/');
+        return lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+    }
+
     private void switchFace(Direction newFace) {
+        // Persist current face pixels and apply live before switching
+        if (textureId != null && canvas != null) {
+            TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
+        }
         applyLive();
         this.face = newFace;
         panOffsetX = 0; panOffsetY = 0;
@@ -149,8 +199,8 @@ public class EditorScreen extends AbstractEditorScreen {
     private void resetBlock() {
         if (blockState == null) return;
         for (Direction dir : Direction.values()) {
-            TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, dir);
-            if (tex != null) {
+            java.util.List<TextureExtractor.BlockFaceTexture> allTex = TextureExtractor.extractAll(blockState, dir);
+            for (TextureExtractor.BlockFaceTexture tex : allTex) {
                 Identifier sid = Identifier.of(tex.textureId().getNamespace(),
                         tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
                 TextureManager.getInstance().removeTexture(tex.textureId());

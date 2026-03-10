@@ -34,6 +34,9 @@ public class ExportScreen extends Screen {
     private int currentColor = 0xFFFF0000;
     private boolean showGrid = true;
 
+    // Continuous stroke tracking for smooth line drawing
+    private int lastIconDragX = -1, lastIconDragY = -1;
+
     // Simple palette for icon
     private static final int[] PALETTE = {
             0xFF000000, 0xFFFFFFFF, 0xFFFF0000, 0xFF00FF00, 0xFF0000FF,
@@ -176,14 +179,59 @@ public class ExportScreen extends Screen {
             }
         }
 
-        if (handleIconCanvasClick(mouseX, mouseY)) return true;
+        if (handleIconCanvasClick(mouseX, mouseY)) {
+            int px = (int) ((mouseX - iconScreenX) / iconZoom);
+            int py = (int) ((mouseY - iconScreenY) / iconZoom);
+            lastIconDragX = px;
+            lastIconDragY = py;
+            return true;
+        }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        lastIconDragX = -1;
+        lastIconDragY = -1;
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (handleIconCanvasClick(mouseX, mouseY)) return true;
+        int px = (int) ((mouseX - iconScreenX) / iconZoom);
+        int py = (int) ((mouseY - iconScreenY) / iconZoom);
+        if (px >= 0 && px < ICON_SIZE && py >= 0 && py < ICON_SIZE) {
+            if (lastIconDragX >= 0 && lastIconDragY >= 0 && (px != lastIconDragX || py != lastIconDragY)) {
+                drawIconLine(lastIconDragX, lastIconDragY, px, py);
+            } else {
+                iconCanvas.setPixel(px, py, currentColor);
+            }
+            lastIconDragX = px;
+            lastIconDragY = py;
+            return true;
+        }
         return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    }
+
+    /**
+     * Draw a line on the icon canvas using Bresenham's algorithm.
+     */
+    private void drawIconLine(int x0, int y0, int x1, int y1) {
+        int dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy;
+        int startX = x0, startY = y0;
+        while (true) {
+            if (!(x0 == startX && y0 == startY)) {
+                if (x0 >= 0 && x0 < ICON_SIZE && y0 >= 0 && y0 < ICON_SIZE) {
+                    iconCanvas.setPixel(x0, y0, currentColor);
+                }
+            }
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
     }
 
     private boolean handleIconCanvasClick(double mouseX, double mouseY) {

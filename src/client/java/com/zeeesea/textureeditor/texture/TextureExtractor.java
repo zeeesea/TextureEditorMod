@@ -22,41 +22,57 @@ public class TextureExtractor {
     public record BlockFaceTexture(Identifier textureId, int[][] pixels, int width, int height) {}
 
     /**
-     * Extract the texture for a given block state and face direction.
+     * Extract ALL unique textures for a given block state and face direction.
+     * This includes overlay textures (e.g. grass_block_side_overlay) that are
+     * rendered as separate quads on the same face.
      */
-    public static BlockFaceTexture extract(BlockState state, Direction face) {
+    public static List<BlockFaceTexture> extractAll(BlockState state, Direction face) {
         MinecraftClient client = MinecraftClient.getInstance();
         BakedModel model = client.getBlockRenderManager().getModel(state);
+        List<BlockFaceTexture> results = new java.util.ArrayList<>();
+        java.util.Set<Identifier> seen = new java.util.HashSet<>();
 
         // Get quads for the specific face
         List<BakedQuad> quads = model.getQuads(state, face, Random.create());
-        if (quads.isEmpty()) {
-            // Try null direction (for full-cube models that use null direction quads)
-            quads = model.getQuads(state, null, Random.create());
-        }
-        if (quads.isEmpty()) {
-            // Try any face
-            for (Direction dir : Direction.values()) {
-                quads = model.getQuads(state, dir, Random.create());
-                if (!quads.isEmpty()) break;
-            }
-        }
 
-        if (!quads.isEmpty()) {
-            BakedQuad quad = quads.get(0);
+        // Also check null-direction quads (some overlay quads use null direction)
+        List<BakedQuad> nullQuads = model.getQuads(state, null, Random.create());
+        List<BakedQuad> allQuads = new java.util.ArrayList<>(quads);
+        allQuads.addAll(nullQuads);
+
+        for (BakedQuad quad : allQuads) {
             Sprite sprite = quad.getSprite();
-            if (!sprite.getContents().getId().getPath().equals("missingno")) {
-                return extractFromSprite(sprite);
+            if (sprite.getContents().getId().getPath().equals("missingno")) continue;
+            Identifier spriteId = sprite.getContents().getId();
+            Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
+            if (seen.contains(textureId)) continue;
+            seen.add(textureId);
+            BlockFaceTexture tex = extractFromSprite(sprite);
+            if (tex != null) {
+                results.add(tex);
+                System.out.println("[TextureEditor] extractAll: found " + textureId + " for face " + face);
             }
         }
 
-        // Fallback: particle sprite (works for leaves, signs, etc.)
-        Sprite particle = model.getParticleSprite();
-        if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
-            return extractFromSprite(particle);
+        // If we still have nothing, try particle sprite
+        if (results.isEmpty()) {
+            Sprite particle = model.getParticleSprite();
+            if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
+                BlockFaceTexture tex = extractFromSprite(particle);
+                if (tex != null) results.add(tex);
+            }
         }
 
-        return null;
+        return results;
+    }
+
+    /**
+     * Extract the texture for a given block state and face direction.
+     * Returns only the first (primary) texture.
+     */
+    public static BlockFaceTexture extract(BlockState state, Direction face) {
+        List<BlockFaceTexture> all = extractAll(state, face);
+        return all.isEmpty() ? null : all.get(0);
     }
 
     private static BlockFaceTexture extractFromSprite(Sprite sprite) {

@@ -56,6 +56,9 @@ public abstract class AbstractEditorScreen extends Screen {
     private int lineStartX = -1, lineStartY = -1;
     private boolean lineFirstClick = false;
 
+    // Continuous stroke tracking (for Bresenham interpolation between drag events)
+    private int lastDragPixelX = -1, lastDragPixelY = -1;
+
     protected PanelType currentPanel = PanelType.NONE;
     protected enum PanelType { NONE, COLOR_PANEL, LAYER_PANEL }
     private float pickerHue = 0f, pickerSat = 1f, pickerVal = 1f;
@@ -304,6 +307,7 @@ public abstract class AbstractEditorScreen extends Screen {
                         MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
                 .position(5, this.height - 54).size(tbw, tbh).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> {
+            applyLive();
             Screen bs = getBackScreen();
             if (bs != null) MinecraftClient.getInstance().setScreen(bs);
             else MinecraftClient.getInstance().setScreen(new BrowseScreen());
@@ -365,6 +369,70 @@ public abstract class AbstractEditorScreen extends Screen {
         return mx < getLeftSidebarWidth() || mx > this.width - getRightSidebarWidth() || my < 28;
     }
 
+    /**
+     * Check if coordinates are inside an open panel (color picker or layer panel).
+     * Returns true if a panel is open and the point is within its bounds.
+     */
+    protected boolean isInsideOpenPanel(double mx, double my) {
+        if (currentPanel == PanelType.COLOR_PANEL) {
+            int lsw = getLeftSidebarWidth();
+            int rsw = getRightSidebarWidth();
+            int canvasAreaCenter = lsw + (this.width - lsw - rsw) / 2;
+            int cpX = canvasAreaCenter - 80, cpY = this.height - 90;
+            if (mx >= cpX - 2 && mx <= cpX + 162 && my >= cpY - 14 && my <= cpY + 82) return true;
+        }
+        if (currentPanel == PanelType.LAYER_PANEL && canvas != null) {
+            var stack = canvas.getLayerStack();
+            int panelW = 150, rowH = 20;
+            int panelH = 30 + stack.getLayerCount() * rowH + 30;
+            int panelX = this.width / 2 - panelW / 2;
+            int panelY = this.height - panelH - 30;
+            if (mx >= panelX - 2 && mx <= panelX + panelW + 2 && my >= panelY - 2 && my <= panelY + panelH + 2) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Apply the current tool along a Bresenham line from (x0,y0) to (x1,y1).
+     * Used to fill gaps when dragging quickly.
+     */
+    private void applyToolAtPixel(int px, int py) {
+        float variation = ModSettings.getInstance().brushVariation;
+        if (currentTool == EditorTool.PENCIL) {
+            if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor);
+            else canvas.drawPixel(px, py, currentColor);
+        } else if (currentTool == EditorTool.BRUSH) {
+            if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation);
+            else canvas.drawBrushPixel(px, py, currentColor, variation);
+        } else if (currentTool == EditorTool.ERASER) {
+            if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize);
+            else canvas.erasePixel(px, py);
+        }
+    }
+
+    /**
+     * Draw a continuous line between two pixel coordinates using Bresenham's algorithm.
+     * Applies the current tool at each intermediate point (skips the start, draws to end).
+     */
+    private void applyToolAlongLine(int x0, int y0, int x1, int y1) {
+        int dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy;
+        int startX = x0, startY = y0;
+        while (true) {
+            // Skip the start point (already drawn by previous drag event)
+            if (!(x0 == startX && y0 == startY)) {
+                if (x0 >= 0 && x0 < canvas.getWidth() && y0 >= 0 && y0 < canvas.getHeight()) {
+                    applyToolAtPixel(x0, y0);
+                }
+            }
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
+    }
+
     protected void doResetAll() {
         TextureManager.getInstance().clear();
         MinecraftClient.getInstance().reloadResources();
@@ -423,10 +491,10 @@ public abstract class AbstractEditorScreen extends Screen {
         context.fill(lsw, 0, this.width - rsw, 28, bg);
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawText(textRenderer, getEditorTitle(), getLeftSidebarWidth() + 5, 8, 0xFFFFFF, true);
+        context.drawText(textRenderer, getEditorTitle(), lsw + 5, 8, 0xFFFFFF, true);
         context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() +
                 " | Size: " + toolSize + "px" +
-                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), getLeftSidebarWidth() + 5, 20, 0xCCCCCC, false);
+                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), lsw + 5, 20, 0xCCCCCC, false);
 
         drawPalette(context);
         int paletteX = getPaletteX();
@@ -599,6 +667,11 @@ public abstract class AbstractEditorScreen extends Screen {
         if (handleExtraClick(mx, my, btn)) return true;
         if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
         if (currentPanel == PanelType.LAYER_PANEL && btn == 0 && handleLayerPanelClick(mx, my)) return true;
+        // If a panel is open and click is outside, close the panel and consume the click
+        if (currentPanel != PanelType.NONE && btn == 0 && !isInsideOpenPanel(mx, my)) {
+            currentPanel = PanelType.NONE;
+            return true;
+        }
         if (btn == 0 && handleHistoryClick(mx, my)) return true;
         if (btn == 1) {
             isPanning = true;
@@ -612,6 +685,9 @@ public abstract class AbstractEditorScreen extends Screen {
             int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
                 handleCanvasClick(px, py, btn);
+                // Track for continuous stroke interpolation
+                lastDragPixelX = px;
+                lastDragPixelY = py;
                 return true;
             }
         }
@@ -622,6 +698,10 @@ public abstract class AbstractEditorScreen extends Screen {
     public boolean mouseReleased(double mx, double my, int btn) {
         if (handleExtraRelease(mx, my, btn)) return true;
         if (btn == 1) { isPanning = false; return true; }
+        if (btn == 0) {
+            lastDragPixelX = -1;
+            lastDragPixelY = -1;
+        }
         return super.mouseReleased(mx, my, btn);
     }
 
@@ -636,21 +716,20 @@ public abstract class AbstractEditorScreen extends Screen {
         }
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
         if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
+        // Block canvas drawing when a panel is open and mouse is over it
+        if (currentPanel != PanelType.NONE && isInsideOpenPanel(mx, my)) return true;
         if (isInUIRegion(mx, my)) return super.mouseDragged(mx, my, btn, dx, dy);
-        if (canvas != null) {
+        if (canvas != null && (currentTool == EditorTool.PENCIL || currentTool == EditorTool.BRUSH || currentTool == EditorTool.ERASER)) {
             int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
-                float variation = ModSettings.getInstance().brushVariation;
-                if (currentTool == EditorTool.PENCIL) {
-                    if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor);
-                    else canvas.drawPixel(px, py, currentColor);
-                } else if (currentTool == EditorTool.BRUSH) {
-                    if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation);
-                    else canvas.drawBrushPixel(px, py, currentColor, variation);
-                } else if (currentTool == EditorTool.ERASER) {
-                    if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize);
-                    else canvas.erasePixel(px, py);
+                // Interpolate from last drag position to current using Bresenham
+                if (lastDragPixelX >= 0 && lastDragPixelY >= 0 && (px != lastDragPixelX || py != lastDragPixelY)) {
+                    applyToolAlongLine(lastDragPixelX, lastDragPixelY, px, py);
+                } else {
+                    applyToolAtPixel(px, py);
                 }
+                lastDragPixelX = px;
+                lastDragPixelY = py;
                 return true;
             }
         }
@@ -676,7 +755,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
         if (kc == s.getKeybind("line")) { currentTool = EditorTool.LINE; return true; }
         if (kc == s.getKeybind("brush")) { currentTool = EditorTool.BRUSH; return true; }
-        if (kc == s.getKeybind("browse")) { MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
+        if (kc == s.getKeybind("browse")) { applyLive(); MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
         if (openKey != null && openKey.matchesKey(kc, sc)) {
             if (s.autoApplyLive) this.applyLive();

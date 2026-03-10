@@ -31,6 +31,30 @@ public class MobTextureExtractor {
 
         System.out.println("[TextureEditor] Extracting mob texture for: " + entityId);
 
+        // Try to detect the entity's variant texture first (cow, cat, frog, wolf, etc.)
+        Identifier variantTexture = tryGetVariantTexture(entity, entityId);
+        if (variantTexture != null) {
+            System.out.println("[TextureEditor] Variant texture detected: " + variantTexture);
+            var optResource = client.getResourceManager().getResource(variantTexture);
+            if (optResource.isPresent()) {
+                try {
+                    InputStream stream = optResource.get().getInputStream();
+                    NativeImage image = NativeImage.read(stream);
+                    int w = image.getWidth(), h = image.getHeight();
+                    int[][] pixels = new int[w][h];
+                    for (int x = 0; x < w; x++)
+                        for (int y = 0; y < h; y++)
+                            pixels[x][y] = image.getColorArgb(x, y);
+                    image.close();
+                    stream.close();
+                    System.out.println("[TextureEditor] Found mob texture: " + variantTexture + " size=" + w + "x" + h);
+                    return new MobTexture(variantTexture, pixels, w, h, name);
+                } catch (IOException e) {
+                    System.out.println("[TextureEditor] Failed to read variant texture: " + variantTexture + " - " + e.getMessage());
+                }
+            }
+        }
+
         // Build candidate texture paths
         List<Identifier> candidates = buildTexturePaths(entityId);
 
@@ -64,6 +88,411 @@ public class MobTextureExtractor {
         }
 
         System.out.println("[TextureEditor] FAILED to find texture for entity: " + entityId);
+        return null;
+    }
+
+    /**
+     * Try to extract the variant-specific texture from an entity using reflection.
+     * Uses reflection throughout because yarn mapping names can differ between versions.
+     */
+    private static Identifier tryGetVariantTexture(Entity entity, Identifier entityId) {
+        try {
+            String entityPath = entityId.getPath();
+
+            // 1) Wolf: direct getTextureId() method
+            var getTextureIdMethod = findMethod(entity.getClass(), "getTextureId");
+            if (getTextureIdMethod != null) {
+                getTextureIdMethod.setAccessible(true);
+                Object result = getTextureIdMethod.invoke(entity);
+                if (result instanceof Identifier id) {
+                    System.out.println("[TextureEditor] Wolf-style getTextureId(): " + id);
+                    return id;
+                }
+            }
+
+            // 2) Horse: find any method returning HorseColor enum, then map to texture
+            if (entityPath.equals("horse")) {
+                Identifier horseTex = tryHorseVariant(entity);
+                if (horseTex != null) return horseTex;
+            }
+
+            // 3) Llama: getVariant() returns enum directly
+            if (entityPath.equals("llama") || entityPath.equals("trader_llama")) {
+                Identifier llamaTex = tryEnumVariantTexture(entity, "textures/entity/llama/", null);
+                if (llamaTex != null) return llamaTex;
+            }
+
+            // 4) Rabbit: find method returning int for type
+            if (entityPath.equals("rabbit")) {
+                Identifier rabbitTex = tryRabbitVariant(entity);
+                if (rabbitTex != null) return rabbitTex;
+            }
+
+            // 5) Fox: find method returning fox type enum
+            if (entityPath.equals("fox")) {
+                Identifier foxTex = tryFoxVariant(entity);
+                if (foxTex != null) return foxTex;
+            }
+
+            // 6) Parrot: variant enum
+            if (entityPath.equals("parrot")) {
+                Identifier parrotTex = tryParrotVariant(entity);
+                if (parrotTex != null) return parrotTex;
+            }
+
+            // 7) Cow/Pig/Chicken/Cat/Frog: getVariant() -> RegistryEntry -> value() -> variant object -> texture chain
+            var getVariantMethod = findMethod(entity.getClass(), "getVariant");
+            if (getVariantMethod != null) {
+                getVariantMethod.setAccessible(true);
+                Object variantRef = getVariantMethod.invoke(entity);
+                System.out.println("[TextureEditor] getVariant() returned: " + (variantRef != null ? variantRef.getClass().getSimpleName() : "null"));
+
+                if (variantRef != null) {
+                    // For RegistryEntry types, get the value
+                    Object variantValue = variantRef;
+                    var valueMethod = findMethod(variantRef.getClass(), "value");
+                    if (valueMethod != null) {
+                        valueMethod.setAccessible(true);
+                        variantValue = valueMethod.invoke(variantRef);
+                        System.out.println("[TextureEditor] Variant value: " + (variantValue != null ? variantValue.getClass().getSimpleName() : "null"));
+                    }
+
+                    if (variantValue != null) {
+                        // Try to get texture from the variant value
+                        Identifier texId = extractTextureFromVariant(variantValue);
+                        if (texId != null) return texId;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] Variant detection failed: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Try to extract a texture Identifier from a variant object using reflection.
+     * Handles multiple patterns:
+     * - modelAndTexture().asset().texturePath() (Cow, Pig, Chicken)
+     * - assetInfo().texturePath() (Cat, Frog)
+     * - texture() / texturePath() directly
+     */
+    private static Identifier extractTextureFromVariant(Object variant) {
+        if (variant == null) return null;
+        try {
+            // Pattern 1: modelAndTexture() -> asset() -> texturePath() (Cow, Pig, Chicken)
+            var matMethod = findMethod(variant.getClass(), "modelAndTexture");
+            if (matMethod != null) {
+                matMethod.setAccessible(true);
+                Object mat = matMethod.invoke(variant);
+                if (mat != null) {
+                    // Try asset() -> texturePath()
+                    var assetMethod = findMethod(mat.getClass(), "asset");
+                    if (assetMethod != null) {
+                        assetMethod.setAccessible(true);
+                        Object asset = assetMethod.invoke(mat);
+                        if (asset != null) {
+                            Identifier texId = callTexturePath(asset);
+                            if (texId != null) {
+                                System.out.println("[TextureEditor] Found via modelAndTexture().asset().texturePath(): " + texId);
+                                return texId;
+                            }
+                        }
+                    }
+                    // Try texturePath() directly on modelAndTexture result
+                    Identifier texId = callTexturePath(mat);
+                    if (texId != null) {
+                        System.out.println("[TextureEditor] Found via modelAndTexture().texturePath(): " + texId);
+                        return texId;
+                    }
+                }
+            }
+
+            // Pattern 2: assetInfo() -> texturePath() (Cat, Frog)
+            var assetInfoMethod = findMethod(variant.getClass(), "assetInfo");
+            if (assetInfoMethod != null) {
+                assetInfoMethod.setAccessible(true);
+                Object assetInfo = assetInfoMethod.invoke(variant);
+                if (assetInfo != null) {
+                    Identifier texId = callTexturePath(assetInfo);
+                    if (texId != null) {
+                        System.out.println("[TextureEditor] Found via assetInfo().texturePath(): " + texId);
+                        return texId;
+                    }
+                }
+            }
+
+            // Pattern 3: Direct texturePath() on variant
+            Identifier texId = callTexturePath(variant);
+            if (texId != null) {
+                System.out.println("[TextureEditor] Found via direct texturePath(): " + texId);
+                return texId;
+            }
+
+            // Pattern 4: Direct texture() on variant (fallback)
+            var textureMethod = findMethod(variant.getClass(), "texture");
+            if (textureMethod != null) {
+                textureMethod.setAccessible(true);
+                Object result = textureMethod.invoke(variant);
+                texId = resolveIdentifier(result);
+                if (texId != null) {
+                    System.out.println("[TextureEditor] Found via direct texture(): " + texId);
+                    return texId;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] extractTextureFromVariant error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Call texturePath() on an object and return the result as Identifier.
+     */
+    private static Identifier callTexturePath(Object obj) {
+        try {
+            var method = findMethod(obj.getClass(), "texturePath");
+            if (method != null) {
+                method.setAccessible(true);
+                Object result = method.invoke(obj);
+                return resolveIdentifier(result);
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    /**
+     * Resolve an object to an Identifier texture path.
+     */
+    private static Identifier resolveIdentifier(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof Identifier id) {
+            // If it's already a full texture path, use it directly
+            if (id.getPath().startsWith("textures/") && id.getPath().endsWith(".png")) {
+                return id;
+            }
+            // Otherwise, construct the texture path
+            return Identifier.of(id.getNamespace(), "textures/" + id.getPath() + ".png");
+        }
+        // Try toString and parse
+        String str = obj.toString();
+        if (str.contains(":")) {
+            try {
+                Identifier id = Identifier.of(str);
+                if (id.getPath().startsWith("textures/") && id.getPath().endsWith(".png")) return id;
+                return Identifier.of(id.getNamespace(), "textures/" + id.getPath() + ".png");
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    /**
+     * Horse: scan all no-arg methods for one returning an enum whose simple name contains "HorseColor",
+     * then map the enum constant name to a texture path.
+     */
+    private static Identifier tryHorseVariant(Entity entity) {
+        try {
+            for (var m : entity.getClass().getMethods()) {
+                if (m.getParameterCount() != 0) continue;
+                Class<?> ret = m.getReturnType();
+                if (ret.isEnum() && ret.getSimpleName().contains("HorseColor")) {
+                    m.setAccessible(true);
+                    Object color = m.invoke(entity);
+                    if (color == null) continue;
+                    String colorName = color.toString().toLowerCase();
+                    System.out.println("[TextureEditor] Horse color (via " + m.getName() + "): " + colorName);
+                    String texName = switch (colorName) {
+                        case "white" -> "horse_white";
+                        case "creamy" -> "horse_creamy";
+                        case "chestnut" -> "horse_chestnut";
+                        case "brown" -> "horse_brown";
+                        case "black" -> "horse_black";
+                        case "gray" -> "horse_gray";
+                        case "dark_brown" -> "horse_darkbrown";
+                        default -> "horse_" + colorName;
+                    };
+                    return Identifier.of("minecraft", "textures/entity/horse/" + texName + ".png");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] tryHorseVariant error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Generic helper: call getVariant() and if it returns an enum, map it to textures/<prefix><enumName>.png
+     */
+    private static Identifier tryEnumVariantTexture(Entity entity, String prefix, java.util.Map<String, String> nameMap) {
+        try {
+            var getVariantMethod = findMethod(entity.getClass(), "getVariant");
+            if (getVariantMethod != null) {
+                getVariantMethod.setAccessible(true);
+                Object variant = getVariantMethod.invoke(entity);
+                if (variant != null && variant.getClass().isEnum()) {
+                    String varName = variant.toString().toLowerCase();
+                    if (nameMap != null && nameMap.containsKey(varName)) {
+                        varName = nameMap.get(varName);
+                    }
+                    System.out.println("[TextureEditor] Enum variant: " + varName);
+                    return Identifier.of("minecraft", prefix + varName + ".png");
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] tryEnumVariantTexture error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Rabbit: scan for any no-arg method returning int whose name contains "rabbit" or "type" (case insensitive).
+     * Falls back to scanning for any method returning int on the rabbit-specific class.
+     */
+    private static Identifier tryRabbitVariant(Entity entity) {
+        try {
+            // Try known method name candidates
+            for (String name : new String[]{"getRabbitType", "getVariant", "getRabbitVariant"}) {
+                var m = findMethod(entity.getClass(), name);
+                if (m != null) {
+                    m.setAccessible(true);
+                    Object result = m.invoke(entity);
+                    if (result instanceof Integer typeInt) {
+                        return rabbitTypeToTexture(typeInt);
+                    }
+                    // Some mappings may return an enum
+                    if (result != null && result.getClass().isEnum()) {
+                        int ordinal = ((Enum<?>) result).ordinal();
+                        return rabbitTypeToTexture(ordinal);
+                    }
+                }
+            }
+            // Brute-force: find a method on the entity's own class (not superclass) returning int
+            for (var m : entity.getClass().getDeclaredMethods()) {
+                if (m.getParameterCount() == 0 && m.getReturnType() == int.class) {
+                    String mName = m.getName().toLowerCase();
+                    if (mName.contains("rabbit") || mName.contains("type") || mName.contains("variant")) {
+                        m.setAccessible(true);
+                        int typeInt = (int) m.invoke(entity);
+                        System.out.println("[TextureEditor] Rabbit type (via " + m.getName() + "): " + typeInt);
+                        return rabbitTypeToTexture(typeInt);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] tryRabbitVariant error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static Identifier rabbitTypeToTexture(int typeInt) {
+        String texName = switch (typeInt) {
+            case 0 -> "brown";
+            case 1 -> "white";
+            case 2 -> "black";
+            case 3 -> "white_splotched";
+            case 4 -> "gold";
+            case 5 -> "salt";
+            case 99 -> "caerbannog";
+            default -> "brown";
+        };
+        System.out.println("[TextureEditor] Rabbit type: " + typeInt + " -> " + texName);
+        return Identifier.of("minecraft", "textures/entity/rabbit/" + texName + ".png");
+    }
+
+    /**
+     * Fox: scan for method returning an enum whose simple name contains "Fox" (e.g. FoxEntity$Type).
+     */
+    private static Identifier tryFoxVariant(Entity entity) {
+        try {
+            // Try known names first
+            for (String name : new String[]{"getFoxType", "getVariant", "getFoxVariant"}) {
+                var m = findMethod(entity.getClass(), name);
+                if (m != null && m.getReturnType().isEnum()) {
+                    m.setAccessible(true);
+                    Object foxType = m.invoke(entity);
+                    if (foxType != null) {
+                        String typeName = foxType.toString().toLowerCase();
+                        System.out.println("[TextureEditor] Fox type (via " + m.getName() + "): " + typeName);
+                        String texName = typeName.equals("snow") ? "snow_fox" : "fox";
+                        return Identifier.of("minecraft", "textures/entity/fox/" + texName + ".png");
+                    }
+                }
+            }
+            // Brute-force: scan for any method returning an enum with "Type" in its name on the entity class
+            for (var m : entity.getClass().getDeclaredMethods()) {
+                if (m.getParameterCount() == 0 && m.getReturnType().isEnum()) {
+                    String retName = m.getReturnType().getSimpleName();
+                    if (retName.contains("Type") || retName.contains("Fox")) {
+                        m.setAccessible(true);
+                        Object foxType = m.invoke(entity);
+                        if (foxType != null) {
+                            String typeName = foxType.toString().toLowerCase();
+                            System.out.println("[TextureEditor] Fox type (via scan " + m.getName() + "): " + typeName);
+                            String texName = typeName.equals("snow") ? "snow_fox" : "fox";
+                            return Identifier.of("minecraft", "textures/entity/fox/" + texName + ".png");
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] tryFoxVariant error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Parrot: scan for method returning an enum whose simple name contains "Parrot" or "Variant".
+     */
+    private static Identifier tryParrotVariant(Entity entity) {
+        try {
+            for (String name : new String[]{"getVariant", "getParrotVariant"}) {
+                var m = findMethod(entity.getClass(), name);
+                if (m != null && m.getReturnType().isEnum()) {
+                    m.setAccessible(true);
+                    Object variant = m.invoke(entity);
+                    if (variant != null) {
+                        String varName = variant.toString().toLowerCase();
+                        System.out.println("[TextureEditor] Parrot variant (via " + m.getName() + "): " + varName);
+                        String texName = switch (varName) {
+                            case "red_blue" -> "parrot_red_blue";
+                            case "blue" -> "parrot_blue";
+                            case "green" -> "parrot_green";
+                            case "yellow_blue" -> "parrot_yellow_blue";
+                            case "gray" -> "parrot_grey";
+                            default -> "parrot_" + varName;
+                        };
+                        return Identifier.of("minecraft", "textures/entity/parrot/" + texName + ".png");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] tryParrotVariant error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Find a method by name in a class hierarchy.
+     */
+    private static java.lang.reflect.Method findMethod(Class<?> clazz, String name) {
+        Class<?> c = clazz;
+        while (c != null && c != Object.class) {
+            for (var m : c.getDeclaredMethods()) {
+                if (m.getName().equals(name) && m.getParameterCount() == 0) {
+                    return m;
+                }
+            }
+            // Also check interfaces
+            for (var iface : c.getInterfaces()) {
+                for (var m : iface.getDeclaredMethods()) {
+                    if (m.getName().equals(name) && m.getParameterCount() == 0) {
+                        return m;
+                    }
+                }
+            }
+            c = c.getSuperclass();
+        }
         return null;
     }
 

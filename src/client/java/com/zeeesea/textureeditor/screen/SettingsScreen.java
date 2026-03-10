@@ -116,7 +116,7 @@ public class SettingsScreen extends Screen {
         y += 40;
 
         // External Editor Settings
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bExternal Editor..."), btn ->
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bExternal Editor... (Experimental)"), btn ->
                 client.setScreen(new ExternalEditorSettingsScreen(this)))
                 .position(centerX - 100, y).size(200, 20).build());
         y += 28;
