@@ -139,9 +139,15 @@ public class EditorScreen extends AbstractEditorScreen {
     @Override
     protected void applyLive() {
         if (spriteId == null || canvas == null) return;
+        // Capture everything NOW before the lambda runs (canvas may be nulled by switchFace)
+        final Identifier sid = spriteId;
+        final int[][] px = canvas.getPixels();
+        final int w = canvas.getWidth();
+        final int h = canvas.getHeight();
         final int[][] origCopy = originalPixels;
+        System.out.println("[TextureEditor] EditorScreen.applyLive: spriteId=" + sid + " size=" + w + "x" + h);
         MinecraftClient.getInstance().execute(() ->
-                TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));
+                TextureManager.getInstance().applyLive(sid, px, w, h, origCopy));
     }
 
     @Override
@@ -173,9 +179,12 @@ public class EditorScreen extends AbstractEditorScreen {
         }
 
         // Apply original pixels back to the atlas
-        final int[][] origCopy = copyPixels(originalPixels, canvas.getWidth(), canvas.getHeight());
+        final Identifier sid = spriteId;
+        final int cw = canvas.getWidth();
+        final int ch = canvas.getHeight();
+        final int[][] origCopy = copyPixels(originalPixels, cw, ch);
         MinecraftClient.getInstance().execute(() ->
-                TextureManager.getInstance().applyLive(spriteId, origCopy, canvas.getWidth(), canvas.getHeight()));
+                TextureManager.getInstance().applyLive(sid, origCopy, cw, ch));
     }
 
     private void resetBlock() {
