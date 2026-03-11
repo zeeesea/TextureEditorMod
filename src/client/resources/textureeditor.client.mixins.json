@@ -5,7 +5,9 @@
 	"client": [
 		"ExampleClientMixin",
 		"SpriteAccessor",
-		"SpriteContentsAccessor"
+		"SpriteContentsAccessor",
+		"BasicItemModelAccessor",
+		"BakedModelManagerAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

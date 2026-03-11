@@ -103,112 +103,87 @@ public class TextureManager {
                 pixels = modifiedTextures.get(textureId);
             }
             writeSpritePixels(spriteId, pixels, w, h);
+
+            // Also rebake item models for updated 3D thickness
+            try {
+                ItemModelRebaker.rebake(spriteId);
+            } catch (Exception e) {
+                System.out.println("[TextureEditor] ItemModelRebaker preview toggle failed: " + e.getMessage());
+            }
         }
     }
 
     /**
-     * Write pixel data into a sprite's NativeImage and re-upload to the block atlas.
-     *
-     * In 1.21.11 the atlas uses RenderPass + ANIMATE_SPRITE_BLIT shader to position sprites.
-     * We replicate that approach: create temp texture, upload pixels, blit to atlas via RenderPass.
+     * Write pixel data into a sprite and re-upload to ALL atlases that contain it.
+     * In 1.21.10, sprites can exist in multiple atlases (e.g. block AND items atlas).
+     * We must write to ALL so both world rendering and hotbar/inventory update immediately.
      */
     private void writeSpritePixels(Identifier spriteId, int[][] pixels, int width, int height) {
         MinecraftClient client = MinecraftClient.getInstance();
+        int hitCount = 0;
 
-        // Try block atlas first, then items atlas, then GUI atlas
-        SpriteAtlasTexture atlas = null;
-        Sprite sprite = null;
+        // Try each atlas — blit to ALL that contain this sprite
+        hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
+                SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE, "BLOCK");
 
-        SpriteAtlasTexture blockAtlas = (SpriteAtlasTexture) client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        if (blockAtlas != null) {
-            sprite = blockAtlas.getSprite(spriteId);
-            if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                atlas = blockAtlas;
-            } else {
-                sprite = null;
-            }
-        }
+        try {
+            hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
+                    SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE, "ITEMS");
+        } catch (Exception ignored) {}
 
-        if (sprite == null) {
-            try {
-                var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
-                if (tex instanceof SpriteAtlasTexture itemsAtlas) {
-                    sprite = itemsAtlas.getSprite(spriteId);
-                    if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                        atlas = itemsAtlas;
-                    } else {
-                        sprite = null;
-                    }
-                }
-            } catch (Exception e) {
-                // Items atlas not available
-            }
-        }
+        try {
+            hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
+                    Identifier.ofVanilla("textures/atlas/gui.png"), "GUI");
+        } catch (Exception ignored) {}
 
-        // Try GUI atlas (for HUD sprites like hotbar, hearts, etc.)
-        if (sprite == null) {
-            try {
-                Identifier guiAtlasId = Identifier.ofVanilla("textures/atlas/gui.png");
-                var tex = client.getTextureManager().getTexture(guiAtlasId);
-                if (tex instanceof SpriteAtlasTexture guiAtlas) {
-                    sprite = guiAtlas.getSprite(spriteId);
-                    if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                        atlas = guiAtlas;
-                    } else {
-                        sprite = null;
-                    }
-                }
-            } catch (Exception e) {
-                // GUI atlas not available
-            }
-        }
+        try {
+            hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
+                    Identifier.ofVanilla("textures/atlas/celestials.png"), "CELESTIALS");
+        } catch (Exception ignored) {}
 
-        // Try celestials atlas (for sun, moon sprites)
-        if (sprite == null) {
-            try {
-                Identifier celestialsAtlasId = Identifier.ofVanilla("textures/atlas/celestials.png");
-                var tex = client.getTextureManager().getTexture(celestialsAtlasId);
-                if (tex instanceof SpriteAtlasTexture celestialsAtlas) {
-                    sprite = celestialsAtlas.getSprite(spriteId);
-                    if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                        atlas = celestialsAtlas;
-                    } else {
-                        sprite = null;
-                    }
-                }
-            } catch (Exception e) {
-                // Celestials atlas not available
-            }
-        }
-
-        if (atlas == null || sprite == null) {
+        if (hitCount == 0) {
             System.out.println("[TextureEditor] ERROR: Sprite not found in any atlas for " + spriteId);
-            return;
+        } else {
+            System.out.println("[TextureEditor] writeSpritePixels: " + spriteId + " updated in " + hitCount + " atlas(es)");
         }
+    }
 
-        // Debug: log which atlas and usage flags
-        GpuTexture atlasTex = atlas.getGlTexture();
-        int usage = atlasTex.usage();
-        System.out.println("[TextureEditor] writeSpritePixels: " + spriteId + " in atlas " +
-            atlasTex.getWidth(0) + "x" + atlasTex.getHeight(0) +
-            " usage=0x" + Integer.toHexString(usage) +
-            " RENDER_ATTACHMENT=" + ((usage & 8) != 0));
+    /**
+     * Try to find the sprite in the given atlas and blit pixels to it.
+     * Returns 1 if found and blitted, 0 otherwise.
+     */
+    private int tryBlitToAtlas(MinecraftClient client, Identifier spriteId, int[][] pixels,
+                                int width, int height, Identifier atlasId, String atlasName) {
+        var tex = client.getTextureManager().getTexture(atlasId);
+        if (!(tex instanceof SpriteAtlasTexture atlas)) return 0;
 
+        Sprite sprite = atlas.getSprite(spriteId);
+        if (sprite == null || sprite.getContents().getId().getPath().equals("missingno")) return 0;
+
+        blitSpriteToAtlas(atlas, sprite, spriteId, pixels, width, height, atlasName, client);
+        return 1;
+    }
+
+    /**
+     * Blit updated pixel data for a single sprite into a single atlas texture.
+     * Updates the sprite's CPU-side NativeImage, regenerates mipmaps, and uploads via RenderPass.
+     */
+    private void blitSpriteToAtlas(SpriteAtlasTexture atlas, Sprite sprite, Identifier spriteId,
+                                    int[][] pixels, int width, int height,
+                                    String atlasName, MinecraftClient client) {
         SpriteContents contents = sprite.getContents();
         SpriteContentsAccessor contentsAccessor = (SpriteContentsAccessor) contents;
         NativeImage image = contentsAccessor.getImage();
         if (image == null) {
-            System.out.println("[TextureEditor] ERROR: NativeImage is NULL for " + spriteId);
+            System.out.println("[TextureEditor] ERROR: NativeImage is NULL for " + spriteId + " in " + atlasName);
             return;
         }
 
         int padding = ((SpriteAccessor) sprite).getPadding();
         int spriteX = sprite.getX();
         int spriteY = sprite.getY();
-        int imgW = image.getWidth();
-        int imgH = image.getHeight();
-        int writeW = Math.min(width, imgW);
-        int writeH = Math.min(height, imgH);
+        int writeW = Math.min(width, image.getWidth());
+        int writeH = Math.min(height, image.getHeight());
 
         // Step 1: Write new pixel data into the sprite's NativeImage (CPU side)
         for (int x = 0; x < writeW; x++) {
@@ -222,23 +197,20 @@ public class TextureManager {
         try {
             contents.generateMipmaps(mipLevels);
         } catch (Throwable t) {
-            System.out.println("[TextureEditor] WARN: Failed to regenerate mipmaps: " + t.getMessage());
+            System.out.println("[TextureEditor] WARN: Failed to regenerate mipmaps for " + atlasName + ": " + t.getMessage());
         }
 
         NativeImage[] mipmaps = contentsAccessor.getMipmapLevelsImages();
         int spriteMipLevels = mipmaps.length;
 
-        // Step 3: Upload via RenderPass blit (same approach as SpriteAtlasTexture.upload())
+        // Step 3: Upload via RenderPass blit
         try {
             GpuTexture atlasTexture = atlas.getGlTexture();
             int atlasW = atlasTexture.getWidth(0);
             int atlasH = atlasTexture.getHeight(0);
-            // Use the atlas's mip level count, not the sprite's — GUI atlas may have fewer mip levels than block atlas
             int atlasMipLevels = atlasTexture.getMipLevels();
             int numMipLevels = Math.min(spriteMipLevels, atlasMipLevels);
             if (numMipLevels <= 0) numMipLevels = 1;
-
-            System.out.println("[TextureEditor] Blitting " + spriteId + ": atlasMips=" + atlasMipLevels + " spriteMips=" + spriteMipLevels + " using=" + numMipLevels);
 
             // Create temp GpuTexture for the sprite
             GpuTexture tempTexture = RenderSystem.getDevice().createTexture(
@@ -251,7 +223,7 @@ public class TextureManager {
                 numMipLevels
             );
 
-            // Upload each mip level to the temp texture at (0,0)
+            // Upload each mip level to the temp texture
             for (int mip = 0; mip < numMipLevels; mip++) {
                 int mipW = contents.getWidth() >> mip;
                 int mipH = contents.getHeight() >> mip;
@@ -268,7 +240,6 @@ public class TextureManager {
             int totalSize = stride * numMipLevels;
             ByteBuffer buffer = MemoryUtil.memAlloc(totalSize);
 
-            // Fill uniform data for each mip level (replicating Sprite.putSpriteInfo)
             for (int mip = 0; mip < numMipLevels; mip++) {
                 int bufOffset = mip * stride;
                 Std140Builder.intoBuffer(MemoryUtil.memSlice(buffer, bufOffset, stride))
@@ -320,8 +291,12 @@ public class TextureManager {
             for (GpuTextureView v : tempViews) v.close();
             tempTexture.close();
             uniformBuffer.close();
+
+            System.out.println("[TextureEditor] Blitted " + spriteId + " to " + atlasName +
+                " atlas (" + atlasW + "x" + atlasH + ") at " + spriteX + "," + spriteY +
+                " mips=" + numMipLevels);
         } catch (Throwable t) {
-            System.out.println("[TextureEditor] ERROR during upload: " + t.getClass().getName() + ": " + t.getMessage());
+            System.out.println("[TextureEditor] ERROR during " + atlasName + " upload: " + t.getClass().getName() + ": " + t.getMessage());
             t.printStackTrace();
         }
     }
@@ -342,6 +317,13 @@ public class TextureManager {
 
         putTexture(textureId, pixels, width, height);
         writeSpritePixels(spriteId, pixels, width, height);
+
+        // Rebake item models to update 3D thickness quads for new pixel shapes
+        try {
+            ItemModelRebaker.rebake(spriteId);
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] ItemModelRebaker failed: " + e.getMessage());
+        }
     }
 
     private static int averageColors(int c1, int c2, int c3, int c4) {
@@ -357,5 +339,6 @@ public class TextureManager {
         textureDimensions.clear();
         originalTextures.clear();
         previewingOriginals = false;
+        ItemModelRebaker.invalidateCache();
     }
 }

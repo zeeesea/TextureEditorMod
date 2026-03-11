@@ -20,6 +20,7 @@ repositories {
 }
 
 loom {
+	accessWidenerPath = file("src/main/resources/textureeditor.accesswidener")
 	splitEnvironmentSourceSets()
 
 	mods {
