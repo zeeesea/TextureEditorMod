@@ -38,6 +38,15 @@ public class ItemModelRebaker {
      * @param spriteId The sprite identifier (e.g. minecraft:item/diamond_sword)
      */
     public static void rebake(Identifier spriteId) {
+        // Only rebake for item sprites (item/diamond_sword, etc.)
+        // Block sprites (block/stone, block/grass_block_top, etc.) must NOT be rebaked
+        // because block items use 3D cube models, not flat GeneratedItemModel geometry.
+        // Rebaking a block sprite with GeneratedItemModel would turn the 3D block into a 1px flat sheet.
+        String path = spriteId.getPath();
+        if (!path.startsWith("item/")) {
+            return;
+        }
+
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null || client.getBakedModelManager() == null) return;
 
