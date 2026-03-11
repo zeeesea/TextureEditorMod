@@ -92,6 +92,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     @Override
     protected void applyLive() {
         if (spriteId == null || canvas == null) return;
+        System.out.println("[TextureEditor] ItemEditor.applyLive: spriteId=" + spriteId + " textureId=" + textureId + " canvas=" + canvas.getWidth() + "x" + canvas.getHeight());
         final int[][] origCopy = originalPixels;
         MinecraftClient.getInstance().execute(() ->
                 TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));

@@ -338,6 +338,7 @@ public abstract class AbstractEditorScreen extends Screen {
                         MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
                 .position(5, this.height - 54).size(tbw, tbh).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> {
+            if (settings.autoApplyLive) this.applyLive();
             Screen bs = getBackScreen();
             if (bs != null) MinecraftClient.getInstance().setScreen(bs);
             else MinecraftClient.getInstance().setScreen(new BrowseScreen());
@@ -458,10 +459,10 @@ public abstract class AbstractEditorScreen extends Screen {
         context.fill(lsw, 0, this.width - rsw, 28, bg);
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawText(textRenderer, getEditorTitle(), getLeftSidebarWidth() + 5, 8, 0xFFFFFFFF, true);
+        context.drawText(textRenderer, getEditorTitle(), 5, 8, 0xFFFFFFFF, true);
         context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() +
                 " | Size: " + toolSize + "px" +
-                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), getLeftSidebarWidth() + 5, 20, 0xFFCCCCCC, false);
+                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), 5, 20, 0xFFCCCCCC, false);
 
         drawPalette(context);
         int paletteX = getPaletteX();
@@ -882,7 +883,11 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
         if (kc == s.getKeybind("line")) { currentTool = EditorTool.LINE; return true; }
         if (kc == s.getKeybind("brush")) { currentTool = EditorTool.BRUSH; return true; }
-        if (kc == s.getKeybind("browse")) { MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
+        if (kc == s.getKeybind("browse")) {
+            if (s.autoApplyLive) this.applyLive();
+            MinecraftClient.getInstance().setScreen(new BrowseScreen());
+            return true;
+        }
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
         if (openKey != null && openKey.matchesKey(keyInput)) {
             if (s.autoApplyLive) this.applyLive();

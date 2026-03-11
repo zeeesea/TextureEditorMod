@@ -248,11 +248,19 @@ public class BrowseScreen extends Screen {
         addGUIEntry(entries, "gui/container/cartography_table", "Cartography Table");
         addGUIEntry(entries, "gui/container/stonecutter", "Stonecutter");
         addGUIEntry(entries, "gui/container/smithing", "Smithing Table");
-        addGUIEntry(entries, "gui/container/creative_inventory/tabs", "Creative Tabs");
-        // General GUI
-        addGUIEntry(entries, "gui/sprites/widget/button", "Button Widget");
-        addGUIEntry(entries, "gui/sprites/widget/button_disabled", "Button (Disabled)");
-        addGUIEntry(entries, "gui/sprites/widget/button_highlighted", "Button (Highlighted)");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_inventory", "Creative Inventory BG");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_items", "Creative Items BG");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_item_search", "Creative Search BG");
+        // General GUI - individual widget sprites
+        addGUIEntry(entries, "gui/sprites/widget/button", "Button");
+        addGUIEntry(entries, "gui/sprites/widget/button_highlighted", "Button Highlighted");
+        addGUIEntry(entries, "gui/sprites/widget/button_disabled", "Button Disabled");
+        addGUIEntry(entries, "gui/sprites/widget/slider", "Slider");
+        addGUIEntry(entries, "gui/sprites/widget/slider_highlighted", "Slider Highlighted");
+        addGUIEntry(entries, "gui/sprites/widget/slider_handle", "Slider Handle");
+        addGUIEntry(entries, "gui/sprites/widget/slider_handle_highlighted", "Slider Handle HL");
+        addGUIEntry(entries, "gui/sprites/widget/text_field", "Text Field");
+        addGUIEntry(entries, "gui/sprites/widget/text_field_highlighted", "Text Field HL");
         addGUIEntry(entries, "gui/title/minecraft", "Title Logo");
         addGUIEntry(entries, "gui/title/edition", "Edition Badge");
         return entries;
@@ -480,7 +488,7 @@ public class BrowseScreen extends Screen {
             if (hovered) {
                 tooltipText = entry.name + " (" + entry.type.displayName + ")";
                 if (modified) {
-                    tooltipText += " \u00a7a[Modified]";
+                    tooltipText += " \u00a7a[Modified] \u00a77- Right-click to reset";
                 }
             }
         }
@@ -548,8 +556,8 @@ public class BrowseScreen extends Screen {
         if (super.mouseClicked(click, bl)) return true;
         double mouseX = click.x(); double mouseY = click.y(); int button = click.button();
 
-        if (button == 0) {
-            // Check grid click
+        // Left-click: open editor, Right-click: reset texture
+        if (button == 0 || button == 1) {
             int startIdx = scrollOffset * columns;
             int gridX = GRID_SIDE_MARGIN;
             int gridY = GRID_TOP;
@@ -566,7 +574,11 @@ public class BrowseScreen extends Screen {
                 if (y + CELL_SIZE > this.height) break;
 
                 if (mouseX >= x && mouseX < x + CELL_SIZE && mouseY >= y && mouseY < y + CELL_SIZE) {
-                    openEditor(filteredEntries.get(i));
+                    if (button == 0) {
+                        openEditor(filteredEntries.get(i));
+                    } else {
+                        resetEntry(filteredEntries.get(i));
+                    }
                     return true;
                 }
             }
@@ -576,32 +588,180 @@ public class BrowseScreen extends Screen {
     }
 
     private void openEditor(BrowseEntry entry) {
+        com.zeeesea.textureeditor.editor.ExternalEditorManager extMgr = com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance();
+        boolean useExternal = extMgr.isExternalEditorEnabled();
+
         if (entry.type == EntryType.BLOCK) {
             Block block = Registries.BLOCK.get(entry.id);
-            client.setScreen(new EditorScreen(block, this));
+            if (useExternal) {
+                openExternalForBlock(block);
+            } else {
+                client.setScreen(new EditorScreen(block, this));
+            }
         } else if (entry.type == EntryType.MOB) {
-            // If the ID is a direct texture path (e.g. textures/entity/elytra.png), open as GuiTextureEditorScreen
             if (entry.id.getPath().startsWith("textures/")) {
-                client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+                if (useExternal) {
+                    openExternalForDirectTexture(entry.id, entry.name);
+                } else {
+                    client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+                }
             } else if (entry.stack == null) {
-                // No entity (e.g sheep fur via non-texture path)
-                client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+                if (useExternal) {
+                    openExternalForDirectTexture(entry.id, entry.name);
+                } else {
+                    client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+                }
             } else if (client.world != null) {
                 net.minecraft.entity.Entity entity = com.zeeesea.textureeditor.util.EntityMapper.getEntityFromItem(entry.stack, client.world);
                 if (entity != null) {
-                    client.setScreen(new MobEditorScreen(entity, this));
+                    if (useExternal) {
+                        openExternalForMob(entity);
+                    } else {
+                        client.setScreen(new MobEditorScreen(entity, this));
+                    }
                 } else {
-                    // Entity creation failed (e.g. elytra has no entity), open item editor
-                    client.setScreen(new ItemEditorScreen(entry.stack, this));
+                    if (useExternal) {
+                        openExternalForItem(entry.stack);
+                    } else {
+                        client.setScreen(new ItemEditorScreen(entry.stack, this));
+                    }
                 }
             }
         } else if (entry.type == EntryType.ITEM) {
             if (entry.stack != null) {
-                client.setScreen(new ItemEditorScreen(entry.stack, this));
+                if (useExternal) {
+                    openExternalForItem(entry.stack);
+                } else {
+                    client.setScreen(new ItemEditorScreen(entry.stack, this));
+                }
             }
         } else if (entry.type == EntryType.GUI) {
-            client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+            if (useExternal) {
+                openExternalForDirectTexture(entry.id, entry.name);
+            } else {
+                client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+            }
         }
+    }
+
+    /**
+     * Right-click on a browser entry to reset its texture to default.
+     */
+    private void resetEntry(BrowseEntry entry) {
+        if (!isModified(entry)) return;
+
+        if (entry.type == EntryType.BLOCK) {
+            Block block = Registries.BLOCK.get(entry.id);
+            for (Direction dir : Direction.values()) {
+                TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), dir);
+                if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
+                    Identifier spriteId = Identifier.of(tex.textureId().getNamespace(),
+                            tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+                    com.zeeesea.textureeditor.editor.ExternalEditorManager.resetTextureStatic(
+                            tex.textureId(), spriteId, tex.pixels(), tex.width(), tex.height());
+                }
+            }
+        } else if (entry.type == EntryType.ITEM && entry.stack != null) {
+            ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(entry.stack);
+            if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
+                com.zeeesea.textureeditor.editor.ExternalEditorManager.resetTextureStatic(
+                        tex.textureId(), tex.spriteId(), tex.pixels(), tex.width(), tex.height());
+            }
+        } else if (entry.type == EntryType.MOB || entry.type == EntryType.GUI) {
+            Identifier fullId = entry.id.getPath().startsWith("textures/") ? entry.id :
+                    Identifier.of(entry.id.getNamespace(), "textures/" + entry.id.getPath() + ".png");
+            if (TextureManager.getInstance().getPixels(fullId) != null) {
+                TextureManager.getInstance().removeTexture(fullId);
+                String safeName = fullId.toString().replaceAll("[^a-zA-Z0-9._-]", "_") + ".png";
+                java.io.File tempFile = new java.io.File(
+                        com.zeeesea.textureeditor.editor.ExternalEditorSession.getTempDir(), safeName);
+                if (tempFile.exists()) tempFile.delete();
+                if (client != null) client.reloadResources();
+            }
+        }
+    }
+
+    // --- External editor helpers ---
+
+    private void openExternalForBlock(Block block) {
+        TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), Direction.UP);
+        if (tex == null) {
+            for (Direction dir : Direction.values()) {
+                tex = TextureExtractor.extract(block.getDefaultState(), dir);
+                if (tex != null) break;
+            }
+        }
+        if (tex != null) {
+            Identifier spriteId = Identifier.of(tex.textureId().getNamespace(),
+                    tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
+            int[][] origCopy = copyPixels(tex.pixels(), tex.width(), tex.height());
+            com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance().startAtlasSession(
+                    tex.textureId(), spriteId, tex.pixels(), origCopy, tex.width(), tex.height());
+        }
+    }
+
+    private void openExternalForItem(ItemStack stack) {
+        ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(stack);
+        if (tex != null) {
+            int[][] origCopy = copyPixels(tex.pixels(), tex.width(), tex.height());
+            if (tex.spriteId() != null && !tex.textureId().getPath().startsWith("textures/entity/")) {
+                com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance().startAtlasSession(
+                        tex.textureId(), tex.spriteId(), tex.pixels(), origCopy, tex.width(), tex.height());
+            } else {
+                com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance().startEntitySession(
+                        tex.textureId(), tex.pixels(), origCopy, tex.width(), tex.height());
+            }
+        }
+    }
+
+    private void openExternalForMob(net.minecraft.entity.Entity entity) {
+        com.zeeesea.textureeditor.texture.MobTextureExtractor.MobTexture tex =
+                com.zeeesea.textureeditor.texture.MobTextureExtractor.extract(entity);
+        if (tex != null) {
+            int[][] origCopy = copyPixels(tex.pixels(), tex.width(), tex.height());
+            com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance().startEntitySession(
+                    tex.textureId(), tex.pixels(), origCopy, tex.width(), tex.height());
+        }
+    }
+
+    private void openExternalForDirectTexture(Identifier textureId, String name) {
+        boolean isGuiSprite = textureId.getPath().startsWith("gui/sprites/")
+                || textureId.getPath().startsWith("gui/container/")
+                || textureId.getPath().startsWith("gui/");
+
+        Identifier fullId = textureId.getPath().startsWith("textures/") ? textureId :
+                Identifier.of(textureId.getNamespace(), "textures/" + textureId.getPath() + ".png");
+        try {
+            var optResource = client.getResourceManager().getResource(fullId);
+            if (optResource.isPresent()) {
+                java.io.InputStream stream = optResource.get().getInputStream();
+                net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(stream);
+                int w = image.getWidth(), h = image.getHeight();
+                int[][] pixels = new int[w][h];
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                        pixels[x][y] = image.getColorArgb(x, y);
+                image.close();
+                stream.close();
+                int[][] origCopy = copyPixels(pixels, w, h);
+
+                if (isGuiSprite) {
+                    com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance().startGuiSession(
+                            fullId, textureId, pixels, origCopy, w, h);
+                } else {
+                    com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance().startEntitySession(
+                            fullId, pixels, origCopy, w, h);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] Failed to load texture for external editor: " + fullId + " - " + e.getMessage());
+        }
+    }
+
+    private static int[][] copyPixels(int[][] src, int w, int h) {
+        int[][] copy = new int[w][h];
+        for (int x = 0; x < w; x++) System.arraycopy(src[x], 0, copy[x], 0, h);
+        return copy;
     }
 
     @Override
