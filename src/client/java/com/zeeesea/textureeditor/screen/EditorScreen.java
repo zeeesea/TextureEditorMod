@@ -25,10 +25,6 @@ public class EditorScreen extends AbstractEditorScreen {
     private Direction face;
     private final Screen parent;
 
-    // Overlay support: some blocks (like grass) have multiple texture layers per face
-    private int currentQuadIndex = 0;
-    private int maxQuadIndex = 0;
-
     // World block constructor
     public EditorScreen(BlockHitResult hitResult) {
         super(Text.literal("Texture Editor"));
@@ -67,13 +63,7 @@ public class EditorScreen extends AbstractEditorScreen {
     @Override
     protected void loadTexture() {
         if (blockState == null) return;
-
-        // Count overlay layers for this face
-        maxQuadIndex = TextureExtractor.getFaceTextureCount(blockState, face) - 1;
-        if (maxQuadIndex < 0) maxQuadIndex = 0;
-        if (currentQuadIndex > maxQuadIndex) currentQuadIndex = 0;
-
-        TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, face, currentQuadIndex);
+        TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, face);
         if (tex != null) {
             textureId = tex.textureId();
             spriteId = Identifier.of(tex.textureId().getNamespace(),
@@ -101,8 +91,7 @@ public class EditorScreen extends AbstractEditorScreen {
     protected String getEditorTitle() {
         String name = block != null ? block.getName().getString() : (blockState != null ? blockState.getBlock().getName().getString() : "Unknown");
         String tintLabel = isTinted ? " \u00a7a[Tinted]" : "";
-        String overlayLabel = (maxQuadIndex > 0 && currentQuadIndex > 0) ? " \u00a7e[Overlay]" : "";
-        return "Block Editor - " + name + " (" + face.asString() + ")" + tintLabel + overlayLabel;
+        return "Block Editor - " + name + " (" + face.asString() + ")" + tintLabel;
     }
 
     @Override
@@ -123,19 +112,8 @@ public class EditorScreen extends AbstractEditorScreen {
                         Direction[] dirs = Direction.values();
                         face = dirs[(face.ordinal() + 1) % dirs.length];
                         btn.setMessage(Text.literal("Face: " + face.asString().toUpperCase()));
-                        currentQuadIndex = 0;
                         switchFace(face);
                     }
-            ).position(5, toolY).size(tbw, tbh).build());
-            toolY += tbh + 4;
-        }
-
-        // Overlay toggle button — only shown when face has multiple texture layers (e.g. grass overhang)
-        if (maxQuadIndex > 0) {
-            String layerLabel = currentQuadIndex == 0 ? "Layer: Base" : "Layer: Overlay " + currentQuadIndex;
-            addDrawableChild(ButtonWidget.builder(
-                    Text.literal("\u00a7e" + layerLabel),
-                    btn -> switchOverlay()
             ).position(5, toolY).size(tbw, tbh).build());
             toolY += tbh + 4;
         }
@@ -152,15 +130,6 @@ public class EditorScreen extends AbstractEditorScreen {
     private void switchFace(Direction newFace) {
         applyLive();
         this.face = newFace;
-        panOffsetX = 0; panOffsetY = 0;
-        canvas = null;
-        this.clearChildren();
-        this.init();
-    }
-
-    private void switchOverlay() {
-        applyLive();
-        currentQuadIndex = (currentQuadIndex + 1) % (maxQuadIndex + 1);
         panOffsetX = 0; panOffsetY = 0;
         canvas = null;
         this.clearChildren();
@@ -184,13 +153,6 @@ public class EditorScreen extends AbstractEditorScreen {
         if (textureId != null) {
             trueOriginals = TextureManager.getInstance().getOriginalPixels(textureId);
         }
-        // If no stored originals, re-extract from the actual block model as fallback
-        if (trueOriginals == null && blockState != null) {
-            TextureExtractor.BlockFaceTexture freshTex = TextureExtractor.extract(blockState, face, currentQuadIndex);
-            if (freshTex != null) {
-                trueOriginals = freshTex.pixels();
-            }
-        }
         if (trueOriginals == null) {
             trueOriginals = originalPixels;
         }
@@ -211,39 +173,30 @@ public class EditorScreen extends AbstractEditorScreen {
         }
 
         // Apply original pixels back to the atlas
-        final Identifier sid = spriteId;
         final int[][] origCopy = copyPixels(originalPixels, canvas.getWidth(), canvas.getHeight());
-        final int cw = canvas.getWidth(), ch = canvas.getHeight();
         MinecraftClient.getInstance().execute(() ->
-                TextureManager.getInstance().applyLive(sid, origCopy, cw, ch));
+                TextureManager.getInstance().applyLive(spriteId, origCopy, canvas.getWidth(), canvas.getHeight()));
     }
 
     private void resetBlock() {
         if (blockState == null) return;
         for (Direction dir : Direction.values()) {
-            int layerCount = TextureExtractor.getFaceTextureCount(blockState, dir);
-            for (int qi = 0; qi < layerCount; qi++) {
-                TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, dir, qi);
-                if (tex == null) continue;
-                Identifier tid = tex.textureId();
-                Identifier sid = Identifier.of(tid.getNamespace(),
-                        tid.getPath().replace("textures/", "").replace(".png", ""));
-                // Use stored originals (the true unmodified pixels)
-                int[][] origPx = TextureManager.getInstance().getOriginalPixels(tid);
-                if (origPx == null) continue; // not modified, skip
-                int w = tex.width(), h = tex.height();
-                final int[][] px = copyPixels(origPx, w, h);
-                // Remove AFTER copying
-                TextureManager.getInstance().removeTexture(tid);
-                TextureManager.getInstance().removeOriginal(tid);
-                MinecraftClient.getInstance().execute(() ->
-                        TextureManager.getInstance().applyLive(sid, px, w, h));
-            }
+            TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, dir);
+            if (tex == null) continue;
+            Identifier tid = tex.textureId();
+            Identifier sid = Identifier.of(tid.getNamespace(),
+                    tid.getPath().replace("textures/", "").replace(".png", ""));
+            // Use stored originals (the true unmodified pixels)
+            int[][] origPx = TextureManager.getInstance().getOriginalPixels(tid);
+            if (origPx == null) continue; // not modified, skip
+            int w = tex.width(), h = tex.height();
+            TextureManager.getInstance().removeTexture(tid);
+            TextureManager.getInstance().removeOriginal(tid);
+            final int[][] px = copyPixels(origPx, w, h);
+            MinecraftClient.getInstance().execute(() ->
+                    TextureManager.getInstance().applyLive(sid, px, w, h));
         }
-        // Reload current face canvas from the block model (not from stored data)
-        panOffsetX = 0; panOffsetY = 0;
-        canvas = null;
-        this.clearChildren();
-        this.init();
+        // Reset the current face canvas
+        resetCurrent();
     }
 }
