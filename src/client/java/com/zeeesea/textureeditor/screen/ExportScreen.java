@@ -2,6 +2,7 @@ package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ResourcePackExporter;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -87,13 +88,21 @@ public class ExportScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal("Grid"), btn -> showGrid = !showGrid)
                 .position(iconScreenX + ICON_SIZE * iconZoom + 10, iconScreenY).size(50, 20).build());
 
+
+        int exportBackPosX = centerX - 60;
+        int exportBackPosY = this.height - 50;
+
+        if (getWindowHeight() < 1080 || getGuiScale() >= 3) {
+            exportBackPosX = centerX + fieldWidth / 2 + 30;
+            exportBackPosY = 40;
+        }
         // Export button
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aExport"), btn -> doExport())
-                .position(centerX - 60, this.height - 50).size(120, 20).build());
+                .position(exportBackPosX, exportBackPosY).size(120, 20).build());
 
         // Back button
         addDrawableChild(ButtonWidget.builder(Text.literal("Back"), btn -> client.setScreen(parent))
-                .position(centerX - 60, this.height - 26).size(120, 20).build());
+                .position(exportBackPosX, exportBackPosY + 24).size(120, 20).build());
     }
 
     @Override
@@ -275,6 +284,14 @@ public class ExportScreen extends Screen {
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private int getWindowHeight() {
+        return MinecraftClient.getInstance().getWindow().getHeight();
+    }
+
+    private int getGuiScale() {
+        return (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
     }
 
     @Override
