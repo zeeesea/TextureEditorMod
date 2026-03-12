@@ -125,11 +125,14 @@ public class TextureManager {
         // Try each atlas — blit to ALL that contain this sprite
         hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
                 SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE, "BLOCK");
-
         try {
-            hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
+            int itemsHit = tryBlitToAtlas(client, spriteId, pixels, width, height,
                     SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE, "ITEMS");
-        } catch (Exception ignored) {}
+            System.out.println("[TextureEditor] ITEMS atlas hit: " + itemsHit + " for " + spriteId);
+            hitCount += itemsHit;
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] ITEMS atlas FAILED: " + e.getMessage());
+        }
 
         try {
             hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
