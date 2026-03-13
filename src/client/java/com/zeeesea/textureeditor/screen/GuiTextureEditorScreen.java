@@ -99,6 +99,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                 if (optResource.isPresent()) {
                     System.out.println("[TextureEditor] Resource FOUND: " + candidateId);
                     fullTextureId = candidateId; // Update to the found path
+                    System.out.println("[TextureEditor] Resolved texture: requested=" + guiTextureId + " -> resolved=" + fullTextureId);
                     InputStream stream = optResource.get().getInputStream();
                     NativeImage image = NativeImage.read(stream);
                     int w = image.getWidth(), h = image.getHeight();
@@ -143,21 +144,40 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         }
 
         if (name.endsWith("_layer_1")) {
-            String material = name.substring(0, name.length() - "_layer_1".length());
-            candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/humanoid/" + material + suffix + ".png"));
+            String rawMaterial = name.substring(0, name.length() - "_layer_1".length());
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid/", rawMaterial, suffix);
             return;
         }
         if (name.endsWith("_layer_2")) {
-            String material = name.substring(0, name.length() - "_layer_2".length());
-            candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/humanoid_leggings/" + material + suffix + ".png"));
+            String rawMaterial = name.substring(0, name.length() - "_layer_2".length());
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid_leggings/", rawMaterial, suffix);
             return;
         }
 
         if (name.contains("_piglin_helmet")) {
-            String material = name.replace("_piglin_helmet", "");
-            candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/piglin_head/" + material + suffix + ".png"));
-            candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/humanoid/" + material + suffix + ".png"));
+            String rawMaterial = name.replace("_piglin_helmet", "");
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/piglin_head/", rawMaterial, suffix);
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid/", rawMaterial, suffix);
         }
+    }
+
+    private void addEquipmentCandidate(Set<Identifier> candidates, Identifier baseId, String folderPath, String rawMaterial, String suffix) {
+        String normalizedMaterial = normalizeArmorMaterial(rawMaterial);
+        candidates.add(Identifier.of(baseId.getNamespace(), folderPath + rawMaterial + suffix + ".png"));
+        if (!normalizedMaterial.equals(rawMaterial)) {
+            candidates.add(Identifier.of(baseId.getNamespace(), folderPath + normalizedMaterial + suffix + ".png"));
+        }
+    }
+
+    private String normalizeArmorMaterial(String material) {
+        String normalized = material;
+        if (normalized.startsWith("piglin_")) {
+            normalized = normalized.substring("piglin_".length());
+        }
+        if ("turtle".equals(normalized)) {
+            normalized = "turtle_scute";
+        }
+        return normalized;
     }
 
     @Override
