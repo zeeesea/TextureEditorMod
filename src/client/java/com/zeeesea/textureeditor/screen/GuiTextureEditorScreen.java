@@ -141,20 +141,33 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         }
 
         if (name.endsWith("_layer_1")) {
-            String material = name.substring(0, name.length() - "_layer_1".length());
+            String material = normalizeArmorMaterial(name.substring(0, name.length() - "_layer_1".length()));
             candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/humanoid/" + material + suffix + ".png"));
             return;
         }
         if (name.endsWith("_layer_2")) {
-            String material = name.substring(0, name.length() - "_layer_2".length());
+            String material = normalizeArmorMaterial(name.substring(0, name.length() - "_layer_2".length()));
             candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/humanoid_leggings/" + material + suffix + ".png"));
             return;
         }
         if (name.contains("_piglin_helmet")) {
-            String material = name.replace("_piglin_helmet", "");
+            String material = normalizeArmorMaterial(name.replace("_piglin_helmet", ""));
             candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/piglin_head/" + material + suffix + ".png"));
             candidates.add(Identifier.of(baseId.getNamespace(), "textures/entity/equipment/humanoid/" + material + suffix + ".png"));
         }
+    }
+
+    private String normalizeArmorMaterial(String material) {
+        String normalized = material;
+        if (normalized.startsWith("piglin_")) {
+            // piglin_leather_layer_1 -> leather equipment texture naming
+            normalized = normalized.substring("piglin_".length());
+        }
+        if ("turtle".equals(normalized)) {
+            // Turtle equipment texture uses turtle_scute naming in newer versions.
+            normalized = "turtle_scute";
+        }
+        return normalized;
     }
 
     @Override
