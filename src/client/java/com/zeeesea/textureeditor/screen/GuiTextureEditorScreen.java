@@ -13,7 +13,9 @@ import net.minecraft.util.Identifier;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * GUI/HUD texture editor. Loads textures directly from resource manager.
@@ -65,27 +67,30 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         int[][] savedPixels = TextureManager.getInstance().getPixels(fullTextureId);
         int[] savedDims = TextureManager.getInstance().getDimensions(fullTextureId);
 
-        // Build candidate list: primary ID + known alternatives
-        List<Identifier> candidates = new ArrayList<>();
-        candidates.add(fullTextureId);
+        // Build candidate list: requested ID + known alternatives + armor aliases
+        Set<Identifier> candidateSet = new LinkedHashSet<>();
+        candidateSet.add(fullTextureId);
         String[] alts = ALTERNATIVE_PATHS.get(fullTextureId.getPath());
         if (alts != null) {
             for (String alt : alts) {
-                candidates.add(Identifier.of(fullTextureId.getNamespace(), alt));
+                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), alt));
             }
         }
+        addArmorAliasCandidates(candidateSet, fullTextureId);
 
         // Also try a generic scan for entity textures that might have moved
         if (fullTextureId.getPath().startsWith("textures/entity/") && fullTextureId.getPath().endsWith(".png")) {
             String filename = fullTextureId.getPath().replace("textures/entity/", "").replace(".png", "");
             // Try textures/entity/<name>/<name>.png
             if (!filename.contains("/")) {
-                candidates.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/" + filename + "/" + filename + ".png"));
+                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/" + filename + "/" + filename + ".png"));
                 // Try textures/entity/equipment/wings/<name>.png (1.21.4 pattern)
-                candidates.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/equipment/wings/" + filename + ".png"));
-                candidates.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/equipment/" + filename + ".png"));
+                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/equipment/wings/" + filename + ".png"));
+                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/equipment/" + filename + ".png"));
             }
         }
+
+        List<Identifier> candidates = new ArrayList<>(candidateSet);
 
         try {
             for (Identifier candidateId : candidates) {
@@ -94,6 +99,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                 if (optResource.isPresent()) {
                     System.out.println("[TextureEditor] Resource FOUND: " + candidateId);
                     fullTextureId = candidateId; // Update to the found path
+                    System.out.println("[TextureEditor] Resolved texture: requested=" + guiTextureId + " -> resolved=" + fullTextureId);
                     InputStream stream = optResource.get().getInputStream();
                     NativeImage image = NativeImage.read(stream);
                     int w = image.getWidth(), h = image.getHeight();
@@ -124,6 +130,53 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
             System.out.println("[TextureEditor] Failed to load GUI texture: " + fullTextureId + " - " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private void addArmorAliasCandidates(Set<Identifier> candidates, Identifier baseId) {
+        String path = baseId.getPath();
+        if (!path.startsWith("textures/models/armor/") || !path.endsWith(".png")) return;
+
+        String name = path.substring("textures/models/armor/".length(), path.length() - 4);
+        String suffix = "";
+        if (name.endsWith("_overlay")) {
+            suffix = "_overlay";
+            name = name.substring(0, name.length() - "_overlay".length());
+        }
+
+        if (name.endsWith("_layer_1")) {
+            String rawMaterial = name.substring(0, name.length() - "_layer_1".length());
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid/", rawMaterial, suffix);
+            return;
+        }
+        if (name.endsWith("_layer_2")) {
+            String rawMaterial = name.substring(0, name.length() - "_layer_2".length());
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid_leggings/", rawMaterial, suffix);
+            return;
+        }
+        if (name.contains("_piglin_helmet")) {
+            String rawMaterial = name.replace("_piglin_helmet", "");
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/piglin_head/", rawMaterial, suffix);
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid/", rawMaterial, suffix);
+        }
+    }
+
+    private void addEquipmentCandidate(Set<Identifier> candidates, Identifier baseId, String folderPath, String rawMaterial, String suffix) {
+        String normalizedMaterial = normalizeArmorMaterial(rawMaterial);
+        candidates.add(Identifier.of(baseId.getNamespace(), folderPath + rawMaterial + suffix + ".png"));
+        if (!normalizedMaterial.equals(rawMaterial)) {
+            candidates.add(Identifier.of(baseId.getNamespace(), folderPath + normalizedMaterial + suffix + ".png"));
+        }
+    }
+
+    private String normalizeArmorMaterial(String material) {
+        String normalized = material;
+        if (normalized.startsWith("piglin_")) {
+            normalized = normalized.substring("piglin_".length());
+        }
+        if ("turtle".equals(normalized)) {
+            normalized = "turtle_scute";
+        }
+        return normalized;
     }
 
     @Override

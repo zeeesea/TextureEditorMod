@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  */
 public class BrowseScreen extends Screen {
 
-    private enum Tab { ALL, BLOCKS, ITEMS, MOBS, GUI, SKY }
+    private enum Tab { ALL, BLOCKS, ITEMS, MOBS, GUI, ENTITY, SKY }
 
     private Tab currentTab = Tab.ALL;
     private TextFieldWidget searchField;
@@ -49,7 +49,7 @@ public class BrowseScreen extends Screen {
     private int maxScroll = 0;
 
     // Tab buttons
-    private ButtonWidget tabAll, tabBlocks, tabItems, tabMobs, tabGui, tabSky;
+    private ButtonWidget tabAll, tabBlocks, tabItems, tabMobs, tabGui, tabEntity, tabSky;
 
     public BrowseScreen() {
         super(Text.literal("Texture Browser"));
@@ -84,10 +84,10 @@ public class BrowseScreen extends Screen {
                     .position(94, tabY).size(40, 20).build());
 
             // Referenzen für den Tab-Underline-Indikator setzen (brauchen wir für render())
-            tabAll = tabBlocks = tabItems = tabMobs = tabGui = null;
+            tabAll = tabBlocks = tabItems = tabMobs = tabGui = tabEntity = null;
             tabSky = null;
         } else {
-            // Normal: alle 6 Buttons
+            // Normal: alle 7 Buttons
             int tabX = 10;
             int tabW = 50;
             tabAll = addDrawableChild(ButtonWidget.builder(Text.literal("All"), btn -> switchTab(Tab.ALL))
@@ -103,6 +103,9 @@ public class BrowseScreen extends Screen {
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
             tabGui = addDrawableChild(ButtonWidget.builder(Text.literal("GUI"), btn -> switchTab(Tab.GUI))
+                    .position(tabX, tabY).size(tabW, 20).build());
+            tabX += tabW + 4;
+            tabEntity = addDrawableChild(ButtonWidget.builder(Text.literal("Entities"), btn -> switchTab(Tab.ENTITY))
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
             tabSky = addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
@@ -152,6 +155,7 @@ public class BrowseScreen extends Screen {
                     if (currentTab == Tab.ITEMS && e.type != EntryType.ITEM) return false;
                     if (currentTab == Tab.MOBS && e.type != EntryType.MOB) return false;
                     if (currentTab == Tab.GUI && e.type != EntryType.GUI) return false;
+                    if (currentTab == Tab.ENTITY && e.type != EntryType.ENTITY) return false;
                     if (currentTab == Tab.ALL && e.type == EntryType.GUI) return false; // GUI only shows in GUI tab
                     if (!searchQuery.isEmpty() && !e.name.toLowerCase().contains(searchQuery)
                             && !e.id.toString().toLowerCase().contains(searchQuery)) return false;
@@ -202,8 +206,70 @@ public class BrowseScreen extends Screen {
         // Add GUI texture entries
         entries.addAll(buildGuiEntries());
         entries.addAll(buildNotNormalEntries());
+        entries.addAll(buildEntities());
 
         return entries;
+    }
+
+    private List<BrowseEntry> buildEntities() {
+        List<BrowseEntry> entries = new ArrayList<>();
+        // Armor textures from assets/minecraft/textures/models/armor
+        addEntityArmorEntry(entries, "chainmail_layer_1");
+        addEntityArmorEntry(entries, "chainmail_layer_2");
+        addEntityArmorEntry(entries, "chainmail_piglin_helmet");
+        addEntityArmorEntry(entries, "diamond_layer_1");
+        addEntityArmorEntry(entries, "diamond_layer_2");
+        addEntityArmorEntry(entries, "diamond_piglin_helmet");
+        addEntityArmorEntry(entries, "gold_layer_1");
+        addEntityArmorEntry(entries, "gold_layer_2");
+        addEntityArmorEntry(entries, "gold_piglin_helmet");
+        addEntityArmorEntry(entries, "iron_layer_1");
+        addEntityArmorEntry(entries, "iron_layer_2");
+        addEntityArmorEntry(entries, "iron_piglin_helmet");
+        addEntityArmorEntry(entries, "leather_layer_1");
+        addEntityArmorEntry(entries, "leather_layer_1_overlay");
+        addEntityArmorEntry(entries, "leather_layer_2");
+        addEntityArmorEntry(entries, "leather_layer_2_overlay");
+        addEntityArmorEntry(entries, "leather_piglin_helmet");
+        addEntityArmorEntry(entries, "leather_piglin_helmet_overlay");
+        addEntityArmorEntry(entries, "netherite_layer_1");
+        addEntityArmorEntry(entries, "netherite_layer_2");
+        addEntityArmorEntry(entries, "netherite_piglin_helmet");
+        addEntityArmorEntry(entries, "piglin_leather_layer_1");
+        addEntityArmorEntry(entries, "piglin_leather_layer_1_overlay");
+        addEntityArmorEntry(entries, "turtle_layer_1");
+        entries.sort(Comparator.comparing(e -> e.name));
+        return entries;
+    }
+
+    private void addEntityArmorEntry(List<BrowseEntry> entries, String fileName) {
+        Identifier id = Identifier.of("minecraft", "textures/models/armor/" + fileName + ".png");
+        entries.add(new BrowseEntry(id, formatArmorDisplayName(fileName), EntryType.ENTITY, null));
+    }
+
+    private String formatArmorDisplayName(String fileName) {
+        boolean isOverlay = fileName.endsWith("_overlay");
+        String base = isOverlay ? fileName.substring(0, fileName.length() - "_overlay".length()) : fileName;
+        String[] words = base.split("_");
+        StringBuilder sb = new StringBuilder();
+        boolean previousWasLayer = false;
+        for (String word : words) {
+            if (!sb.isEmpty()) sb.append(' ');
+            if (word.matches("\\d+")) {
+                if (previousWasLayer) {
+                    sb.append(word);
+                } else {
+                    sb.append("Layer ").append(word);
+                }
+                previousWasLayer = false;
+                continue;
+            }
+            sb.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+            previousWasLayer = "layer".equals(word);
+        }
+        if (isOverlay) sb.append(" Overlay");
+        sb.append(" Armor");
+        return sb.toString();
     }
 
     /**
@@ -412,6 +478,7 @@ public class BrowseScreen extends Screen {
                 case ITEMS -> tabItems;
                 case MOBS -> tabMobs;
                 case GUI -> tabGui;
+                case ENTITY -> tabEntity;
                 case SKY -> tabSky;
             };
             if (activeTab != null)
@@ -527,11 +594,10 @@ public class BrowseScreen extends Screen {
             Identifier itemId = Registries.ITEM.getId(entry.stack.getItem());
             Identifier texId = Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
             if (TextureManager.getInstance().getPixels(texId) != null) return true;
-        } else if (entry.type == EntryType.MOB || entry.type == EntryType.GUI) {
+        } else if (entry.type == EntryType.MOB || entry.type == EntryType.GUI || entry.type == EntryType.ENTITY) {
             // For mob/GUI entries that have a direct texture path
-            if (entry.id.getPath().startsWith("textures/")) {
-                if (TextureManager.getInstance().getPixels(entry.id) != null) return true;
-            }
+            Identifier fullId = asFullTextureId(entry.id);
+            if (TextureManager.getInstance().getPixels(fullId) != null) return true;
         }
         return false;
     }
@@ -548,8 +614,7 @@ public class BrowseScreen extends Screen {
         if (super.mouseClicked(click, bl)) return true;
         double mouseX = click.x(); double mouseY = click.y(); int button = click.button();
 
-        if (button == 0) {
-            // Check grid click
+        if (button == 0 || button == 1) {
             int startIdx = scrollOffset * columns;
             int gridX = GRID_SIDE_MARGIN;
             int gridY = GRID_TOP;
@@ -566,7 +631,11 @@ public class BrowseScreen extends Screen {
                 if (y + CELL_SIZE > this.height) break;
 
                 if (mouseX >= x && mouseX < x + CELL_SIZE && mouseY >= y && mouseY < y + CELL_SIZE) {
-                    openEditor(filteredEntries.get(i));
+                    if (button == 0) {
+                        openEditor(filteredEntries.get(i));
+                    } else {
+                        resetEntry(filteredEntries.get(i));
+                    }
                     return true;
                 }
             }
@@ -601,7 +670,51 @@ public class BrowseScreen extends Screen {
             }
         } else if (entry.type == EntryType.GUI) {
             client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+        } else if (entry.type == EntryType.ENTITY) {
+            client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
         }
+    }
+
+    /**
+     * Right-click on a browser entry to reset its texture to default.
+     */
+    private void resetEntry(BrowseEntry entry) {
+        if (!isModified(entry)) return;
+
+        if (entry.type == EntryType.BLOCK) {
+            Block block = Registries.BLOCK.get(entry.id);
+            for (Direction dir : Direction.values()) {
+                TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), dir);
+                if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
+                    TextureManager.getInstance().removeTexture(tex.textureId());
+                }
+            }
+            if (client != null) client.reloadResources();
+            return;
+        }
+
+        if (entry.type == EntryType.ITEM && entry.stack != null) {
+            ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(entry.stack);
+            if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
+                TextureManager.getInstance().removeTexture(tex.textureId());
+                if (client != null) client.reloadResources();
+            }
+            return;
+        }
+
+        if (entry.type == EntryType.MOB || entry.type == EntryType.GUI || entry.type == EntryType.ENTITY) {
+            Identifier fullId = asFullTextureId(entry.id);
+            if (TextureManager.getInstance().getPixels(fullId) != null) {
+                TextureManager.getInstance().removeTexture(fullId);
+                if (client != null) client.reloadResources();
+            }
+        }
+    }
+
+    private Identifier asFullTextureId(Identifier id) {
+        return id.getPath().startsWith("textures/")
+                ? id
+                : Identifier.of(id.getNamespace(), "textures/" + id.getPath() + ".png");
     }
 
     @Override
@@ -634,7 +747,8 @@ public class BrowseScreen extends Screen {
         BLOCK("Block"),
         ITEM("Item"),
         MOB("Mob"),
-        GUI("GUI");
+        GUI("GUI"),
+        ENTITY("Entity");
 
         final String displayName;
         EntryType(String displayName) { this.displayName = displayName; }
