@@ -23,6 +23,3 @@ public abstract class GuiRendererMixin {
         }
     }
 }
-
-
-
