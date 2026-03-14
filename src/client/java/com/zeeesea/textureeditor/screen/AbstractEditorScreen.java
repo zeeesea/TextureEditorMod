@@ -339,6 +339,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 .position(5, this.height - 54).size(tbw, tbh).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7dBrowse"), btn -> {
             Screen bs = getBackScreen();
+            if (ModSettings.getInstance().autoApplyLive) this.applyLive();
             if (bs != null) MinecraftClient.getInstance().setScreen(bs);
             else MinecraftClient.getInstance().setScreen(new BrowseScreen());
         }).position(5, this.height - 30).size(tbw, tbh).build());
@@ -882,7 +883,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
         if (kc == s.getKeybind("line")) { currentTool = EditorTool.LINE; return true; }
         if (kc == s.getKeybind("brush")) { currentTool = EditorTool.BRUSH; return true; }
-        if (kc == s.getKeybind("browse")) { MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
+        if (kc == s.getKeybind("browse")) { if (s.autoApplyLive) this.applyLive(); MinecraftClient.getInstance().setScreen(new BrowseScreen()); return true; }
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
         if (openKey != null && openKey.matchesKey(keyInput)) {
             if (s.autoApplyLive) this.applyLive();
