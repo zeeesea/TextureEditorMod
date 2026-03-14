@@ -3,6 +3,7 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.texture.TextureResourceLoader;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import net.minecraft.block.Block;
 import net.minecraft.client.gui.DrawContext;
@@ -716,17 +717,25 @@ public class BrowseScreen extends Screen {
             for (Direction dir : Direction.values()) {
                 TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), dir);
                 if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
+                    TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(tex.textureId());
+                    int[][] resetPixels = defaultTex != null ? defaultTex.pixels() : tex.pixels();
+                    int resetW = defaultTex != null ? defaultTex.width() : tex.width();
+                    int resetH = defaultTex != null ? defaultTex.height() : tex.height();
                     Identifier spriteId = Identifier.of(tex.textureId().getNamespace(),
                             tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
                     com.zeeesea.textureeditor.editor.ExternalEditorManager.resetTextureStatic(
-                            tex.textureId(), spriteId, tex.pixels(), tex.width(), tex.height());
+                            tex.textureId(), spriteId, resetPixels, resetW, resetH);
                 }
             }
         } else if (entry.type == EntryType.ITEM && entry.stack != null) {
             ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(entry.stack);
             if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
+                TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(tex.textureId());
+                int[][] resetPixels = defaultTex != null ? defaultTex.pixels() : tex.pixels();
+                int resetW = defaultTex != null ? defaultTex.width() : tex.width();
+                int resetH = defaultTex != null ? defaultTex.height() : tex.height();
                 com.zeeesea.textureeditor.editor.ExternalEditorManager.resetTextureStatic(
-                        tex.textureId(), tex.spriteId(), tex.pixels(), tex.width(), tex.height());
+                        tex.textureId(), tex.spriteId(), resetPixels, resetW, resetH);
             }
         } else if (entry.type == EntryType.MOB || entry.type == EntryType.GUI || entry.type == EntryType.ENTITY) {
             // For mob/gui entries, the texture ID might be direct

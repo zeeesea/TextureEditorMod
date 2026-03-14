@@ -4,6 +4,7 @@ import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.MobTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.texture.TextureResourceLoader;
 import com.zeeesea.textureeditor.util.EntityMapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -37,15 +38,20 @@ public class MobEditorScreen extends AbstractEditorScreen {
     protected void loadTexture() {
         MobTextureExtractor.MobTexture tex = MobTextureExtractor.extract(entity);
         if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
             textureId = tex.textureId();
+
+            TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(textureId);
+            int baseW = defaultTex != null ? defaultTex.width() : tex.width();
+            int baseH = defaultTex != null ? defaultTex.height() : tex.height();
+            int[][] basePixels = defaultTex != null ? defaultTex.pixels() : tex.pixels();
+            originalPixels = copyPixels(basePixels, baseW, baseH);
 
             int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
             int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
-            if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
+            if (savedPixels != null && savedDims != null && savedDims[0] == baseW && savedDims[1] == baseH) {
                 canvas = new PixelCanvas(savedDims[0], savedDims[1], savedPixels);
             } else {
-                canvas = new PixelCanvas(tex.width(), tex.height(), tex.pixels());
+                canvas = new PixelCanvas(baseW, baseH, basePixels);
             }
         }
         if (canvas == null) {
@@ -152,8 +158,13 @@ public class MobEditorScreen extends AbstractEditorScreen {
     @Override
     protected void resetCurrent() {
         if (originalPixels == null || textureId == null) return;
+        TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(textureId);
+        int[][] resetPixels = defaultTex != null ? defaultTex.pixels() : originalPixels;
+        if (defaultTex != null) {
+            originalPixels = copyPixels(defaultTex.pixels(), defaultTex.width(), defaultTex.height());
+        }
         canvas.saveSnapshot();
-        canvas.setLayerStack(new LayerStack(canvas.getWidth(),canvas.getHeight(), originalPixels));
+        canvas.setLayerStack(new LayerStack(canvas.getWidth(), canvas.getHeight(), resetPixels));
         canvas.invalidateCache();
         applyLive();
     }

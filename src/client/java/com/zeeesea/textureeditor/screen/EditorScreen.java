@@ -3,6 +3,7 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.texture.TextureResourceLoader;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -72,7 +73,12 @@ public class EditorScreen extends AbstractEditorScreen {
         if (faceTextureIndex >= faceTextures.size()) faceTextureIndex = 0;
 
         TextureExtractor.BlockFaceTexture tex = faceTextures.get(faceTextureIndex);
-        originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
+        TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(tex.textureId());
+        int baseW = defaultTex != null ? defaultTex.width() : tex.width();
+        int baseH = defaultTex != null ? defaultTex.height() : tex.height();
+        int[][] basePixels = defaultTex != null ? defaultTex.pixels() : tex.pixels();
+
+        originalPixels = copyPixels(basePixels, baseW, baseH);
         textureId = tex.textureId();
         spriteId = Identifier.of(tex.textureId().getNamespace(),
                 tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
@@ -81,10 +87,10 @@ public class EditorScreen extends AbstractEditorScreen {
 
         int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
         int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
-        if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
+        if (savedPixels != null && savedDims != null && savedDims[0] == baseW && savedDims[1] == baseH) {
             canvas = new com.zeeesea.textureeditor.editor.PixelCanvas(savedDims[0], savedDims[1], savedPixels);
         } else {
-            canvas = new com.zeeesea.textureeditor.editor.PixelCanvas(tex.width(), tex.height(), tex.pixels());
+            canvas = new com.zeeesea.textureeditor.editor.PixelCanvas(baseW, baseH, basePixels);
         }
     }
 
@@ -201,11 +207,15 @@ public class EditorScreen extends AbstractEditorScreen {
         for (Direction dir : Direction.values()) {
             java.util.List<TextureExtractor.BlockFaceTexture> allTex = TextureExtractor.extractAll(blockState, dir);
             for (TextureExtractor.BlockFaceTexture tex : allTex) {
+                TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(tex.textureId());
+                int[][] resetPixels = defaultTex != null ? defaultTex.pixels() : tex.pixels();
+                int resetW = defaultTex != null ? defaultTex.width() : tex.width();
+                int resetH = defaultTex != null ? defaultTex.height() : tex.height();
                 Identifier sid = Identifier.of(tex.textureId().getNamespace(),
                         tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
                 TextureManager.getInstance().removeTexture(tex.textureId());
                 MinecraftClient.getInstance().execute(() ->
-                        TextureManager.getInstance().applyLive(sid, tex.pixels(), tex.width(), tex.height()));
+                        TextureManager.getInstance().applyLive(sid, resetPixels, resetW, resetH));
             }
         }
         resetCurrent();
