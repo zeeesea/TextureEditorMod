@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
  */
 public class BrowseScreen extends Screen {
 
-    private enum Tab { ALL, BLOCKS, ITEMS, MOBS, GUI, ENTITY, SKY }
+     private enum Tab { ALL, BLOCKS, ITEMS, MOBS, GUI, ENTITY, SKY }
 
     private Tab currentTab = Tab.ALL;
     private TextFieldWidget searchField;
@@ -314,11 +314,19 @@ public class BrowseScreen extends Screen {
         addGUIEntry(entries, "gui/container/cartography_table", "Cartography Table");
         addGUIEntry(entries, "gui/container/stonecutter", "Stonecutter");
         addGUIEntry(entries, "gui/container/smithing", "Smithing Table");
-        addGUIEntry(entries, "gui/container/creative_inventory/tabs", "Creative Tabs");
-        // General GUI
-        addGUIEntry(entries, "gui/sprites/widget/button", "Button Widget");
-        addGUIEntry(entries, "gui/sprites/widget/button_disabled", "Button (Disabled)");
-        addGUIEntry(entries, "gui/sprites/widget/button_highlighted", "Button (Highlighted)");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_inventory", "Creative Inventory BG");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_items", "Creative Items BG");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_item_search", "Creative Search BG");
+        // General GUI - individual widget sprites
+        addGUIEntry(entries, "gui/sprites/widget/button", "Button");
+        addGUIEntry(entries, "gui/sprites/widget/button_highlighted", "Button Highlighted");
+        addGUIEntry(entries, "gui/sprites/widget/button_disabled", "Button Disabled");
+        addGUIEntry(entries, "gui/sprites/widget/slider", "Slider");
+        addGUIEntry(entries, "gui/sprites/widget/slider_highlighted", "Slider Highlighted");
+        addGUIEntry(entries, "gui/sprites/widget/slider_handle", "Slider Handle");
+        addGUIEntry(entries, "gui/sprites/widget/slider_handle_highlighted", "Slider Handle HL");
+        addGUIEntry(entries, "gui/sprites/widget/text_field", "Text Field");
+        addGUIEntry(entries, "gui/sprites/widget/text_field_highlighted", "Text Field HL");
         addGUIEntry(entries, "gui/title/minecraft", "Title Logo");
         addGUIEntry(entries, "gui/title/edition", "Edition Badge");
         return entries;
