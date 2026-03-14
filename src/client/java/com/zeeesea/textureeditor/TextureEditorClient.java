@@ -9,6 +9,7 @@ import com.zeeesea.textureeditor.editor.ExternalEditorManager;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
+import com.zeeesea.textureeditor.texture.ItemModelRebaker;
 import com.zeeesea.textureeditor.texture.MobTextureExtractor;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import com.zeeesea.textureeditor.util.EntityMapper;
@@ -16,6 +17,8 @@ import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
@@ -29,6 +32,8 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.resource.ResourceType;
 import org.lwjgl.glfw.GLFW;
 
 
@@ -49,6 +54,18 @@ public class TextureEditorClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES).registerReloadListener(new SimpleSynchronousResourceReloadListener() {
+            @Override
+            public Identifier getFabricId() {
+                return Identifier.of("textureeditor", "item_rebake_cache_invalidator");
+            }
+
+            @Override
+            public void reload(ResourceManager manager) {
+                ItemModelRebaker.invalidateCache();
+            }
+        });
+
         toggleEditorKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.toggle",
                 InputUtil.Type.KEYSYM,

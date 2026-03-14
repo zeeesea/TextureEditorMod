@@ -1,10 +1,12 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.util.Identifier;
 import org.lwjgl.opengl.GL11;
 
@@ -105,6 +107,8 @@ public class TextureManager {
         Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(spriteId);
         if (sprite == null) return;
 
+        updateSpriteContents(sprite, pixels, width, height);
+
         int atlasX = sprite.getX();
         int atlasY = sprite.getY();
 
@@ -120,6 +124,26 @@ public class TextureManager {
                 }
             }
             img.upload(0, atlasX, atlasY, false);
+        }
+
+        if (spriteId.getPath().startsWith("item/")) {
+            ItemModelRebaker.rebake(spriteId);
+        }
+    }
+
+    /**
+     * Keep CPU-side sprite image in sync with live edits so generated item rebakes
+     * can use the updated alpha mask to rebuild side quads.
+     */
+    private static void updateSpriteContents(Sprite sprite, int[][] pixels, int width, int height) {
+        SpriteContents contents = sprite.getContents();
+        NativeImage image = ((SpriteContentsAccessor) contents).getImage();
+        if (image == null || image.getWidth() < width || image.getHeight() < height) return;
+
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                image.setColorArgb(x, y, pixels[x][y]);
+            }
         }
     }
 
@@ -183,6 +207,8 @@ public class TextureManager {
         // Find the sprite in the block atlas
         Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(spriteId);
         if (sprite == null) return;
+
+        updateSpriteContents(sprite, pixels, width, height);
 
         int atlasX = sprite.getX();
         int atlasY = sprite.getY();
@@ -248,6 +274,10 @@ public class TextureManager {
             // Minecraft typically uses 4 mipmap levels max
             if (level > 4) break;
         }
+
+        if (spriteId.getPath().startsWith("item/")) {
+            ItemModelRebaker.rebake(spriteId);
+        }
     }
 
     /**
@@ -269,5 +299,6 @@ public class TextureManager {
         textureDimensions.clear();
         originalTextures.clear();
         previewingOriginals = false;
+        ItemModelRebaker.invalidateCache();
     }
 }

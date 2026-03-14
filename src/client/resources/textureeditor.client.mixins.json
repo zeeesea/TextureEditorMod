@@ -4,7 +4,9 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ExampleClientMixin",
-		"SpriteContentsAccessor"
+		"SpriteContentsAccessor",
+		"BasicItemModelAccessor",
+		"BakedModelManagerAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1
