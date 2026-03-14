@@ -12,7 +12,7 @@
 		"sources": "https://github.com/zeeesea/texture-editor",
 		"issues": "https://github.com/zeeesea/texture-editor/issues"
 	},
-	"license": "CC-BY-NC-4.0",
+	"license": "ARR",
 	"icon": "assets/textureeditor/icon.png",
 	"environment": "*",
 	"entrypoints": {
