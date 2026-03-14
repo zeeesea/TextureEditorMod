@@ -25,6 +25,7 @@ public class TextureManager {
     private final Map<Identifier, int[]> textureDimensions = new HashMap<>();
     private final Map<Identifier, int[][]> originalTextures = new HashMap<>();
     private boolean previewingOriginals = false;
+    private volatile boolean itemGuiAtlasDirty = false;
 
     private TextureManager() {}
 
@@ -51,6 +52,23 @@ public class TextureManager {
     public int[][] getPixels(Identifier textureId) { return modifiedTextures.get(textureId); }
     public int[] getDimensions(Identifier textureId) { return textureDimensions.get(textureId); }
     public boolean hasModifiedTextures() { return !modifiedTextures.isEmpty(); }
+
+    /**
+     * Consumed by GuiRenderer mixin to rebuild cached UI item icons once after live edits.
+     */
+    public boolean consumeItemGuiAtlasDirty() {
+        if (!itemGuiAtlasDirty) return false;
+        itemGuiAtlasDirty = false;
+        return true;
+    }
+
+    private void markItemGuiAtlasDirty(Identifier spriteId) {
+        if (spriteId == null) return;
+        String path = spriteId.getPath();
+        if (path.startsWith("item/") || path.startsWith("block/")) {
+            itemGuiAtlasDirty = true;
+        }
+    }
 
     public void removeTexture(Identifier textureId) {
         modifiedTextures.remove(textureId);
@@ -88,6 +106,7 @@ public class TextureManager {
                 pixels = modifiedTextures.get(textureId);
             }
             writeSpritePixels(spriteId, pixels, w, h);
+            markItemGuiAtlasDirty(spriteId);
         }
     }
 
@@ -240,6 +259,7 @@ public class TextureManager {
 
         putTexture(textureId, pixels, width, height);
         writeSpritePixels(spriteId, pixels, width, height);
+        markItemGuiAtlasDirty(spriteId);
 
         if (spriteId.getPath().startsWith("item/")) {
             ItemModelRebaker.rebake(spriteId);
@@ -259,6 +279,7 @@ public class TextureManager {
         textureDimensions.clear();
         originalTextures.clear();
         previewingOriginals = false;
+        itemGuiAtlasDirty = false;
         ItemModelRebaker.invalidateCache();
     }
 }
