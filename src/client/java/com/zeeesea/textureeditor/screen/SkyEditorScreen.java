@@ -2,6 +2,7 @@ package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -64,7 +65,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
                 originalPixels = new int[w][h];
                 for (int x = 0; x < w; x++)
                     for (int y = 0; y < h; y++)
-                        originalPixels[x][y] = image.getColorArgb(x, y);
+                        originalPixels[x][y] = ImageColorCompat.readArgb(image, x, y);
                 image.close();
                 stream.close();
 
@@ -123,7 +124,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
             NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
             for (int x = 0; x < canvas.getWidth(); x++)
                 for (int y = 0; y < canvas.getHeight(); y++)
-                    img.setColorArgb(x, y, canvas.getPixels()[x][y]);
+                    ImageColorCompat.writeArgb(img, x, y, canvas.getPixels()[x][y]);
             var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(img);
             client.getTextureManager().registerTexture(textureId, dynamicTex);
         });

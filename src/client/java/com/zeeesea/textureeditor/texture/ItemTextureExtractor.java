@@ -1,6 +1,7 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
@@ -116,7 +117,7 @@ public class ItemTextureExtractor {
                     int[][] pixels = new int[w][h];
                     for (int x = 0; x < w; x++)
                         for (int y = 0; y < h; y++)
-                            pixels[x][y] = image.getColorArgb(x, y);
+                            pixels[x][y] = ImageColorCompat.readArgb(image, x, y);
                     image.close();
                     stream.close();
                     // Use the entity texture path itself as both IDs (not atlas-based)
@@ -201,7 +202,7 @@ public class ItemTextureExtractor {
         int[][] pixels = new int[w][h];
         for (int x = 0; x < w; x++) {
             for (int y = 0; y < h; y++) {
-                pixels[x][y] = image.getColorArgb(x, y);
+                pixels[x][y] = ImageColorCompat.readArgb(image, x, y);
             }
         }
 

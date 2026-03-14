@@ -2,6 +2,7 @@ package com.zeeesea.textureeditor.editor;
 
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.toast.SystemToast;
 import net.minecraft.util.Identifier;
@@ -251,7 +252,7 @@ public class ExternalEditorSession {
             try (var img = new net.minecraft.client.texture.NativeImage(newW, newH, false)) {
                 for (int x = 0; x < newW; x++)
                     for (int y = 0; y < newH; y++)
-                        img.setColorArgb(x, y, newPixels[x][y]);
+                        ImageColorCompat.writeArgb(img, x, y, newPixels[x][y]);
 
                 // Try to find the sprite in GUI or block atlases
                 boolean uploaded = false;
@@ -285,7 +286,7 @@ public class ExternalEditorSession {
             try (var img = new net.minecraft.client.texture.NativeImage(newW, newH, false)) {
                 for (int x = 0; x < newW; x++)
                     for (int y = 0; y < newH; y++)
-                        img.setColorArgb(x, y, newPixels[x][y]);
+                        ImageColorCompat.writeArgb(img, x, y, newPixels[x][y]);
                 var tex = client.getTextureManager().getTexture(textureId);
                 if (tex != null) {
                     tex.bindTexture();

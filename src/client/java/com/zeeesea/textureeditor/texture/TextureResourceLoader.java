@@ -1,5 +1,6 @@
 package com.zeeesea.textureeditor.texture;
 
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.util.Identifier;
@@ -29,7 +30,7 @@ public final class TextureResourceLoader {
                 int[][] pixels = new int[width][height];
                 for (int x = 0; x < width; x++) {
                     for (int y = 0; y < height; y++) {
-                        pixels[x][y] = image.getColorArgb(x, y);
+                        pixels[x][y] = ImageColorCompat.readArgb(image, x, y);
                     }
                 }
                 return new LoadedTexture(textureId, pixels, width, height);

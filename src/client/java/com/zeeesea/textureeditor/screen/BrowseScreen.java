@@ -5,6 +5,7 @@ import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.texture.TextureResourceLoader;
 import com.zeeesea.textureeditor.util.BlockFilter;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.block.Block;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -344,7 +345,8 @@ public class BrowseScreen extends Screen {
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/mangrove.png"), "Mangrove Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.MANGROVE_BOAT)));
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/cherry.png"), "Cherry Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.CHERRY_BOAT)));
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/bamboo.png"), "Bamboo Raft", EntryType.MOB, new ItemStack(net.minecraft.item.Items.BAMBOO_RAFT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/pale_oak.png"), "Pale Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.PALE_OAK_BOAT)));
+        Registries.ITEM.getOrEmpty(Identifier.ofVanilla("pale_oak_boat")).ifPresent(paleOakBoat ->
+                entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/pale_oak.png"), "Pale Oak Boat", EntryType.MOB, new ItemStack(paleOakBoat))));
 
         // Minecart
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/minecart.png"), "Minecart", EntryType.MOB, new ItemStack(net.minecraft.item.Items.MINECART)));
@@ -818,7 +820,7 @@ public class BrowseScreen extends Screen {
                 int[][] pixels = new int[w][h];
                 for (int x = 0; x < w; x++)
                     for (int y = 0; y < h; y++)
-                        pixels[x][y] = image.getColorArgb(x, y);
+                        pixels[x][y] = ImageColorCompat.readArgb(image, x, y);
                 image.close();
                 stream.close();
                 int[][] origCopy = copyPixels(pixels, w, h);

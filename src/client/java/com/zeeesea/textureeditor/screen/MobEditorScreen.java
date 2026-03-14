@@ -6,6 +6,7 @@ import com.zeeesea.textureeditor.texture.MobTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.texture.TextureResourceLoader;
 import com.zeeesea.textureeditor.util.EntityMapper;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -148,7 +149,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
             try (var img = new net.minecraft.client.texture.NativeImage(canvas.getWidth(), canvas.getHeight(), false)) {
                 for (int x = 0; x < canvas.getWidth(); x++)
                     for (int y = 0; y < canvas.getHeight(); y++)
-                        img.setColorArgb(x, y, canvas.getPixels()[x][y]);
+                        ImageColorCompat.writeArgb(img, x, y, canvas.getPixels()[x][y]);
                 var tex = client.getTextureManager().getTexture(textureId);
                 if (tex != null) { tex.bindTexture(); img.upload(0, 0, 0, false); }
             }

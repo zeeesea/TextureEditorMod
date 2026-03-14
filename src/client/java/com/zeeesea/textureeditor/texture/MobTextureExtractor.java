@@ -1,5 +1,6 @@
 package com.zeeesea.textureeditor.texture;
 
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.entity.Entity;
@@ -44,7 +45,7 @@ public class MobTextureExtractor {
                     int[][] pixels = new int[w][h];
                     for (int x = 0; x < w; x++)
                         for (int y = 0; y < h; y++)
-                            pixels[x][y] = image.getColorArgb(x, y);
+                            pixels[x][y] = ImageColorCompat.readArgb(image, x, y);
                     image.close();
                     stream.close();
                     System.out.println("[TextureEditor] Found mob texture: " + variantTexture + " size=" + w + "x" + h);
@@ -71,7 +72,7 @@ public class MobTextureExtractor {
                     int[][] pixels = new int[w][h];
                     for (int x = 0; x < w; x++) {
                         for (int y = 0; y < h; y++) {
-                            pixels[x][y] = image.getColorArgb(x, y);
+                            pixels[x][y] = ImageColorCompat.readArgb(image, x, y);
                         }
                     }
 

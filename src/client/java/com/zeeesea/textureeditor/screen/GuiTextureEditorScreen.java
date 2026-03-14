@@ -2,6 +2,8 @@ package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.texture.TextureResourceLoader;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -99,16 +101,32 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                 if (optResource.isPresent()) {
                     System.out.println("[TextureEditor] Resource FOUND: " + candidateId);
                     fullTextureId = candidateId; // Update to the found path
-                    InputStream stream = optResource.get().getInputStream();
-                    NativeImage image = NativeImage.read(stream);
-                    int w = image.getWidth(), h = image.getHeight();
+
+                    TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(fullTextureId);
+                    int w;
+                    int h;
+                    int[][] basePixels;
+
+                    if (defaultTex != null) {
+                        w = defaultTex.width();
+                        h = defaultTex.height();
+                        basePixels = defaultTex.pixels();
+                    } else {
+                        InputStream stream = optResource.get().getInputStream();
+                        NativeImage image = NativeImage.read(stream);
+                        w = image.getWidth();
+                        h = image.getHeight();
+                        basePixels = new int[w][h];
+                        for (int x = 0; x < w; x++) {
+                            for (int y = 0; y < h; y++) {
+                                basePixels[x][y] = ImageColorCompat.readArgb(image, x, y);
+                            }
+                        }
+                        image.close();
+                        stream.close();
+                    }
                     System.out.println("[TextureEditor] Image loaded: " + w + "x" + h);
-                    originalPixels = new int[w][h];
-                    for (int x = 0; x < w; x++)
-                        for (int y = 0; y < h; y++)
-                            originalPixels[x][y] = image.getColorArgb(x, y);
-                    image.close();
-                    stream.close();
+                    originalPixels = copyPixels(basePixels, w, h);
 
                     // Check for saved modified pixels using the found ID
                     savedPixels = TextureManager.getInstance().getPixels(fullTextureId);
@@ -117,7 +135,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                     if (savedPixels != null && savedDims != null && savedDims[0] == w && savedDims[1] == h) {
                         canvas = new PixelCanvas(savedDims[0], savedDims[1], savedPixels);
                     } else {
-                        canvas = new PixelCanvas(w, h, originalPixels);
+                        canvas = new PixelCanvas(w, h, basePixels);
                     }
                     return; // Success!
                 }
@@ -203,11 +221,17 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         MinecraftClient client = MinecraftClient.getInstance();
         TextureManager.getInstance().putTexture(fullTextureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
 
+        uploadCanvasToTarget(client);
+    }
+
+    private void uploadCanvasToTarget(MinecraftClient client) {
+        if (canvas == null) return;
+
         client.execute(() -> {
             NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
             for (int x = 0; x < canvas.getWidth(); x++) {
                 for (int y = 0; y < canvas.getHeight(); y++) {
-                    img.setColorArgb(x, y, canvas.getPixels()[x][y]);
+                    ImageColorCompat.writeArgb(img, x, y, canvas.getPixels()[x][y]);
                 }
             }
 
@@ -262,12 +286,29 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null) return;
+        if (fullTextureId == null || canvas == null) return;
+
+        TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(fullTextureId);
+        int[][] resetPixels = defaultTex != null ? defaultTex.pixels() : originalPixels;
+        if (resetPixels == null) return;
+
+        if (defaultTex != null) {
+            originalPixels = copyPixels(defaultTex.pixels(), defaultTex.width(), defaultTex.height());
+        }
+
         canvas.saveSnapshot();
-        for (int x = 0; x < canvas.getWidth(); x++)
-            for (int y = 0; y < canvas.getHeight(); y++)
-                canvas.setPixel(x, y, originalPixels[x][y]);
+
+        if (canvas.getWidth() != resetPixels.length || canvas.getHeight() != resetPixels[0].length) {
+            canvas = new PixelCanvas(resetPixels.length, resetPixels[0].length, resetPixels);
+        } else {
+            for (int x = 0; x < canvas.getWidth(); x++) {
+                for (int y = 0; y < canvas.getHeight(); y++) {
+                    canvas.setPixel(x, y, resetPixels[x][y]);
+                }
+            }
+        }
+
         TextureManager.getInstance().removeTexture(fullTextureId);
-        applyLive();
+        uploadCanvasToTarget(MinecraftClient.getInstance());
     }
 }

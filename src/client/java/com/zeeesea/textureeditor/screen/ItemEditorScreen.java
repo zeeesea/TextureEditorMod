@@ -3,6 +3,7 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.texture.TextureResourceLoader;
 import com.zeeesea.textureeditor.util.EntityMapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
@@ -32,16 +33,21 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     protected void loadTexture() {
         ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(itemStack);
         if (tex != null) {
-            originalPixels = copyPixels(tex.pixels(), tex.width(), tex.height());
             textureId = tex.textureId();
             spriteId = tex.spriteId();
 
+            TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(textureId);
+            int baseW = defaultTex != null ? defaultTex.width() : tex.width();
+            int baseH = defaultTex != null ? defaultTex.height() : tex.height();
+            int[][] basePixels = defaultTex != null ? defaultTex.pixels() : tex.pixels();
+            originalPixels = copyPixels(basePixels, baseW, baseH);
+
             int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
             int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
-            if (savedPixels != null && savedDims != null && savedDims[0] == tex.width() && savedDims[1] == tex.height()) {
+            if (savedPixels != null && savedDims != null && savedDims[0] == baseW && savedDims[1] == baseH) {
                 canvas = new PixelCanvas(savedDims[0], savedDims[1], savedPixels);
             } else {
-                canvas = new PixelCanvas(tex.width(), tex.height(), tex.pixels());
+                canvas = new PixelCanvas(baseW, baseH, basePixels);
             }
         }
     }
@@ -92,12 +98,31 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void resetCurrent() {
-        if (originalPixels == null) return;
+        if (canvas == null || textureId == null) return;
+
+        TextureResourceLoader.LoadedTexture defaultTex = TextureResourceLoader.loadTexture(textureId);
+        int[][] resetPixels = defaultTex != null ? defaultTex.pixels() : originalPixels;
+        if (resetPixels == null) return;
+
+        if (defaultTex != null) {
+            originalPixels = copyPixels(defaultTex.pixels(), defaultTex.width(), defaultTex.height());
+        }
+
         canvas.saveSnapshot();
-        for (int x = 0; x < canvas.getWidth(); x++)
-            for (int y = 0; y < canvas.getHeight(); y++)
-                canvas.setPixel(x, y, originalPixels[x][y]);
-        if (textureId != null) TextureManager.getInstance().removeTexture(textureId);
-        applyLive();
+
+        if (canvas.getWidth() != resetPixels.length || canvas.getHeight() != resetPixels[0].length) {
+            canvas = new PixelCanvas(resetPixels.length, resetPixels[0].length, resetPixels);
+        } else {
+            for (int x = 0; x < canvas.getWidth(); x++) {
+                for (int y = 0; y < canvas.getHeight(); y++) {
+                    canvas.setPixel(x, y, resetPixels[x][y]);
+                }
+            }
+        }
+
+        TextureManager.getInstance().removeTexture(textureId);
+        if (spriteId != null) {
+            TextureManager.getInstance().applyLiveTransient(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.zeeesea.textureeditor.texture;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
@@ -103,6 +104,10 @@ public class TextureManager {
      * Re-upload pixels to the sprite atlas (used for preview toggling).
      */
     private void reuploadToAtlas(Identifier spriteId, int[][] pixels, int width, int height) {
+        reuploadToAtlas(spriteId, pixels, width, height, true);
+    }
+
+    private void reuploadToAtlas(Identifier spriteId, int[][] pixels, int width, int height, boolean allowRebake) {
         MinecraftClient client = MinecraftClient.getInstance();
         Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(spriteId);
         if (sprite == null) return;
@@ -120,14 +125,32 @@ public class TextureManager {
         try (NativeImage img = new NativeImage(width, height, false)) {
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
-                    img.setColorArgb(x, y, pixels[x][y]);
+                    ImageColorCompat.writeArgb(img, x, y, pixels[x][y]);
                 }
             }
             img.upload(0, atlasX, atlasY, false);
         }
 
-        if (spriteId.getPath().startsWith("item/")) {
+        if (allowRebake && spriteId.getPath().startsWith("item/") && !ItemModelRebaker.shouldSuppressLiveRebake(spriteId)) {
             ItemModelRebaker.rebake(spriteId);
+        }
+    }
+
+    /**
+     * Re-upload all currently modified textures after a resource reload.
+     */
+    public void reapplyAllModifiedTextures() {
+        for (Identifier textureId : modifiedTextures.keySet()) {
+            int[] dims = textureDimensions.get(textureId);
+            int[][] pixels = modifiedTextures.get(textureId);
+            if (dims == null || pixels == null) continue;
+
+            String path = textureId.getPath();
+            if (path.startsWith("textures/") && path.endsWith(".png")) {
+                path = path.substring("textures/".length(), path.length() - ".png".length());
+            }
+            Identifier spriteId = Identifier.of(textureId.getNamespace(), path);
+            reuploadToAtlas(spriteId, pixels, dims[0], dims[1], false);
         }
     }
 
@@ -142,7 +165,7 @@ public class TextureManager {
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                image.setColorArgb(x, y, pixels[x][y]);
+                ImageColorCompat.writeArgb(image, x, y, pixels[x][y]);
             }
         }
     }
@@ -192,17 +215,26 @@ public class TextureManager {
      * Apply live with optional original pixels for preview support.
      */
     public void applyLive(Identifier spriteId, int[][] pixels, int width, int height, int[][] origPixels) {
+        applyLive(spriteId, pixels, width, height, origPixels, true);
+    }
+
+    /**
+     * Apply live without storing in modified texture maps (used for canonical reset).
+     */
+    public void applyLiveTransient(Identifier spriteId, int[][] pixels, int width, int height) {
+        applyLive(spriteId, pixels, width, height, null, false);
+    }
+
+    private void applyLive(Identifier spriteId, int[][] pixels, int width, int height, int[][] origPixels, boolean persist) {
         MinecraftClient client = MinecraftClient.getInstance();
 
-        // Store the modified texture
         Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
-
-        // Store original pixels for preview if provided and not yet stored
-        if (origPixels != null) {
-            storeOriginal(textureId, origPixels, width, height);
+        if (persist) {
+            if (origPixels != null) {
+                storeOriginal(textureId, origPixels, width, height);
+            }
+            putTexture(textureId, pixels, width, height);
         }
-
-        putTexture(textureId, pixels, width, height);
 
         // Find the sprite in the block atlas
         Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(spriteId);
@@ -225,7 +257,7 @@ public class TextureManager {
         try (NativeImage img = new NativeImage(width, height, false)) {
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
-                    img.setColorArgb(x, y, pixels[x][y]);
+                    ImageColorCompat.writeArgb(img, x, y, pixels[x][y]);
                 }
             }
             img.upload(0, atlasX, atlasY, false);
@@ -260,7 +292,7 @@ public class TextureManager {
             try (NativeImage mipImg = new NativeImage(newW, newH, false)) {
                 for (int x = 0; x < newW; x++) {
                     for (int y = 0; y < newH; y++) {
-                        mipImg.setColorArgb(x, y, mipPixels[x][y]);
+                        ImageColorCompat.writeArgb(mipImg, x, y, mipPixels[x][y]);
                     }
                 }
                 mipImg.upload(level, atlasX >> level, atlasY >> level, false);
@@ -275,7 +307,7 @@ public class TextureManager {
             if (level > 4) break;
         }
 
-        if (spriteId.getPath().startsWith("item/")) {
+        if (spriteId.getPath().startsWith("item/") && !ItemModelRebaker.shouldSuppressLiveRebake(spriteId)) {
             ItemModelRebaker.rebake(spriteId);
         }
     }

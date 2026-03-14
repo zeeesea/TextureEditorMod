@@ -9,7 +9,6 @@ import net.minecraft.entity.decoration.painting.PaintingEntity;
 import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.entity.vehicle.ChestBoatEntity;
 import net.minecraft.entity.vehicle.MinecartEntity;
-import net.minecraft.entity.SpawnReason;
 import net.minecraft.item.*;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
@@ -30,21 +29,24 @@ public class EntityMapper {
 
                 // Pig is default if not found, so check if name matches
                 if (type != EntityType.PIG || entityName.equals("pig")) {
-                   return type.create(world, null);
+                   return type.create(world);
                 }
             }
         }
 
         if (item instanceof BoatItem) {
-            return EntityType.OAK_BOAT.create(world, null);
+            Identifier boatId = Registries.ITEM.getId(item).getPath().contains("chest_boat")
+                    ? Identifier.ofVanilla("chest_boat")
+                    : Identifier.ofVanilla("boat");
+            return Registries.ENTITY_TYPE.get(boatId).create(world);
         }
 
         if (item instanceof MinecartItem) {
-            return EntityType.MINECART.create(world, null);
+            return Registries.ENTITY_TYPE.get(Identifier.ofVanilla("minecart")).create(world);
         }
 
         if (item instanceof ArmorStandItem) {
-            return EntityType.ARMOR_STAND.create(world, null);
+            return Registries.ENTITY_TYPE.get(Identifier.ofVanilla("armor_stand")).create(world);
         }
 
         // Elytra -> no entity, but we support it via item

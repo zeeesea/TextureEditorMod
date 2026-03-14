@@ -1,6 +1,7 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.google.gson.JsonObject;
+import com.zeeesea.textureeditor.util.ImageColorCompat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.util.Identifier;
@@ -59,7 +60,19 @@ public class ResourcePackExporter {
             // Write pack.mcmeta
             JsonObject packMcmeta = new JsonObject();
             JsonObject pack = new JsonObject();
-            pack.addProperty("pack_format", 46); // 1.21.4
+            // Das Hauptformat (z.B. 46 für 1.21.4, oder 75 für 1.21.11)
+            pack.addProperty("pack_format", 34);
+
+            // --- NEW SYSTEM (1.21.5+) ---
+            pack.addProperty("min_format", 1);
+            pack.addProperty("max_format", 9999);
+
+            // --- OLD SYSTEM (1.20.2 to 1.21.4) ---
+            JsonObject supportedFormats = new JsonObject();
+            supportedFormats.addProperty("min_inclusive", 1);
+            supportedFormats.addProperty("max_inclusive", 9999);
+            pack.add("supported_formats", supportedFormats);
+
             // Build description with author if provided
             String desc = description != null && !description.isEmpty() ? description : packName;
             if (author != null && !author.isEmpty()) {
@@ -77,7 +90,7 @@ public class ResourcePackExporter {
                 try (NativeImage iconImg = new NativeImage(iconWidth, iconHeight, false)) {
                     for (int x = 0; x < iconWidth; x++) {
                         for (int y = 0; y < iconHeight; y++) {
-                            iconImg.setColorArgb(x, y, iconPixels[x][y]);
+                            ImageColorCompat.writeArgb(iconImg, x, y, iconPixels[x][y]);
                         }
                     }
                     byte[] pngBytes = nativeImageToBytes(iconImg);
@@ -101,7 +114,7 @@ public class ResourcePackExporter {
                 try (NativeImage img = new NativeImage(w, h, false)) {
                     for (int x = 0; x < w; x++) {
                         for (int y = 0; y < h; y++) {
-                            img.setColorArgb(x, y, pixels[x][y]);
+                            ImageColorCompat.writeArgb(img, x, y, pixels[x][y]);
                         }
                     }
                     byte[] pngBytes = nativeImageToBytes(img);
