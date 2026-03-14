@@ -458,10 +458,10 @@ public abstract class AbstractEditorScreen extends Screen {
         context.fill(lsw, 0, this.width - rsw, 28, bg);
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawText(textRenderer, getEditorTitle(), getLeftSidebarWidth() + 5, 8, 0xFFFFFFFF, true);
+        context.drawText(textRenderer, getEditorTitle(), 5, 8, 0xFFFFFFFF, true);
         context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() +
                 " | Size: " + toolSize + "px" +
-                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), getLeftSidebarWidth() + 5, 20, 0xFFCCCCCC, false);
+                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), 5, 20, 0xFFCCCCCC, false);
 
         drawPalette(context);
         int paletteX = getPaletteX();

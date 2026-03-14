@@ -240,6 +240,10 @@ public class TextureManager {
 
         putTexture(textureId, pixels, width, height);
         writeSpritePixels(spriteId, pixels, width, height);
+
+        if (spriteId.getPath().startsWith("item/")) {
+            ItemModelRebaker.rebake(spriteId);
+        }
     }
 
     private static int averageColors(int c1, int c2, int c3, int c4) {
@@ -255,5 +259,6 @@ public class TextureManager {
         textureDimensions.clear();
         originalTextures.clear();
         previewingOriginals = false;
+        ItemModelRebaker.invalidateCache();
     }
 }
