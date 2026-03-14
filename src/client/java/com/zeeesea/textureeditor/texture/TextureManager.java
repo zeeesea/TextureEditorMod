@@ -307,9 +307,10 @@ public class TextureManager {
             if (level > 4) break;
         }
 
+        /* Dont rebake, because not working without game reload
         if (spriteId.getPath().startsWith("item/") && !ItemModelRebaker.shouldSuppressLiveRebake(spriteId)) {
             ItemModelRebaker.rebake(spriteId);
-        }
+        }*/
     }
 
     /**
