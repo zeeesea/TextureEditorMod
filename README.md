@@ -7,6 +7,10 @@
 
 The **Texture Editor Mod** allows you to edit blocks, items, entities, and GUI elements directly inside the game. Whether you are tweaking a resource pack, fixing a stray pixel, or creating pixel art from scratch, you can look at a block, press a key, edit it, and see the changes instantly.
 
+## Join the Discord
+
+[![Discord](https://img.shields.io/discord/1477781686644375572?logo=discord&label=Discord&color=5865F2&logoColor=white)](https://discord.gg/7ceJDn9uGW)
+
 ---
 
 ## ✨ Key Features
