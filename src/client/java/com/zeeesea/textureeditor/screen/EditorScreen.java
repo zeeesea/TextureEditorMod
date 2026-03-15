@@ -1,8 +1,11 @@
 package com.zeeesea.textureeditor.screen;
 
+import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.LayerStack;
+import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
@@ -148,6 +151,16 @@ public class EditorScreen extends AbstractEditorScreen {
         System.out.println("[TextureEditor] EditorScreen.applyLive: spriteId=" + sid + " size=" + w + "x" + h);
         MinecraftClient.getInstance().execute(() ->
                 TextureManager.getInstance().applyLive(sid, px, w, h, origCopy));
+
+        // Send to other players if multiplayer sync enabled
+        if (ModSettings.getInstance().multiplayerSync) {
+            int[] flat = new int[w * h];
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    flat[x * h + y] = px[x][y];
+
+            ClientPlayNetworking.send(new TextureSyncPayload(spriteId, width, height, flat));
+        }
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.zeeesea.textureeditor.screen.ItemEditorScreen;
 import com.zeeesea.textureeditor.screen.MobEditorScreen;
 import com.zeeesea.textureeditor.screen.AbstractEditorScreen;
 import com.zeeesea.textureeditor.editor.ExternalEditorManager;
+import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import com.zeeesea.textureeditor.util.EntityMapper;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
@@ -15,6 +16,7 @@ import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
@@ -183,6 +185,27 @@ public class TextureEditorClient implements ClientModInitializer {
                     }
                 }
             }
+        });
+
+
+        // Receive texture sync from server and apply it
+        ClientPlayNetworking.registerGlobalReceiver(TextureSyncPayload.ID, (payload, context) -> {
+            // Only apply if multiplayer sync is enabled in settings
+            if (!ModSettings.getInstance().multiplayerSync) return;
+
+            int w = payload.width();
+            int h = payload.height();
+            int[] flat = payload.pixels();
+
+            // Convert flat array back to 2D
+            int[][] pixels = new int[w][h];
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    pixels[x][y] = flat[x * h + y];
+
+            context.client().execute(() ->
+                    TextureManager.getInstance().applyLive(payload.spriteId(), pixels, w, h)
+            );
         });
     }
 

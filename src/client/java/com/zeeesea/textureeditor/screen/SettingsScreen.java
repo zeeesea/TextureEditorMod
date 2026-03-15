@@ -115,6 +115,16 @@ public class SettingsScreen extends Screen {
         }).position(centerX - 100, y).size(200, 20).build());
         y += 40;
 
+        addDrawableChild(ButtonWidget.builder(
+                Text.literal("Multiplayer Sync: " + (s.multiplayerSync ? "ON" : "OFF")),
+                btn -> {
+                    s.multiplayerSync = !s.multiplayerSync;
+                    btn.setMessage(Text.literal("Multiplayer Sync: " + (s.multiplayerSync ? "ON" : "OFF")));
+                    s.save();
+                }
+        ).position(centerX - 100, y).size(200, 20).build());
+        y += 40;
+
         // External Editor Settings
         addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bExternal Editor... (Experimental)"), btn ->
                 client.setScreen(new ExternalEditorSettingsScreen(this)))

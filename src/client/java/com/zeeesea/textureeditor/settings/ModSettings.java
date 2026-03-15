@@ -32,6 +32,8 @@ public class ModSettings {
     public int colorHistorySize = 20;
     public float brushVariation = 0.15f; // ±15% brightness variation for brush tool
 
+    public boolean multiplayerSync = true;
+
     // External editor
     public boolean useExternalEditor = false;
     public String selectedEditorName = ""; // name from auto-detected list
