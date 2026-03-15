@@ -49,6 +49,8 @@ public class BrowseScreen extends Screen {
     private int scrollOffset = 0;
     private int maxScroll = 0;
 
+    private Map<Identifier, Boolean> modifiedCache = new HashMap<>();
+
     // Tab buttons
     private ButtonWidget tabAll, tabBlocks, tabItems, tabMobs, tabGui, tabEntity, tabSky;
 
@@ -58,6 +60,7 @@ public class BrowseScreen extends Screen {
 
     @Override
     protected void init() {
+        modifiedCache.clear();
         // Build entries list on first init
         if (allEntries == null) {
             allEntries = buildEntries();
@@ -569,22 +572,20 @@ public class BrowseScreen extends Screen {
     }
 
     private boolean isModified(BrowseEntry entry) {
-        // Quick check - if no textures modified at all, return false
         if (!TextureManager.getInstance().hasModifiedTextures()) return false;
+        return modifiedCache.computeIfAbsent(entry.id, id -> computeIsModified(entry));
+    }
 
+    private boolean computeIsModified(BrowseEntry entry) {
         if (entry.type == EntryType.BLOCK) {
             Block block = Registries.BLOCK.get(entry.id);
             for (Direction dir : Direction.values()) {
                 TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), dir);
-                if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
-                    return true;
-                }
+                if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) return true;
             }
         } else if (entry.type == EntryType.ITEM && entry.stack != null) {
             ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(entry.stack);
-            if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
-                return true;
-            }
+            if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) return true;
         } else if (entry.type == EntryType.MOB || entry.type == EntryType.GUI || entry.type == EntryType.ENTITY) {
             Identifier fullId = asFullTextureId(entry.id);
             if (TextureManager.getInstance().getPixels(fullId) != null) return true;
@@ -751,6 +752,7 @@ public class BrowseScreen extends Screen {
                 if (client != null) client.reloadResources();
             }
         }
+        modifiedCache.remove(entry.id);
     }
 
     private Identifier asFullTextureId(Identifier id) {
