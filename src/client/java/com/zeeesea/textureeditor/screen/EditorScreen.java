@@ -30,7 +30,7 @@ public class EditorScreen extends AbstractEditorScreen {
 
     // World block constructor
     public EditorScreen(BlockHitResult hitResult) {
-        super(Text.literal("Texture Editor"));
+        super(Text.translatable("textureeditor.screen.block.title"));
         this.blockPos = hitResult.getBlockPos();
         this.face = hitResult.getSide();
         MinecraftClient client = MinecraftClient.getInstance();
@@ -42,7 +42,7 @@ public class EditorScreen extends AbstractEditorScreen {
 
     // Browse block constructor
     public EditorScreen(Block block, Screen parent) {
-        super(Text.literal("Block Texture Editor"));
+        super(Text.translatable("textureeditor.screen.block.title"));
         this.block = block;
         this.blockState = block.getDefaultState();
         this.face = Direction.UP;
@@ -93,12 +93,12 @@ public class EditorScreen extends AbstractEditorScreen {
     @Override
     protected String getEditorTitle() {
         String name = block != null ? block.getName().getString() : (blockState != null ? blockState.getBlock().getName().getString() : "Unknown");
-        String tintLabel = isTinted ? " \u00a7a[Tinted]" : "";
-        return "Block Editor - " + name + " (" + face.asString() + ")" + tintLabel;
+        String tintLabel = isTinted ? " \u00a7a" + Text.translatable("textureeditor.label.tinted").getString() : "";
+        return Text.translatable("textureeditor.screen.block.editor_title", name, Text.translatable("textureeditor.face." + face.asString().toLowerCase()), tintLabel).getString();
     }
 
     @Override
-    protected String getResetCurrentLabel() { return "Reset Face"; }
+    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_face").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -110,11 +110,11 @@ public class EditorScreen extends AbstractEditorScreen {
         // Face cycle button — only at scale <= 4
         if (showFaceButton()) {
             addDrawableChild(ButtonWidget.builder(
-                    Text.literal("Face: " + face.asString().toUpperCase()),
+                    Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())),
                     btn -> {
                         Direction[] dirs = Direction.values();
                         face = dirs[(face.ordinal() + 1) % dirs.length];
-                        btn.setMessage(Text.literal("Face: " + face.asString().toUpperCase()));
+                        btn.setMessage(Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())));
                         switchFace(face);
                     }
             ).position(5, toolY).size(tbw, tbh).build());
@@ -124,7 +124,7 @@ public class EditorScreen extends AbstractEditorScreen {
         // Reset Block button — always shown
         int rsw = getRightSidebarWidth();
         int resetBtnW = rsw - 10;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Reset Block"), btn -> resetBlock())
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.reset_block"), btn -> resetBlock())
                 .position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
 
         return toolY;

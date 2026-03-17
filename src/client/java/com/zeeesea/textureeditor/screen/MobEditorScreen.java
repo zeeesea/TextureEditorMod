@@ -30,7 +30,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
     private boolean mobPreviewActive = false;
 
     public MobEditorScreen(Entity entity, Screen parent) {
-        super(Text.literal("Mob Texture Editor"));
+        super(Text.translatable("textureeditor.screen.mob.title"));
         this.entity = entity;
         this.entityName = entity.getType().getName().getString();
         this.parent = parent;
@@ -66,10 +66,10 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected String getEditorTitle() { return "Mob Editor - " + entityName; }
+    protected String getEditorTitle() { return Text.translatable("textureeditor.screen.mob.editor_title", entityName).getString(); }
 
     @Override
-    protected String getResetCurrentLabel() { return "Reset Mob"; }
+    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_mob").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -83,7 +83,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
         // 3D Preview toggle
         mobPreview = new MobPreviewWidget(entity);
         mobPreview.setPosition(115, 30, 140, 160);
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7d3D"), btn -> {mobPreview.toggleVisible(); mobPreviewActive = mobPreview.isVisible(); })
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.preview_3d"), btn -> {mobPreview.toggleVisible(); mobPreviewActive = mobPreview.isVisible(); })
                 .position(this.width - 195, this.height - 26).size(60, 20).build());
 
         // "Edit Item" button — switch to item editor for entities with item form
@@ -91,7 +91,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
             int rsw = getRightSidebarWidth();
             int resetBtnW = rsw - 10;
             int tbh = getToolButtonHeight();
-            addDrawableChild(ButtonWidget.builder(Text.literal("Edit Item"), btn -> {
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_item"), btn -> {
                 ItemStack itemStack = EntityMapper.getItemFromEntity(entity);
                 if (itemStack != null) {
                     MinecraftClient.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));

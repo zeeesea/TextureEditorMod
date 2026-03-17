@@ -26,7 +26,7 @@ public class BlockBrowseEditorScreen extends AbstractEditorScreen {
     private Direction currentFace = Direction.UP;
 
     public BlockBrowseEditorScreen(Block block, Screen parent) {
-        super(Text.literal("Block Texture Editor"));
+        super(Text.translatable("textureeditor.screen.block.title"));
         this.block = block;
         this.blockState = block.getDefaultState();
         this.parent = parent;
@@ -69,12 +69,12 @@ public class BlockBrowseEditorScreen extends AbstractEditorScreen {
     @Override
     protected String getEditorTitle() {
         String name = block.getName().getString();
-        String tintLabel = isTinted ? " \u00a7a[Tinted]" : "";
-        return "Block Editor - " + name + " (" + currentFace.asString() + ")" + tintLabel;
+        String tintLabel = isTinted ? " \u00a7a" + Text.translatable("textureeditor.label.tinted").getString() : "";
+        return Text.translatable("textureeditor.screen.block.editor_title", name, Text.translatable("textureeditor.face." + currentFace.asString().toLowerCase()), tintLabel).getString();
     }
 
     @Override
-    protected String getResetCurrentLabel() { return "Reset Face"; }
+    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_face").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -82,18 +82,18 @@ public class BlockBrowseEditorScreen extends AbstractEditorScreen {
     @Override
     protected int addExtraButtons(int toolY) {
         // Face selection buttons
-        addDrawableChild(ButtonWidget.builder(Text.literal("Top"), btn -> switchFace(Direction.UP)).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Bottom"), btn -> switchFace(Direction.DOWN)).position(57, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.face.up"), btn -> switchFace(Direction.UP)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.face.down"), btn -> switchFace(Direction.DOWN)).position(57, toolY).size(48, 20).build());
         toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("North"), btn -> switchFace(Direction.NORTH)).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("South"), btn -> switchFace(Direction.SOUTH)).position(57, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.face.north"), btn -> switchFace(Direction.NORTH)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.face.south"), btn -> switchFace(Direction.SOUTH)).position(57, toolY).size(48, 20).build());
         toolY += 24;
-        addDrawableChild(ButtonWidget.builder(Text.literal("East"), btn -> switchFace(Direction.EAST)).position(5, toolY).size(48, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("West"), btn -> switchFace(Direction.WEST)).position(57, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.face.east"), btn -> switchFace(Direction.EAST)).position(5, toolY).size(48, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.face.west"), btn -> switchFace(Direction.WEST)).position(57, toolY).size(48, 20).build());
         toolY += 24;
 
         // Reset block button
-        addDrawableChild(ButtonWidget.builder(Text.literal("Reset Block"), btn -> resetBlock())
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.reset_block"), btn -> resetBlock())
                 .position(this.width - 115, this.height - 124).size(110, 20).build());
 
         return toolY;

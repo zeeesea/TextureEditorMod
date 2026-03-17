@@ -53,7 +53,7 @@ public class BrowseScreen extends Screen {
     private ButtonWidget tabAll, tabBlocks, tabItems, tabMobs, tabEntity, tabGui, tabSky;
 
     public BrowseScreen() {
-        super(Text.literal("Texture Browser"));
+        super(Text.translatable("textureeditor.screen.browse.title"));
     }
 
     private boolean showCycleTabs() {
@@ -76,18 +76,18 @@ public class BrowseScreen extends Screen {
         if (!showCycleTabs()) {
             // All Tabs as a Cycle-Button
             addDrawableChild(ButtonWidget.builder(
-                    Text.literal("Tab: " + currentTab.name()),
+                    Text.translatable("textureeditor.button.tab_cycle", Text.translatable("textureeditor.tab." + currentTab.name().toLowerCase())),
                     btn -> {
                         Tab[] tabs = Tab.values();
                         // SKY überspringen (öffnet extra screen)
                         Tab next = tabs[(currentTab.ordinal() + 1) % (tabs.length - 1)];
                         switchTab(next);
-                        btn.setMessage(Text.literal("Tab: " + next.name()));
+                        btn.setMessage(Text.translatable("textureeditor.button.tab_cycle", Text.translatable("textureeditor.tab." + next.name().toLowerCase())));
                     }
             ).position(10, tabY).size(80, 20).build());
 
             // Sky Button
-            addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
                     .position(94, tabY).size(40, 20).build());
 
             tabAll = tabBlocks = tabItems = tabEntity = tabMobs = tabGui = null;
@@ -96,30 +96,30 @@ public class BrowseScreen extends Screen {
             // Normal: all 7 Buttons
             int tabX = 10;
             int tabW = 50;
-            tabAll = addDrawableChild(ButtonWidget.builder(Text.literal("All"), btn -> switchTab(Tab.ALL))
+            tabAll = addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.all"), btn -> switchTab(Tab.ALL))
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
-            tabBlocks = addDrawableChild(ButtonWidget.builder(Text.literal("Blocks"), btn -> switchTab(Tab.BLOCKS))
+            tabBlocks = addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.blocks"), btn -> switchTab(Tab.BLOCKS))
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
-            tabItems = addDrawableChild(ButtonWidget.builder(Text.literal("Items"), btn -> switchTab(Tab.ITEMS))
+            tabItems = addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.items"), btn -> switchTab(Tab.ITEMS))
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
-            tabMobs = addDrawableChild(ButtonWidget.builder(Text.literal("Mobs"), btn -> switchTab(Tab.MOBS))
+            tabMobs = addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.mobs"), btn -> switchTab(Tab.MOBS))
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
-            tabGui = addDrawableChild(ButtonWidget.builder(Text.literal("GUI"), btn -> switchTab(Tab.GUI))
+            tabGui = addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.gui"), btn -> switchTab(Tab.GUI))
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
-            tabEntity = addDrawableChild(ButtonWidget.builder(Text.literal("Entities"), btn -> switchTab(Tab.ENTITY))
+            tabEntity = addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.entity"), btn -> switchTab(Tab.ENTITY))
                     .position(tabX, tabY).size(tabW, 20).build());
             tabX += tabW + 4;
-            tabSky = addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
+            tabSky = addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.tab.sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
                     .position(tabX, tabY).size(tabW, 20).build());
         }
 
         // Search field
-        searchField = new TextFieldWidget(this.textRenderer, this.width / 2 - 80, 32, 160, 18, Text.literal("Search"));
+        searchField = new TextFieldWidget(this.textRenderer, this.width / 2 - 80, 32, 160, 18, Text.translatable("textureeditor.field.search"));
         searchField.setMaxLength(64);
         searchField.setText(searchQuery);
         searchField.setChangedListener(text -> {
@@ -130,15 +130,15 @@ public class BrowseScreen extends Screen {
         addDrawableChild(searchField);
 
         // Close button
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClose"), btn -> this.close())
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.close"), btn -> this.close())
                 .position(this.width - 65, 5).size(60, 20).build());
 
         // Export button
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a76Export"), btn -> client.setScreen(new ExportScreen(this)))
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.export"), btn -> client.setScreen(new ExportScreen(this)))
                 .position(this.width - 130, 5).size(60, 20).build());
 
         // Settings button
-        addDrawableChild(ButtonWidget.builder(Text.literal("Settings"), btn -> client.setScreen(new SettingsScreen(this)))
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.settings"), btn -> client.setScreen(new SettingsScreen(this)))
                 .position(this.width - 195, 5).size(60, 20).build());
 
         // Calculate grid layout

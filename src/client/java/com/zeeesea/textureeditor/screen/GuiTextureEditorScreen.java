@@ -45,7 +45,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
     );
 
     public GuiTextureEditorScreen(Identifier guiTextureId, String displayName, Screen parent) {
-        super(Text.literal("GUI Texture Editor"));
+        super(Text.translatable("textureeditor.screen.gui.title"));
         this.guiTextureId = guiTextureId;
         this.displayName = displayName;
         this.parent = parent;
@@ -185,10 +185,10 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected String getEditorTitle() { return "GUI Editor - " + displayName; }
+    protected String getEditorTitle() { return Text.translatable("textureeditor.screen.gui.editor_title", displayName).getString(); }
 
     @Override
-    protected String getResetCurrentLabel() { return "Reset"; }
+    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -204,7 +204,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
             int rsw = getRightSidebarWidth();
             int resetBtnW = rsw - 10;
             int tbh = getToolButtonHeight();
-            addDrawableChild(ButtonWidget.builder(Text.literal("Edit Item"), btn -> {
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_item"), btn -> {
                 MinecraftClient.getInstance().setScreen(new ItemEditorScreen(new ItemStack(Items.ELYTRA), parent));
             }).position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
         }

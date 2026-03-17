@@ -25,7 +25,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     private final Screen parent;
 
     public ItemEditorScreen(ItemStack itemStack, Screen parent) {
-        super(Text.literal("Item Texture Editor"));
+        super(Text.translatable("textureeditor.screen.item.title"));
         this.itemStack = itemStack;
         this.itemName = itemStack.getName().getString();
         this.parent = parent;
@@ -57,10 +57,10 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected String getEditorTitle() { return "Item Editor - " + itemName; }
+    protected String getEditorTitle() { return Text.translatable("textureeditor.screen.item.editor_title", itemName).getString(); }
 
     @Override
-    protected String getResetCurrentLabel() { return "Reset Item"; }
+    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_item").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -73,7 +73,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
         // "Edit Mob/Entity" button for spawn eggs, boats, minecarts, etc.
         if (EntityMapper.hasEntityMode(itemStack)) {
-            addDrawableChild(ButtonWidget.builder(Text.literal("Edit Mob/Entity"), btn -> {
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_mob_entity"), btn -> {
                 var entity = EntityMapper.getEntityFromItem(itemStack, MinecraftClient.getInstance().world);
                 if (entity != null) {
                     MinecraftClient.getInstance().setScreen(new MobEditorScreen(entity, parent));
@@ -83,9 +83,9 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
         // "Edit Wing Texture" button for elytra → opens the entity/elytra.png texture
         if (itemStack.getItem() == Items.ELYTRA) {
-            addDrawableChild(ButtonWidget.builder(Text.literal("Edit Wing Tex"), btn -> {
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_wing_tex"), btn -> {
                 Identifier elytraTexId = Identifier.of("minecraft", "textures/entity/elytra.png");
-                MinecraftClient.getInstance().setScreen(new GuiTextureEditorScreen(elytraTexId, "Elytra Wings", parent != null ? parent : this));
+                MinecraftClient.getInstance().setScreen(new GuiTextureEditorScreen(elytraTexId, Text.translatable("textureeditor.elytra.wings").getString(), parent != null ? parent : this));
             }).position(this.width - rsw + 5, this.height - 148).size(resetBtnW, tbh).build());
         }
 

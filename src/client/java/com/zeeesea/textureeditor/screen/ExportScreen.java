@@ -53,7 +53,7 @@ public class ExportScreen extends Screen {
     };
 
     public ExportScreen(Screen parent) {
-        super(Text.literal("Export Texture Pack"));
+        super(Text.translatable("textureeditor.screen.export.title"));
         this.parent = parent;
         this.iconCanvas = new PixelCanvas(ICON_SIZE, ICON_SIZE);
         for (int x = 0; x < ICON_SIZE; x++) {
@@ -69,19 +69,19 @@ public class ExportScreen extends Screen {
         int fieldWidth = 200;
 
         // Pack name
-        packNameInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 40, fieldWidth, 18, Text.literal("Pack Name"));
+        packNameInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 40, fieldWidth, 18, Text.translatable("textureeditor.field.pack_name"));
         packNameInput.setMaxLength(64);
-        packNameInput.setText("My Texture Pack");
+        packNameInput.setText(Text.translatable("textureeditor.default.pack_name").getString());
         addDrawableChild(packNameInput);
 
         // Description
-        descriptionInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 75, fieldWidth, 18, Text.literal("Description"));
+        descriptionInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 75, fieldWidth, 18, Text.translatable("textureeditor.field.description"));
         descriptionInput.setMaxLength(128);
-        descriptionInput.setText("Created with Texture Editor Mod");
+        descriptionInput.setText(Text.translatable("textureeditor.default.pack_description").getString());
         addDrawableChild(descriptionInput);
 
         // Author
-        authorInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 110, fieldWidth, 18, Text.literal("Author"));
+        authorInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 110, fieldWidth, 18, Text.translatable("textureeditor.field.author"));
         authorInput.setMaxLength(64);
         authorInput.setText("");
         addDrawableChild(authorInput);
@@ -93,7 +93,7 @@ public class ExportScreen extends Screen {
         iconScreenY = 145;
 
         // Grid toggle
-        addDrawableChild(ButtonWidget.builder(Text.literal("Grid"), btn -> showGrid = !showGrid)
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.grid"), btn -> showGrid = !showGrid)
                 .position(iconScreenX + ICON_SIZE * iconZoom + 10, iconScreenY).size(50, 20).build());
 
         int exportBackPosX = centerX - 60;
@@ -104,11 +104,11 @@ public class ExportScreen extends Screen {
             exportBackPosY = 40;
         }
             // Export button
-            addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7aExport"), btn -> doExport())
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.export"), btn -> doExport())
                     .position(exportBackPosX, exportBackPosY).size(120, 20).build());
 
             // Back button
-            addDrawableChild(ButtonWidget.builder(Text.literal("Back"), btn -> client.setScreen(parent))
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.back"), btn -> client.setScreen(parent))
                     .position(exportBackPosX, exportBackPosY + 24).size(120, 20).build());
 
     }
@@ -122,13 +122,13 @@ public class ExportScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawCenteredTextWithShadow(textRenderer, "Export Texture Pack", this.width / 2, 10, 0xFFFFFFFF);
-        context.drawText(textRenderer, "Pack Name:", this.width / 2 - 100, 30, 0xFFCCCCCC, false);
-        context.drawText(textRenderer, "Description:", this.width / 2 - 100, 65, 0xFFCCCCCC, false);
-        context.drawText(textRenderer, "Author:", this.width / 2 - 100, 100, 0xFFCCCCCC, false);
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("textureeditor.screen.export.title"), this.width / 2, 10, 0xFFFFFFFF);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_name"), this.width / 2 - 100, 30, 0xFFCCCCCC, false);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.description"), this.width / 2 - 100, 65, 0xFFCCCCCC, false);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.author"), this.width / 2 - 100, 100, 0xFFCCCCCC, false);
 
         // Draw "Pack Icon (optional):" label
-        context.drawText(textRenderer, "Pack Icon (draw below):", iconScreenX, 135, 0xFFCCCCCC, false);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_icon"), iconScreenX, 135, 0xFFCCCCCC, false);
 
         // Draw icon canvas
         drawIconCanvas(context, mouseX, mouseY);
@@ -264,7 +264,7 @@ public class ExportScreen extends Screen {
     private void doExport() {
         String name = packNameInput.getText().trim();
         if (name.isEmpty()) {
-            statusMessage = "Please enter a pack name!";
+            statusMessage = Text.translatable("textureeditor.status.enter_pack_name").getString();
             statusColor = 0xFF5555;
             return;
         }
@@ -277,10 +277,10 @@ public class ExportScreen extends Screen {
         File result = ResourcePackExporter.export(name, description, author,
                 iconCanvas.getPixels(), ICON_SIZE, ICON_SIZE);
         if (result != null) {
-            statusMessage = "Exported to: " + result.getName();
+            statusMessage = Text.translatable("textureeditor.status.exported_to", result.getName()).getString();
             statusColor = 0x55FF55;
         } else {
-            statusMessage = "Export failed! No modified textures.";
+            statusMessage = Text.translatable("textureeditor.status.export_failed").getString();
             statusColor = 0xFF5555;
         }
     }

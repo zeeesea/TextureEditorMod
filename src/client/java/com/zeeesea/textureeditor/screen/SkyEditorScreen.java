@@ -21,26 +21,25 @@ import java.io.InputStream;
  */
 public class SkyEditorScreen extends AbstractEditorScreen {
 
-    private enum SkyTexture {
-        // In 1.21.11, sun/moon are sprites in the celestials atlas (textures/atlas/celestials.png)
-        // Sprite IDs are relative to the atlas source directory "environment/celestial"
-        SUN("Sun", new String[]{"environment/celestial/sun", "environment/sun"}, "sun", 32, 32),
-        MOON_FULL("Moon Full", new String[]{"environment/celestial/moon/full_moon", "environment/moon_phases"}, "moon/full_moon", 32, 32),
-        MOON_WANING_G("Moon Wan.Gib", new String[]{"environment/celestial/moon/waning_gibbous"}, "moon/waning_gibbous", 32, 32),
-        MOON_THIRD_Q("Moon 3rd Qtr", new String[]{"environment/celestial/moon/third_quarter"}, "moon/third_quarter", 32, 32),
-        MOON_WANING_C("Moon Wan.Cres", new String[]{"environment/celestial/moon/waning_crescent"}, "moon/waning_crescent", 32, 32),
-        MOON_NEW("Moon New", new String[]{"environment/celestial/moon/new_moon"}, "moon/new_moon", 32, 32),
-        MOON_WAXING_C("Moon Wax.Cres", new String[]{"environment/celestial/moon/waxing_crescent"}, "moon/waxing_crescent", 32, 32),
-        MOON_FIRST_Q("Moon 1st Qtr", new String[]{"environment/celestial/moon/first_quarter"}, "moon/first_quarter", 32, 32),
-        MOON_WAXING_G("Moon Wax.Gib", new String[]{"environment/celestial/moon/waxing_gibbous"}, "moon/waxing_gibbous", 32, 32),
-        END_SKY("End Sky", new String[]{"environment/end_sky"}, null, 128, 128);
 
-        final String displayName;
+    private enum SkyTexture {
+        SUN("sun", new String[]{"environment/celestial/sun", "environment/sun"}, "sun", 32, 32),
+        MOON_FULL("moon_full", new String[]{"environment/celestial/moon/full_moon", "environment/moon_phases"}, "moon/full_moon", 32, 32),
+        MOON_WANING_G("moon_waning_g", new String[]{"environment/celestial/moon/waning_gibbous"}, "moon/waning_gibbous", 32, 32),
+        MOON_THIRD_Q("moon_third_q", new String[]{"environment/celestial/moon/third_quarter"}, "moon/third_quarter", 32, 32),
+        MOON_WANING_C("moon_waning_c", new String[]{"environment/celestial/moon/waning_crescent"}, "moon/waning_crescent", 32, 32),
+        MOON_NEW("moon_new", new String[]{"environment/celestial/moon/new_moon"}, "moon/new_moon", 32, 32),
+        MOON_WAXING_C("moon_waxing_c", new String[]{"environment/celestial/moon/waxing_crescent"}, "moon/waxing_crescent", 32, 32),
+        MOON_FIRST_Q("moon_first_q", new String[]{"environment/celestial/moon/first_quarter"}, "moon/first_quarter", 32, 32),
+        MOON_WAXING_G("moon_waxing_g", new String[]{"environment/celestial/moon/waxing_gibbous"}, "moon/waxing_gibbous", 32, 32),
+        END_SKY("end_sky", new String[]{"environment/end_sky"}, null, 128, 128);
+
+        final String key;
         final String[] paths;
         final String spriteId; // sprite ID in celestials atlas (null = standalone texture)
         final int defaultWidth, defaultHeight;
 
-        SkyTexture(String dn, String[] p, String sid, int dw, int dh) { displayName = dn; paths = p; spriteId = sid; defaultWidth = dw; defaultHeight = dh; }
+        SkyTexture(String key, String[] p, String sid, int dw, int dh) { this.key = key; paths = p; spriteId = sid; defaultWidth = dw; defaultHeight = dh; }
 
         Identifier getTextureId() { return Identifier.of("minecraft", "textures/" + paths[0] + ".png"); }
 
@@ -61,18 +60,36 @@ public class SkyEditorScreen extends AbstractEditorScreen {
     private SkyTexture currentSkyTexture = SkyTexture.SUN;
 
     public SkyEditorScreen(Screen parent) {
-        super(Text.literal("Sky Editor"));
+        super(Text.translatable("textureeditor.screen.sky.title"));
         this.parent = parent;
         this.zoom = 4;
     }
 
-    @Override protected int getBackgroundColor() { return 0xFF0A0A1E; }
-    @Override protected int getMaxZoom() { return 20; }
-    @Override protected int getMinZoom() { return 1; }
-    @Override protected int getZoomStep() { return 1; }
-    @Override protected Screen getBackScreen() { return parent; }
-    @Override protected String getEditorTitle() { return "Sky Editor - " + currentSkyTexture.displayName; }
-    @Override protected String getResetCurrentLabel() { return "Reset"; }
+
+    @Override
+    protected int getBackgroundColor() { return 0xFF0A0A1E; }
+
+    @Override
+    protected int getMaxZoom() { return 20; }
+
+    @Override
+    protected int getMinZoom() { return 1; }
+
+    @Override
+    protected int getZoomStep() { return 1; }
+
+    @Override
+    protected Screen getBackScreen() { return parent; }
+
+    @Override
+    protected String getEditorTitle() {
+        return Text.translatable("textureeditor.screen.sky.editor_title", Text.translatable("textureeditor.sky." + currentSkyTexture.key)).getString();
+    }
+
+    @Override
+    protected String getResetCurrentLabel() {
+        return Text.translatable("textureeditor.button.reset").getString();
+    }
 
     @Override
     protected void loadTexture() {
@@ -127,15 +144,15 @@ public class SkyEditorScreen extends AbstractEditorScreen {
         // Sky texture cycle button (many moon phases now)
         SkyTexture[] textures = SkyTexture.values();
         int skyBtnX = this.width / 2 - 120;
-        addDrawableChild(ButtonWidget.builder(Text.literal("< Prev"), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.prev"), btn -> {
             int idx = (currentSkyTexture.ordinal() - 1 + textures.length) % textures.length;
             switchTexture(textures[idx]);
         }).position(skyBtnX, 5).size(60, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal(currentSkyTexture.displayName), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.sky." + currentSkyTexture.key), btn -> {
             int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
             switchTexture(textures[idx]);
         }).position(skyBtnX + 64, 5).size(110, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Next >"), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
             int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
             switchTexture(textures[idx]);
         }).position(skyBtnX + 178, 5).size(60, 20).build());

@@ -5,6 +5,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.text.Text;
 import org.joml.Quaternionf;
 
 /**
@@ -52,7 +53,7 @@ public class MobPreviewWidget {
 
         // Title
         MinecraftClient client = MinecraftClient.getInstance();
-        context.drawText(client.textRenderer, "\u00a7b3D Preview", x + 2, y - 13, 0xFFFFFFFF, false);
+        context.drawText(client.textRenderer, Text.translatable("textureeditor.button.preview_3d"), x + 2, y - 13, 0xFFFFFFFF, false);
 
         // Render entity
         if (entity instanceof LivingEntity livingEntity) {

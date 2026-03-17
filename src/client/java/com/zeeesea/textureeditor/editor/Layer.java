@@ -52,7 +52,7 @@ public class Layer {
     }
 
     /**
-     * Gibt true zurück, wenn alle Pixel der Layer transparent (0x00000000) sind.
+     * Return true if layer is empty heheheha
      */
     public boolean isEmpty() {
         for (int x = 0; x < width; x++) {

@@ -15,7 +15,8 @@ public class SettingsScreen extends Screen {
     private final Screen parent;
 
     public SettingsScreen(Screen parent) {
-        super(Text.literal("Texture Editor Settings"));
+        // Nutzt jetzt den Key aus deiner JSON für den Fenstertitel
+        super(Text.translatable("textureeditor.screen.settings.title"));
         this.parent = parent;
     }
 
@@ -26,8 +27,13 @@ public class SettingsScreen extends Screen {
         int centerX = this.width / 2;
         int y = 40;
 
+        // Hilfs-Texte für ON/OFF
+        Text textOn = Text.translatable("textureeditor.label.on");
+        Text textOff = Text.translatable("textureeditor.label.off");
+
         // Auto Apply live
-        addDrawableChild(ButtonWidget.builder(Text.literal("Auto Apply Live: " + (s.autoApplyLive ? "ON" : "OFF")), btn -> {
+        // Wir nutzen hier Text.translatable(KEY, ARGUMENT), um das %s in deiner JSON zu füllen
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.auto_apply_live", s.autoApplyLive ? textOn : textOff), btn -> {
             s.autoApplyLive = !s.autoApplyLive;
             s.save();
             this.clearChildren();
@@ -36,7 +42,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Grid On By Default
-        addDrawableChild(ButtonWidget.builder(Text.literal("Grid Default: " + (s.gridOnByDefault ? "ON" : "OFF")), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.grid_default", s.gridOnByDefault ? textOn : textOff), btn -> {
             s.gridOnByDefault = !s.gridOnByDefault;
             s.save();
             this.clearChildren();
@@ -45,7 +51,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Show Tool Hints
-        addDrawableChild(ButtonWidget.builder(Text.literal("Tool Keybind Hints: " + (s.showToolHints ? "ON" : "OFF")), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.tool_keybind_hints", s.showToolHints ? textOn : textOff), btn -> {
             s.showToolHints = !s.showToolHints;
             s.save();
             this.clearChildren();
@@ -54,7 +60,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Max Undo Steps
-        addDrawableChild(ButtonWidget.builder(Text.literal("Max Undo Steps: " + s.maxUndoSteps), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.max_undo_steps", String.valueOf(s.maxUndoSteps)), btn -> {
             s.maxUndoSteps = switch (s.maxUndoSteps) {
                 case 10 -> 25;
                 case 25 -> 50;
@@ -69,7 +75,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Color History Size
-        addDrawableChild(ButtonWidget.builder(Text.literal("Color History Size: " + s.colorHistorySize), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.color_hist_size", String.valueOf(s.colorHistorySize)), btn -> {
             s.colorHistorySize = switch (s.colorHistorySize) {
                 case 5 -> 10;
                 case 10 -> 15;
@@ -83,7 +89,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Default Tool
-        addDrawableChild(ButtonWidget.builder(Text.literal("Default Tool: " + s.defaultTool), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.default_tool", s.defaultTool), btn -> {
             s.defaultTool = switch (s.defaultTool) {
                 case "Pencil" -> "Brush";
                 case "Brush" -> "Eraser";
@@ -100,7 +106,7 @@ public class SettingsScreen extends Screen {
 
         // Brush Variation
         int variationPercent = Math.round(s.brushVariation * 100);
-        addDrawableChild(ButtonWidget.builder(Text.literal("Brush Variation: " + variationPercent + "%"), btn -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.brush_variation", variationPercent + "%"), btn -> {
             s.brushVariation = switch (variationPercent) {
                 case 5 -> 0.10f;
                 case 10 -> 0.15f;
@@ -115,42 +121,45 @@ public class SettingsScreen extends Screen {
         }).position(centerX - 100, y).size(200, 20).build());
         y += 40;
 
-        addDrawableChild(ButtonWidget.builder(
-                Text.literal("Multiplayer Sync: " + (s.multiplayerSync ? "ON" : "OFF")),
-                btn -> {
-                    s.multiplayerSync = !s.multiplayerSync;
-                    btn.setMessage(Text.literal("Multiplayer Sync: " + (s.multiplayerSync ? "ON" : "OFF")));
-                    s.save();
-                }
-        ).position(centerX - 100, y).size(200, 20).build());
+        // Multiplayer Sync
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.multiplayer_sync", s.multiplayerSync ? textOn : textOff), btn -> {
+            s.multiplayerSync = !s.multiplayerSync;
+            s.save();
+            this.clearChildren();
+            this.init();
+        }).position(centerX - 100, y).size(200, 20).build());
         y += 40;
 
         // External Editor Settings
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7bExternal Editor... (Experimental)"), btn ->
-                client.setScreen(new ExternalEditorSettingsScreen(this)))
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.externalEditor"), btn ->
+                        client.setScreen(new ExternalEditorSettingsScreen(this)))
                 .position(centerX - 100, y).size(200, 20).build());
         y += 28;
 
         // Keybind Settings
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7eEditor Keybinds..."), btn ->
-                client.setScreen(new KeybindSettingsScreen(this)))
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.editor_keybinds"), btn ->
+                        client.setScreen(new KeybindSettingsScreen(this)))
                 .position(centerX - 100, y).size(200, 20).build());
         y += 40;
 
         // Done
-        addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> this.close())
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.done"), btn -> this.close())
                 .position(centerX - 50, y).size(100, 20).build());
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
-        context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a76Texture Editor Settings", this.width / 2, 15, 0xFFFFFF);
+
+        context.drawCenteredTextWithShadow(textRenderer, this.title, this.width / 2, 15, 0xFFFFFF);
+
         super.render(context, mouseX, mouseY, delta);
     }
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
+    public void renderBackground(DrawContext ctx, int mx, int my, float d) {
+
+    }
 
     @Override
     public void close() {

@@ -83,6 +83,21 @@ public class TextureEditorClient implements ClientModInitializer {
                             true
                     );
                 }
+                if (client.player != null) {
+                    Text prefix = Text.translatable("textureeditor.status.prefix")
+                            .formatted(net.minecraft.util.Formatting.GOLD);
+
+                    Text status = editorModeEnabled
+                            ? Text.translatable("textureeditor.status.enabled").formatted(net.minecraft.util.Formatting.GREEN)
+                            : Text.translatable("textureeditor.status.disabled").formatted(net.minecraft.util.Formatting.RED);
+
+                    Text fullMessage = Text.empty()
+                            .append(prefix)
+                            .append(Text.literal(" "))
+                            .append(status);
+
+                    client.player.sendMessage(fullMessage, true); // true = Action Bar (über dem Inventar)
+                }
                 if (editorModeEnabled) {
                     while (openEditorKey.wasPressed()) { /* discard stale presses */ }
                 }
