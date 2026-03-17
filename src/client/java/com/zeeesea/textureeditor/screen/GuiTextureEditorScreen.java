@@ -1,7 +1,11 @@
 package com.zeeesea.textureeditor.screen;
 
+import com.zeeesea.textureeditor.EntityTextureSyncPayload;
+import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
+import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -213,16 +217,17 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         MinecraftClient client = MinecraftClient.getInstance();
         TextureManager.getInstance().putTexture(fullTextureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
 
+        var atlasAndSprite = findSpriteInAtlases(client, guiTextureId);
+        final Identifier foundSpriteId = atlasAndSprite != null ?
+                atlasAndSprite.getRight().getContents().getId() : null;
+
         client.execute(() -> {
             try {
                 System.out.println("[TextureEditor] GUI applyLive: fullTextureId=" + fullTextureId + ", guiTextureId=" + guiTextureId + ", isSpriteTexture=" + isSpriteTexture);
-                Identifier spriteId = guiTextureId;
-                var atlasAndSprite = findSpriteInAtlases(client, spriteId);
 
                 if (atlasAndSprite != null) {
                     // Use the proper sprite ID that was found in the atlas
                     net.minecraft.client.texture.Sprite sprite = atlasAndSprite.getRight();
-                    Identifier foundSpriteId = sprite.getContents().getId();
                     System.out.println("[TextureEditor] Updating sprite in atlas: " + foundSpriteId + " (atlas: " + atlasAndSprite.getLeft() + ")");
                     // Use TextureManager's proper RenderPass blit to write at correct atlas position
                     TextureManager.getInstance().applyLive(foundSpriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
@@ -251,6 +256,27 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                 t.printStackTrace();
             }
         });
+
+        final int[][] px = canvas.getPixels();
+        final int w = canvas.getWidth();
+        final int h = canvas.getHeight();
+        final Identifier sid = fullTextureId;
+
+        // Send to other players if multiplayer sync enabled
+        if (ModSettings.getInstance().multiplayerSync) {
+            int[] flat = new int[w * h];
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    flat[y * w + x] = px[x][y];
+
+            int[] origFlat = new int[w * h];
+            if (originalPixels != null) {
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                        origFlat[y * w + x] = originalPixels[x][y];
+            }
+            ClientPlayNetworking.send(new EntityTextureSyncPayload(fullTextureId, foundSpriteId, w, h, flat, origFlat));
+        }
     }
 
     // Utility: Find sprite in block/gui/items atlases

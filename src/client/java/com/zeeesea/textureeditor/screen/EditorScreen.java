@@ -157,9 +157,15 @@ public class EditorScreen extends AbstractEditorScreen {
             int[] flat = new int[w * h];
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h; y++)
-                    flat[x * h + y] = px[x][y];
+                    flat[y * w + x] = px[x][y];
 
-            ClientPlayNetworking.send(new TextureSyncPayload(spriteId, width, height, flat));
+            int[] origFlat = new int[w * h];
+            if (originalPixels != null) {
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                        origFlat[y * w + x] = originalPixels[x][y];
+            }
+            ClientPlayNetworking.send(new TextureSyncPayload(sid, w, h, flat, origFlat));
         }
     }
 

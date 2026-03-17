@@ -4,5 +4,19 @@
   "key.textureeditor.open": "Open Editor (item/block/mob)",
   "key.textureeditor.preview": "Preview Original Texture (Hold)",
   "key.textureeditor.undo": "Undo",
-  "key.textureeditor.redo": "Redo"
+  "key.textureeditor.redo": "Redo",
+  "textureeditor.button.reset": "Reset",
+  "textureeditor.button.reset_all": "Reset All",
+  "textureeditor.button.apply_live": "Apply Live",
+  "textureeditor.button.export_pack": "Export Pack",
+  "textureeditor.button.browse": "Browse",
+  "textureeditor.button.close": "Close",
+  "textureeditor.button.picker": "Picker",
+  "textureeditor.button.layers": "Layers",
+  "textureeditor.button.grid": "Grid",
+  "textureeditor.button.zoom_in": "Zoom +",
+  "textureeditor.button.zoom_out": "Zoom -",
+  "textureeditor.button.size": "Size: %dpx",
+  "textureeditor.button.undo": "Undo",
+  "textureeditor.button.redo": "Redo"
 }

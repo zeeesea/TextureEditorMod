@@ -1,7 +1,11 @@
 package com.zeeesea.textureeditor.screen;
 
+import com.zeeesea.textureeditor.EntityTextureSyncPayload;
+import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
+import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -201,6 +205,27 @@ public class SkyEditorScreen extends AbstractEditorScreen {
                     dynamicTex.upload();
                 }
             });
+        }
+
+        final int[][] px = canvas.getPixels();
+        final int w = canvas.getWidth();
+        final int h = canvas.getHeight();
+        final Identifier sid = textureId;
+
+        // Send to other players if multiplayer sync enabled
+        if (ModSettings.getInstance().multiplayerSync && sid != null) {
+            int[] flat = new int[w * h];
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    flat[y * w + x] = px[x][y];
+
+            int[] origFlat = new int[w * h];
+            if (originalPixels != null) {
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                        origFlat[y * w + x] = originalPixels[x][y];
+            }
+            ClientPlayNetworking.send(new EntityTextureSyncPayload(textureId, spriteId, w, h, flat, origFlat));
         }
     }
 

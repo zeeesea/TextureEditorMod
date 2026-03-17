@@ -195,17 +195,26 @@ public class TextureEditorClient implements ClientModInitializer {
 
             int w = payload.width();
             int h = payload.height();
-            int[] flat = payload.pixels();
-
-            // Convert flat array back to 2D
-            int[][] pixels = new int[w][h];
-            for (int x = 0; x < w; x++)
-                for (int y = 0; y < h; y++)
-                    pixels[x][y] = flat[x * h + y];
-
             context.client().execute(() ->
-                    TextureManager.getInstance().applyLive(payload.spriteId(), pixels, w, h)
+                    TextureManager.getInstance().applyLive(payload.spriteId(), payload.pixels(), w, h)
             );
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(EntityTextureSyncPayload.ID, (payload, context) -> {
+            if (!ModSettings.getInstance().multiplayerSync) return;
+            int w = payload.width();
+            int h = payload.height();
+            context.client().execute(() -> {
+                if (payload.spriteId() != null) {
+                    // GUI/Sky — use sprite-based apply
+                    TextureManager.getInstance().applyLive(
+                            payload.spriteId(), payload.pixels(), payload.originalPixels(), w, h);
+                } else {
+                    // Mob/Entity — use entity apply
+                    TextureManager.getInstance().applyLiveEntity(
+                            payload.textureId(), payload.pixels(), payload.originalPixels(), w, h);
+                }
+            });
         });
     }
 

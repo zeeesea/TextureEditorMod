@@ -337,17 +337,130 @@ public class TextureManager {
 
         if (origPixels != null) {
             storeOriginal(textureId, origPixels, width, height);
+        } else {
+            ensureOriginalStored(textureId);
         }
 
         putTexture(textureId, pixels, width, height);
         writeSpritePixels(spriteId, pixels, width, height);
         markItemGuiAtlasDirty(spriteId);
 
-        // Rebake item models to update 3D thickness quads for new pixel shapes
         try {
             ItemModelRebaker.rebake(spriteId);
         } catch (Exception e) {
             System.out.println("[TextureEditor] ItemModelRebaker failed: " + e.getMessage());
+        }
+    }
+
+    public void applyLive(Identifier spriteId, int[] flatPixels, int[] flatOriginals, int width, int height) {
+        Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
+
+        int[][] origPixels = null;
+        if (flatOriginals != null) {
+            origPixels = new int[width][height];
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                    origPixels[x][y] = flatOriginals[y * width + x];
+        }
+
+        // Check if local texture has different size — scale if needed
+        int[] localDims = getDimensions(textureId);
+        if (localDims != null && (localDims[0] != width || localDims[1] != height)) {
+            int lw = localDims[0], lh = localDims[1];
+            int[][] scaled = new int[lw][lh];
+            for (int x = 0; x < lw; x++)
+                for (int y = 0; y < lh; y++)
+                    scaled[x][y] = flatPixels[((int)(y * height / (float)lh)) * width + (int)(x * width / (float)lw)];
+            applyLive(spriteId, scaled, lw, lh, origPixels != null ? scalePixels(origPixels, width, height, lw, lh) : null);
+            return;
+        }
+
+        int[][] pixels = new int[width][height];
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                pixels[x][y] = flatPixels[y * width + x];
+        applyLive(spriteId, pixels, width, height, origPixels);
+    }
+
+
+
+    public void applyLive(Identifier spriteId, int[] flatPixels, int width, int height) {
+        applyLive(spriteId, flatPixels, null, width, height);
+    }
+
+    // Used by Multiplayer - Entity
+    public void applyLiveEntity(Identifier textureId, int[] flatPixels, int[] flatOriginals, int width, int height) {
+        if (flatOriginals != null && flatOriginals.length > 0) {
+            int[][] origPixels = new int[width][height];
+            for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
+                    origPixels[x][y] = flatOriginals[y * width + x];
+            storeOriginal(textureId, origPixels, width, height);
+        } else {
+            ensureOriginalStored(textureId);
+        }
+
+        // Check local texture size
+        int[] localDims = getDimensions(textureId);
+        int lw = (localDims != null) ? localDims[0] : width;
+        int lh = (localDims != null) ? localDims[1] : height;
+
+        int[][] pixels = new int[lw][lh];
+        for (int x = 0; x < lw; x++)
+            for (int y = 0; y < lh; y++)
+                pixels[x][y] = flatPixels[((int)(y * height / (float)lh)) * width + (int)(x * width / (float)lw)];
+
+        MinecraftClient client = MinecraftClient.getInstance();
+        putTexture(textureId, pixels, lw, lh);
+        final int fw = lw, fh = lh;
+        client.execute(() -> {
+            var img = new net.minecraft.client.texture.NativeImage(fw, fh, false);
+            for (int x = 0; x < fw; x++)
+                for (int y = 0; y < fh; y++)
+                    img.setColorArgb(x, y, pixels[x][y]);
+            var existing = client.getTextureManager().getTexture(textureId);
+            if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                nibt.setImage(img);
+                nibt.upload();
+            } else {
+                var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(
+                        () -> "textureeditor_sync", img);
+                client.getTextureManager().registerTexture(textureId, dynamicTex);
+                dynamicTex.upload();
+            }
+        });
+    }
+
+    private int[][] scalePixels(int[][] src, int srcW, int srcH, int dstW, int dstH) {
+        int[][] result = new int[dstW][dstH];
+        for (int x = 0; x < dstW; x++)
+            for (int y = 0; y < dstH; y++)
+                result[x][y] = src[(int)(x * srcW / (float)dstW)][(int)(y * srcH / (float)dstH)];
+        return result;
+    }
+
+    /**
+     * Load and store original pixels from resource manager if not already stored.
+     * Called before any sync apply to ensure reset works for all players.
+     */
+    private void ensureOriginalStored(Identifier textureId) {
+        if (originalTextures.containsKey(textureId)) return;
+        try {
+            var client = MinecraftClient.getInstance();
+            var resource = client.getResourceManager().getResource(textureId);
+            if (resource.isPresent()) {
+                var img = net.minecraft.client.texture.NativeImage.read(
+                        resource.get().getInputStream());
+                int w = img.getWidth(), h = img.getHeight();
+                int[][] orig = new int[w][h];
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                        orig[x][y] = img.getColorArgb(x, y);
+                img.close();
+                storeOriginal(textureId, orig, w, h);
+            }
+        } catch (Exception e) {
+            System.out.println("[TextureEditor] Could not store original for: " + textureId);
         }
     }
 

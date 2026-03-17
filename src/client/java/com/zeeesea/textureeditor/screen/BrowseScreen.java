@@ -5,6 +5,7 @@ import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import net.minecraft.block.Block;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -55,6 +56,13 @@ public class BrowseScreen extends Screen {
         super(Text.literal("Texture Browser"));
     }
 
+    private boolean showCycleTabs() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int scaledHeight = client.getWindow().getScaledHeight();
+
+        return scaledHeight > 300;
+    }
+
     @Override
     protected void init() {
         // Build entries list on first init
@@ -64,10 +72,9 @@ public class BrowseScreen extends Screen {
 
         // Tab buttons
         int tabY = 5;
-        int guiScale = (int) net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaleFactor();
 
-        if (guiScale >= 5) {
-            // Alle Tabs als ein Cycle-Button
+        if (!showCycleTabs()) {
+            // All Tabs as a Cycle-Button
             addDrawableChild(ButtonWidget.builder(
                     Text.literal("Tab: " + currentTab.name()),
                     btn -> {
@@ -79,15 +86,14 @@ public class BrowseScreen extends Screen {
                     }
             ).position(10, tabY).size(80, 20).build());
 
-            // Sky Button separat
+            // Sky Button
             addDrawableChild(ButtonWidget.builder(Text.literal("Sky"), btn -> client.setScreen(new SkyEditorScreen(this)))
                     .position(94, tabY).size(40, 20).build());
 
-            // Referenzen für den Tab-Underline-Indikator setzen (brauchen wir für render())
             tabAll = tabBlocks = tabItems = tabEntity = tabMobs = tabGui = null;
             tabSky = null;
         } else {
-            // Normal: alle 7 Buttons
+            // Normal: all 7 Buttons
             int tabX = 10;
             int tabW = 50;
             tabAll = addDrawableChild(ButtonWidget.builder(Text.literal("All"), btn -> switchTab(Tab.ALL))

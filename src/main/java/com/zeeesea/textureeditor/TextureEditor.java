@@ -26,5 +26,16 @@ public class TextureEditor implements ModInitializer {
 				}
 			});
 		});
+
+		PayloadTypeRegistry.playC2S().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
+
+		ServerPlayNetworking.registerGlobalReceiver(EntityTextureSyncPayload.ID, (payload, context) -> {
+			context.server().getPlayerManager().getPlayerList().forEach(p -> {
+				if (p != context.player()) {
+					ServerPlayNetworking.send(p, payload);
+				}
+			});
+		});
 	}
 }

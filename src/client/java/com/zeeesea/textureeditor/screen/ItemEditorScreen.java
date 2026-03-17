@@ -1,9 +1,12 @@
 package com.zeeesea.textureeditor.screen;
 
+import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
+import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.EntityMapper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -96,6 +99,27 @@ public class ItemEditorScreen extends AbstractEditorScreen {
         final int[][] origCopy = originalPixels;
         MinecraftClient.getInstance().execute(() ->
                 TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));
+
+        final int[][] px = canvas.getPixels();
+        final int w = canvas.getWidth();
+        final int h = canvas.getHeight();
+        final Identifier sid = spriteId;
+
+        // Send to other players if multiplayer sync enabled
+        if (ModSettings.getInstance().multiplayerSync) {
+            int[] flat = new int[w * h];
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    flat[y * w + x] = px[x][y];
+
+            int[] origFlat = new int[w * h];
+            if (originalPixels != null) {
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                        origFlat[y * w + x] = originalPixels[x][y];
+            }
+            ClientPlayNetworking.send(new TextureSyncPayload(sid, w, h, flat, origFlat));
+        }
     }
 
     @Override
