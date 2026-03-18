@@ -900,8 +900,9 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("brush")) { currentTool = EditorTool.BRUSH; return true; }
         if (kc == s.getKeybind("browse")) {
             if (s.autoApplyLive) this.applyLive();
-            MinecraftClient.getInstance().setScreen(new BrowseScreen());
-            return true;
+            Screen bs = getBackScreen();
+            if (bs != null) MinecraftClient.getInstance().setScreen(bs);
+            else MinecraftClient.getInstance().setScreen(new BrowseScreen());
         }
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
         if (openKey != null && openKey.matchesKey(keyInput)) {
@@ -962,6 +963,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 if (hexInput != null) hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF));
                 return true;
             }
+
         }
         return false;
     }

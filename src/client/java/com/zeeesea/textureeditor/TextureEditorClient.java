@@ -77,13 +77,6 @@ public class TextureEditorClient implements ClientModInitializer {
             while (toggleEditorKey.wasPressed()) {
                 editorModeEnabled = !editorModeEnabled;
                 if (client.player != null) {
-                    client.player.sendMessage(
-                            Text.literal("\u00a76[Texture Editor] \u00a7r" +
-                                    (editorModeEnabled ? "\u00a7aEnabled" : "\u00a7cDisabled")),
-                            true
-                    );
-                }
-                if (client.player != null) {
                     Text prefix = Text.translatable("textureeditor.status.prefix")
                             .formatted(net.minecraft.util.Formatting.GOLD);
 
@@ -206,32 +199,34 @@ public class TextureEditorClient implements ClientModInitializer {
         // Receive texture sync from server and apply it
         ClientPlayNetworking.registerGlobalReceiver(TextureSyncPayload.ID, (payload, context) -> {
             // Only apply if multiplayer sync is enabled in settings
-            if (!ModSettings.getInstance().multiplayerSync) return;
-
-            int w = payload.width();
-            int h = payload.height();
-            context.client().execute(() ->
-                    TextureManager.getInstance().applyLive(payload.spriteId(), payload.pixels(), w, h)
-            );
+            if (ModSettings.getInstance().multiplayerSync) {
+                int w = payload.width();
+                int h = payload.height();
+                context.client().execute(() ->
+                        TextureManager.getInstance().applyLive(payload.spriteId(), payload.pixels(), w, h)
+                );
+            }
         });
 
         ClientPlayNetworking.registerGlobalReceiver(EntityTextureSyncPayload.ID, (payload, context) -> {
-            if (!ModSettings.getInstance().multiplayerSync) return;
-            int w = payload.width();
-            int h = payload.height();
-            context.client().execute(() -> {
-                if (payload.spriteId() != null) {
-                    // GUI/Sky — use sprite-based apply
-                    TextureManager.getInstance().applyLive(
-                            payload.spriteId(), payload.pixels(), payload.originalPixels(), w, h);
-                } else {
-                    // Mob/Entity — use entity apply
-                    TextureManager.getInstance().applyLiveEntity(
-                            payload.textureId(), payload.pixels(), payload.originalPixels(), w, h);
-                }
-            });
+            if (ModSettings.getInstance().multiplayerSync) {
+                int w = payload.width();
+                int h = payload.height();
+                context.client().execute(() -> {
+                    if (payload.spriteId() != null) {
+                        // GUI/Sky — use sprite-based apply
+                        TextureManager.getInstance().applyLive(
+                                payload.spriteId(), payload.pixels(), payload.originalPixels(), w, h);
+                    } else {
+                        // Mob/Entity — use entity apply
+                        TextureManager.getInstance().applyLiveEntity(
+                                payload.textureId(), payload.pixels(), payload.originalPixels(), w, h);
+                    }
+                });
+            }
         });
     }
+
 
     // --- External editor helpers ---
 

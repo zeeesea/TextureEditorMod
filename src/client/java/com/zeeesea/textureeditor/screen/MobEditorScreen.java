@@ -37,9 +37,11 @@ public class MobEditorScreen extends AbstractEditorScreen {
         this.zoom = 6; // mob textures are usually 64x64
     }
 
+
     @Override
     protected void loadTexture() {
         MobTextureExtractor.MobTexture tex = MobTextureExtractor.extract(entity);
+
         if (tex != null) {
             textureId = tex.textureId();
 

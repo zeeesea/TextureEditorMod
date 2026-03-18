@@ -1,5 +1,7 @@
 package com.zeeesea.textureeditor.editor;
 
+import com.zeeesea.textureeditor.settings.ModSettings;
+
 /**
  * A single layer in the layer stack. Contains its own pixel data, visibility flag, and name.
  */
@@ -30,6 +32,7 @@ public class Layer {
     public void setName(String name) { this.name = name; }
     public boolean isVisible() { return visible; }
     public void setVisible(boolean visible) { this.visible = visible; }
+
 
     public int getPixel(int x, int y) {
         if (x < 0 || x >= width || y < 0 || y >= height) return 0;

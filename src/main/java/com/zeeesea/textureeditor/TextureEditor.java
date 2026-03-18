@@ -12,30 +12,35 @@ public class TextureEditor implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		LOGGER.info("Hello Fabric world!");
+		LOGGER.info("Live Texture Editor Server initializing...");
 
-		// Register payload types for texture sync
 		PayloadTypeRegistry.playC2S().register(TextureSyncPayload.ID, TextureSyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(TextureSyncPayload.ID, TextureSyncPayload.CODEC);
-
-		// Server receives texture change from Client A and forwards to all others
-		ServerPlayNetworking.registerGlobalReceiver(TextureSyncPayload.ID, (payload, context) -> {
-			context.server().getPlayerManager().getPlayerList().forEach(p -> {
-				if (p != context.player()) {
-					ServerPlayNetworking.send(p, payload);
-				}
-			});
-		});
-
 		PayloadTypeRegistry.playC2S().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
 
-		ServerPlayNetworking.registerGlobalReceiver(EntityTextureSyncPayload.ID, (payload, context) -> {
-			context.server().getPlayerManager().getPlayerList().forEach(p -> {
-				if (p != context.player()) {
-					ServerPlayNetworking.send(p, payload);
-				}
+		// Standard Texture Sync
+		ServerPlayNetworking.registerGlobalReceiver(TextureSyncPayload.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				context.server().getPlayerManager().getPlayerList().forEach(p -> {
+					if (p != context.player()) {
+						ServerPlayNetworking.send(p, payload);
+					}
+				});
 			});
 		});
+
+		// Entity/Mob Texture Sync
+		ServerPlayNetworking.registerGlobalReceiver(EntityTextureSyncPayload.ID, (payload, context) -> {
+			context.server().execute(() -> {
+				context.server().getPlayerManager().getPlayerList().forEach(p -> {
+					if (p != context.player()) {
+						ServerPlayNetworking.send(p, payload);
+					}
+				});
+			});
+		});
+
+		LOGGER.info("Live Texture Editor Server initialized");
 	}
 }

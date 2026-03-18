@@ -121,6 +121,7 @@ public class SettingsScreen extends Screen {
         }).position(centerX - 100, y).size(200, 20).build());
         y += 40;
 
+        /* DEFAULT: OFF, feature alr implemented, but too unstable to publish
         // Multiplayer Sync
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.multiplayer_sync", s.multiplayerSync ? textOn : textOff), btn -> {
             s.multiplayerSync = !s.multiplayerSync;
@@ -129,6 +130,7 @@ public class SettingsScreen extends Screen {
             this.init();
         }).position(centerX - 100, y).size(200, 20).build());
         y += 40;
+         */
 
         // External Editor Settings
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.externalEditor"), btn ->
