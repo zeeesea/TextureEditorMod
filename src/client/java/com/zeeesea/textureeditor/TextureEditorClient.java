@@ -35,14 +35,13 @@ import org.lwjgl.glfw.GLFW;
 
 public class TextureEditorClient implements ClientModInitializer {
 
-    private static boolean editorModeEnabled = false;
 
     private static KeyBinding toggleEditorKey;
     private static KeyBinding openEditorKey;
     private static KeyBinding previewOriginalKey;
 
     public static boolean isEditorModeEnabled() {
-        return editorModeEnabled;
+        return ModSettings.getInstance().modEnabled;
     }
 
     public static KeyBinding getOpenEditorKey() { return openEditorKey; }
@@ -50,6 +49,8 @@ public class TextureEditorClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        ModSettings s = ModSettings.getInstance();
+
         KeyBinding.Category category = KeyBinding.Category.create(Identifier.of("textureeditor", "category"));
 
         toggleEditorKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -75,12 +76,13 @@ public class TextureEditorClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (toggleEditorKey.wasPressed()) {
-                editorModeEnabled = !editorModeEnabled;
+                s.modEnabled = !s.modEnabled;
+                s.save();
                 if (client.player != null) {
                     Text prefix = Text.translatable("textureeditor.status.prefix")
                             .formatted(net.minecraft.util.Formatting.GOLD);
 
-                    Text status = editorModeEnabled
+                    Text status = ModSettings.getInstance().modEnabled
                             ? Text.translatable("textureeditor.status.enabled").formatted(net.minecraft.util.Formatting.GREEN)
                             : Text.translatable("textureeditor.status.disabled").formatted(net.minecraft.util.Formatting.RED);
 
@@ -91,12 +93,12 @@ public class TextureEditorClient implements ClientModInitializer {
 
                     client.player.sendMessage(fullMessage, true); // true = Action Bar (über dem Inventar)
                 }
-                if (editorModeEnabled) {
+                if (ModSettings.getInstance().modEnabled) {
                     while (openEditorKey.wasPressed()) { /* discard stale presses */ }
                 }
             }
 
-            if (editorModeEnabled) {
+            if (s.modEnabled) {
                 // If an editor screen is open, R closes it
                 if (client.currentScreen instanceof AbstractEditorScreen) {
                     while (openEditorKey.wasPressed()) {

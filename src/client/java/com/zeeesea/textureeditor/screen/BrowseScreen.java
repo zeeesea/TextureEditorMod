@@ -15,6 +15,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
+import net.minecraft.resource.ResourceManager;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
@@ -222,57 +223,156 @@ public class BrowseScreen extends Screen {
     private List<BrowseEntry> buildGuiEntries() {
         List<BrowseEntry> entries = new ArrayList<>();
         // HUD elements
-        addGUIEntry(entries, "gui/sprites/hud/hotbar", "Hotbar");
-        addGUIEntry(entries, "gui/sprites/hud/hotbar_selection", "Hotbar Selection");
-        addGUIEntry(entries, "gui/sprites/hud/crosshair", "Crosshair");
-        addGUIEntry(entries, "gui/sprites/hud/experience_bar_background", "XP Bar Background");
-        addGUIEntry(entries, "gui/sprites/hud/experience_bar_progress", "XP Bar Progress");
-        addGUIEntry(entries, "gui/sprites/hud/armor_empty", "Armor Empty");
-        addGUIEntry(entries, "gui/sprites/hud/armor_half", "Armor Half");
-        addGUIEntry(entries, "gui/sprites/hud/armor_full", "Armor Full");
-        addGUIEntry(entries, "gui/sprites/hud/heart/full", "Heart Full");
-        addGUIEntry(entries, "gui/sprites/hud/heart/half", "Heart Half");
-        addGUIEntry(entries, "gui/sprites/hud/heart/container", "Heart Container");
-        addGUIEntry(entries, "gui/sprites/hud/food_empty", "Food Empty");
-        addGUIEntry(entries, "gui/sprites/hud/food_half", "Food Half");
-        addGUIEntry(entries, "gui/sprites/hud/food_full", "Food Full");
-        addGUIEntry(entries, "gui/sprites/hud/air", "Air Bubble");
-        addGUIEntry(entries, "gui/sprites/hud/air_bursting", "Air Bubble Bursting");
-        // Container screens
-        addGUIEntry(entries, "gui/container/inventory", "Inventory");
-        addGUIEntry(entries, "gui/container/crafting_table", "Crafting Table");
-        addGUIEntry(entries, "gui/container/furnace", "Furnace");
-        addGUIEntry(entries, "gui/container/blast_furnace", "Blast Furnace");
-        addGUIEntry(entries, "gui/container/smoker", "Smoker");
-        addGUIEntry(entries, "gui/container/generic_54", "Large Chest");
-        addGUIEntry(entries, "gui/container/shulker_box", "Shulker Box UI");
-        addGUIEntry(entries, "gui/container/dispenser", "Dispenser/Dropper");
-        addGUIEntry(entries, "gui/container/hopper", "Hopper");
-        addGUIEntry(entries, "gui/container/brewing_stand", "Brewing Stand");
-        addGUIEntry(entries, "gui/container/enchanting_table", "Enchanting Table");
-        addGUIEntry(entries, "gui/container/anvil", "Anvil");
-        addGUIEntry(entries, "gui/container/beacon", "Beacon");
-        addGUIEntry(entries, "gui/container/villager", "Villager Trading");
-        addGUIEntry(entries, "gui/container/grindstone", "Grindstone");
-        addGUIEntry(entries, "gui/container/loom", "Loom");
-        addGUIEntry(entries, "gui/container/cartography_table", "Cartography Table");
-        addGUIEntry(entries, "gui/container/stonecutter", "Stonecutter");
-        addGUIEntry(entries, "gui/container/smithing", "Smithing Table");
-        addGUIEntry(entries, "gui/container/creative_inventory/tab_inventory", "Creative Inventory BG");
-        addGUIEntry(entries, "gui/container/creative_inventory/tab_items", "Creative Items BG");
-        addGUIEntry(entries, "gui/container/creative_inventory/tab_item_search", "Creative Search BG");
-        // General GUI - individual widget sprites
-        addGUIEntry(entries, "gui/sprites/widget/button", "Button");
-        addGUIEntry(entries, "gui/sprites/widget/button_highlighted", "Button Highlighted");
-        addGUIEntry(entries, "gui/sprites/widget/button_disabled", "Button Disabled");
-        addGUIEntry(entries, "gui/sprites/widget/slider", "Slider");
-        addGUIEntry(entries, "gui/sprites/widget/slider_highlighted", "Slider Highlighted");
-        addGUIEntry(entries, "gui/sprites/widget/slider_handle", "Slider Handle");
-        addGUIEntry(entries, "gui/sprites/widget/slider_handle_highlighted", "Slider Handle HL");
-        addGUIEntry(entries, "gui/sprites/widget/text_field", "Text Field");
-        addGUIEntry(entries, "gui/sprites/widget/text_field_highlighted", "Text Field HL");
-        addGUIEntry(entries, "gui/title/minecraft", "Title Logo");
-        addGUIEntry(entries, "gui/title/edition", "Edition Badge");
+        // ICONS
+        addGUIEntry(entries, "gui/sprites/icon/accessibility", "Accessibility Icon");
+        addGUIEntry(entries, "gui/sprites/icon/chat_modified", "Chat Modified Icon");
+        addGUIEntry(entries, "gui/sprites/icon/checkmark", "Checkmark Icon");
+        addGUIEntry(entries, "gui/sprites/icon/draft_report", "Draft Report Icon");
+        addGUIEntry(entries, "gui/sprites/icon/info", "Info Icon");
+        addGUIEntry(entries, "gui/sprites/icon/invite", "Invite Icon");
+        addGUIEntry(entries, "gui/sprites/icon/language", "Language Icon");
+        addGUIEntry(entries, "gui/sprites/icon/link", "Link Icon");
+        addGUIEntry(entries, "gui/sprites/icon/link_highlighted", "Link Highlighted Icon");
+        addGUIEntry(entries, "gui/sprites/icon/new_realm", "New Realm Icon");
+        addGUIEntry(entries, "gui/sprites/icon/news", "News Icon");
+        addGUIEntry(entries, "gui/sprites/icon/ping_1", "Ping 1");
+        addGUIEntry(entries, "gui/sprites/icon/ping_2", "Ping 2");
+        addGUIEntry(entries, "gui/sprites/icon/ping_3", "Ping 3");
+        addGUIEntry(entries, "gui/sprites/icon/ping_4", "Ping 4");
+        addGUIEntry(entries, "gui/sprites/icon/ping_5", "Ping 5");
+        addGUIEntry(entries, "gui/sprites/icon/ping_unknown", "Ping Unknown");
+        addGUIEntry(entries, "gui/sprites/icon/search", "Search Icon");
+        addGUIEntry(entries, "gui/sprites/icon/trial_available", "Trial Available");
+        addGUIEntry(entries, "gui/sprites/icon/unseen_notification", "Unseen Notification");
+        addGUIEntry(entries, "gui/sprites/icon/video_link", "Video Link");
+        addGUIEntry(entries, "gui/sprites/icon/video_link_highlighted", "Video Link Highlighted");
+
+        // NOTIFICATION
+        addGUIEntry(entries, "gui/sprites/notification/1", "Notification 1");
+        addGUIEntry(entries, "gui/sprites/notification/2", "Notification 2");
+        addGUIEntry(entries, "gui/sprites/notification/3", "Notification 3");
+        addGUIEntry(entries, "gui/sprites/notification/4", "Notification 4");
+        addGUIEntry(entries, "gui/sprites/notification/5", "Notification 5");
+        addGUIEntry(entries, "gui/sprites/notification/more", "Notification More");
+
+        // PENDING INVITE
+        addGUIEntry(entries, "gui/sprites/pending_invite/accept", "Invite Accept");
+        addGUIEntry(entries, "gui/sprites/pending_invite/accept_highlighted", "Invite Accept HL");
+        addGUIEntry(entries, "gui/sprites/pending_invite/reject", "Invite Reject");
+        addGUIEntry(entries, "gui/sprites/pending_invite/reject_highlighted", "Invite Reject HL");
+
+        // PLAYER LIST
+        addGUIEntry(entries, "gui/sprites/player_list/make_operator", "Make Operator");
+        addGUIEntry(entries, "gui/sprites/player_list/remove_operator", "Remove Operator");
+        addGUIEntry(entries, "gui/sprites/player_list/remove_player", "Remove Player");
+
+        // REALM STATUS
+        addGUIEntry(entries, "gui/sprites/realm_status/closed", "Realm Closed");
+        addGUIEntry(entries, "gui/sprites/realm_status/expired", "Realm Expired");
+        addGUIEntry(entries, "gui/sprites/realm_status/expires_soon", "Realm Expires Soon");
+        addGUIEntry(entries, "gui/sprites/realm_status/open", "Realm Open");
+
+        // SERVER LIST
+        addGUIEntry(entries, "gui/sprites/server_list/join", "Server Join");
+        addGUIEntry(entries, "gui/sprites/server_list/join_highlighted", "Server Join HL");
+        addGUIEntry(entries, "gui/sprites/server_list/move_down", "Server Move Down");
+        addGUIEntry(entries, "gui/sprites/server_list/move_down_highlighted", "Server Move Down HL");
+        addGUIEntry(entries, "gui/sprites/server_list/move_up", "Server Move Up");
+        addGUIEntry(entries, "gui/sprites/server_list/move_up_highlighted", "Server Move Up HL");
+
+        // SOCIAL INTERACTIONS
+        addGUIEntry(entries, "gui/sprites/social_interactions/mute_button", "Mute Button");
+        addGUIEntry(entries, "gui/sprites/social_interactions/mute_button_highlighted", "Mute Button HL");
+        addGUIEntry(entries, "gui/sprites/social_interactions/report_button", "Report Button");
+        addGUIEntry(entries, "gui/sprites/social_interactions/report_button_disabled", "Report Button Disabled");
+        addGUIEntry(entries, "gui/sprites/social_interactions/report_button_highlighted", "Report Button HL");
+        addGUIEntry(entries, "gui/sprites/social_interactions/unmute_button", "Unmute Button");
+        addGUIEntry(entries, "gui/sprites/social_interactions/unmute_button_highlighted", "Unmute Button HL");
+
+        // SPECTATOR
+        addGUIEntry(entries, "gui/sprites/spectator/close", "Spectator Close");
+        addGUIEntry(entries, "gui/sprites/spectator/scroll_left", "Spectator Scroll Left");
+        addGUIEntry(entries, "gui/sprites/spectator/scroll_right", "Spectator Scroll Right");
+        addGUIEntry(entries, "gui/sprites/spectator/teleport_to_player", "Teleport To Player");
+        addGUIEntry(entries, "gui/sprites/spectator/teleport_to_team", "Teleport To Team");
+
+        // STATISTICS
+        addGUIEntry(entries, "gui/sprites/statistics/block_mined", "Blocks Mined");
+        addGUIEntry(entries, "gui/sprites/statistics/header", "Statistics Header");
+        addGUIEntry(entries, "gui/sprites/statistics/item_broken", "Items Broken");
+        addGUIEntry(entries, "gui/sprites/statistics/item_crafted", "Items Crafted");
+        addGUIEntry(entries, "gui/sprites/statistics/item_dropped", "Items Dropped");
+        addGUIEntry(entries, "gui/sprites/statistics/item_picked_up", "Items Picked Up");
+        addGUIEntry(entries, "gui/sprites/statistics/item_used", "Items Used");
+        addGUIEntry(entries, "gui/sprites/statistics/sort_down", "Sort Down");
+        addGUIEntry(entries, "gui/sprites/statistics/sort_up", "Sort Up");
+
+        // TOAST
+        addGUIEntry(entries, "gui/sprites/toast/mouse", "Toast Mouse");
+        addGUIEntry(entries, "gui/sprites/toast/movement_keys", "Toast Movement Keys");
+        addGUIEntry(entries, "gui/sprites/toast/recipe_book", "Toast Recipe Book");
+        addGUIEntry(entries, "gui/sprites/toast/right_click", "Toast Right Click");
+        addGUIEntry(entries, "gui/sprites/toast/social_interactions", "Toast Social Interactions");
+        addGUIEntry(entries, "gui/sprites/toast/system", "Toast System");
+        addGUIEntry(entries, "gui/sprites/toast/tree", "Toast Tree");
+        addGUIEntry(entries, "gui/sprites/toast/wooden_planks", "Toast Planks");
+
+        // WORLD LIST
+        addGUIEntry(entries, "gui/sprites/world_list/error", "World Error");
+        addGUIEntry(entries, "gui/sprites/world_list/error_highlighted", "World Error HL");
+        addGUIEntry(entries, "gui/sprites/world_list/join", "World Join");
+        addGUIEntry(entries, "gui/sprites/world_list/join_highlighted", "World Join HL");
+        addGUIEntry(entries, "gui/sprites/world_list/marked_join", "World Marked Join");
+        addGUIEntry(entries, "gui/sprites/world_list/marked_join_highlighted", "World Marked Join HL");
+        addGUIEntry(entries, "gui/sprites/world_list/warning", "World Warning");
+        addGUIEntry(entries, "gui/sprites/world_list/warning_highlighted", "World Warning HL");
+
+        // GAMEMODE SWITCHER
+        addGUIEntry(entries, "gui/sprites/gamemode_switcher/selection", "Gamemode Selection");
+        addGUIEntry(entries, "gui/sprites/gamemode_switcher/slot", "Gamemode Slot");
+        return entries;
+    }
+
+    private List<BrowseEntry> buildGuiEntriesAuto() {
+        List<BrowseEntry> entries = new ArrayList<>();
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        try {
+            ResourceManager resourceManager = client.getResourceManager();
+
+            Collection<Identifier> resources = resourceManager.findResources(
+                    "textures/gui/sprites",
+                    id -> id.getPath().endsWith(".png")
+            );
+
+            Set<String> seen = new HashSet<>();
+
+            for (Identifier fullId : resources) {
+                String path = fullId.getPath();
+                // textures/gui/sprites/icon/test.png
+
+                String cleanPath = path
+                        .replace("textures/", "")
+                        .replace(".png", "");
+
+                // gui/sprites/icon/test
+
+                if (!seen.add(cleanPath)) continue;
+
+                String name = generateGuiName(cleanPath);
+
+                entries.add(new BrowseEntry(
+                        Identifier.of(fullId.getNamespace(), cleanPath),
+                        name,
+                        EntryType.GUI,
+                        null
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         return entries;
     }
 
@@ -495,6 +595,29 @@ public class BrowseScreen extends Screen {
     private void addGUIEntry(List<BrowseEntry> entries, String texturePath, String displayName) {
         Identifier id = Identifier.of("minecraft", texturePath);
         entries.add(new BrowseEntry(id, displayName, EntryType.GUI, null));
+    }
+
+    private String generateGuiName(String path) {
+        // gui/sprites/icon/ping_1 → Icon Ping 1
+
+        String withoutPrefix = path.replace("gui/sprites/", "");
+
+        String[] parts = withoutPrefix.split("/");
+
+        StringBuilder name = new StringBuilder();
+
+        for (String part : parts) {
+            String[] words = part.split("_");
+
+            for (String w : words) {
+                if (w.isEmpty()) continue;
+                name.append(Character.toUpperCase(w.charAt(0)))
+                        .append(w.substring(1))
+                        .append(" ");
+            }
+        }
+
+        return name.toString().trim();
     }
 
     @Override

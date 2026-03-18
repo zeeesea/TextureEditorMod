@@ -19,6 +19,7 @@ public class ModSettings {
     // Editor defaults
     public int defaultZoom = 12;
     public boolean gridOnByDefault = false;
+    public boolean modEnabled = true;
     public String defaultTool = "PENCIL"; // EditorTool enum name
 
     // Editor keybinds (GLFW key codes)
@@ -33,6 +34,7 @@ public class ModSettings {
     public float brushVariation = 0.15f; // ±15% brightness variation for brush tool
 
     public boolean multiplayerSync = false;
+
 
     // External editor
     public boolean useExternalEditor = false;
