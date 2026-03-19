@@ -116,7 +116,8 @@ public abstract class AbstractEditorScreen extends Screen {
     protected boolean handleExtraRelease(double mx, double my, int btn) { return false; }
     protected boolean handleExtraDrag(double mx, double my, int btn, double dx, double dy) { return false; }
     protected boolean handleExtraScroll(double mx, double my, double ha, double va) { return false; }
-    protected int getBackgroundColor() { return 0xFF1A1A2E; }
+    //protected int getBackgroundColor() { return 0xFF1A1A2E; }
+    protected int getBackgroundColor() { return 0xFF161626; }
     protected int getMaxZoom() { return 40; }
     protected int getMinZoom() { return 2; }
     protected int getZoomStep() { return 2; }
