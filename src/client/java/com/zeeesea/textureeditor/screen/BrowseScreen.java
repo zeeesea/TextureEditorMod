@@ -15,7 +15,6 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
-import net.minecraft.resource.ResourceManager;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
@@ -68,7 +67,7 @@ public class BrowseScreen extends Screen {
     protected void init() {
         // Build entries list on first init
         if (allEntries == null) {
-            allEntries = buildEntries();
+            allEntries = buildAllEntries();
         }
 
         // Tab buttons
@@ -173,6 +172,16 @@ public class BrowseScreen extends Screen {
         maxScroll = Math.max(0, totalRows - visibleRows);
     }
 
+    private List<BrowseEntry> buildAllEntries() {
+        List<BrowseEntry> entries = new ArrayList<>();
+
+        entries.addAll(buildEntriesNew());
+        //entries.addAll(buildParticleEntries());
+
+        return entries;
+    }
+
+    @Deprecated
     private List<BrowseEntry> buildEntries() {
         List<BrowseEntry> entries = new ArrayList<>();
         Set<Identifier> addedItems = new HashSet<>();
@@ -217,31 +226,172 @@ public class BrowseScreen extends Screen {
         return entries;
     }
 
+    private List<BrowseEntry> buildEntriesNew() {
+        List<BrowseEntry> entries = new ArrayList<>();
+        // Use a Set of texture IDs to avoid duplicates across different categories
+        Set<Identifier> processedTextures = new HashSet<>();
+
+        // 1. Add Editable Blocks
+        for (Block block : net.minecraft.registry.Registries.BLOCK) {
+            Identifier id = net.minecraft.registry.Registries.BLOCK.getId(block);
+            if (id.getPath().equals("air")) continue;
+
+            // Only add if your filter allows it (e.g. no complicated models)
+            if (BlockFilter.isEditableBlock(block.getDefaultState())) {
+                ItemStack stack = new ItemStack(block);
+                if (!stack.isEmpty()) {
+                    entries.add(new BrowseEntry(id, block.getName().getString(), EntryType.BLOCK, stack));
+                    processedTextures.add(id);
+                }
+            }
+        }
+
+        // 2. Add Items (Everything that has a unique item texture)
+        for (Item item : net.minecraft.registry.Registries.ITEM) {
+            Identifier id = net.minecraft.registry.Registries.ITEM.getId(item);
+
+            // Skip if already added as a block, UNLESS it's something like a sign or bed
+            // which has a unique item texture different from the placed block.
+            if (processedTextures.contains(id) && !(item instanceof net.minecraft.item.SignItem)) continue;
+
+            ItemStack stack = new ItemStack(item);
+            if (stack.isEmpty()) continue;
+
+            EntryType type = (item instanceof net.minecraft.item.SpawnEggItem) ? EntryType.MOB : EntryType.ITEM;
+
+            entries.add(new BrowseEntry(
+                    id,
+                    item.getName().getString(),
+                    type,
+                    stack
+            ));
+        }
+
+        // 3. Add Custom Categories (GUI, Particles, Entities, Variants)
+        entries.addAll(buildGuiEntries());
+        entries.addAll(buildNotNormalEntries());
+        entries.addAll(buildEntities());
+
+        return entries;
+    }
+
+    private List<BrowseEntry> buildParticleEntries() {
+        List<BrowseEntry> entries = new ArrayList<>();
+
+        for (Identifier particleId : net.minecraft.registry.Registries.PARTICLE_TYPE.getIds()) {
+            String namespace = particleId.getNamespace();
+            String path = particleId.getPath();
+
+            // Skip block/item markers as they don't have a static texture
+            if (path.contains("block") || path.contains("item")) continue;
+
+            // In 1.21.11, textures are referenced as "textures/particle/name.png"
+            // We build the full path identifier for the texture manager
+            Identifier texturePath = Identifier.of(namespace, "textures/particle/" + path + ".png");
+
+            entries.add(new BrowseEntry(
+                    texturePath, // Use the full path as ID
+                    generateGuiName(path),
+                    EntryType.PARTICLE,
+                    ItemStack.EMPTY
+            ));
+        }
+
+        return entries;
+    }
+
     /**
      * Builds entries for Minecraft GUI/HUD textures that can be edited.
      */
     private List<BrowseEntry> buildGuiEntries() {
         List<BrowseEntry> entries = new ArrayList<>();
         // HUD elements
-        // ICONS
-        addGUIEntry(entries, "gui/sprites/icon/accessibility", "Accessibility Icon");
-        addGUIEntry(entries, "gui/sprites/icon/chat_modified", "Chat Modified Icon");
-        addGUIEntry(entries, "gui/sprites/icon/checkmark", "Checkmark Icon");
-        addGUIEntry(entries, "gui/sprites/icon/draft_report", "Draft Report Icon");
-        addGUIEntry(entries, "gui/sprites/icon/info", "Info Icon");
-        addGUIEntry(entries, "gui/sprites/icon/invite", "Invite Icon");
-        addGUIEntry(entries, "gui/sprites/icon/language", "Language Icon");
-        addGUIEntry(entries, "gui/sprites/icon/link", "Link Icon");
-        addGUIEntry(entries, "gui/sprites/icon/link_highlighted", "Link Highlighted Icon");
-        addGUIEntry(entries, "gui/sprites/icon/new_realm", "New Realm Icon");
-        addGUIEntry(entries, "gui/sprites/icon/news", "News Icon");
+
+        addGUIEntry(entries, "gui/sprites/hud/hotbar", "Hotbar");
+        addGUIEntry(entries, "gui/sprites/hud/hotbar_selection", "Hotbar Selection");
+        addGUIEntry(entries, "gui/sprites/hud/crosshair", "Crosshair");
+
+        addGUIEntry(entries, "gui/sprites/hud/experience_bar_background", "XP Bar Background");
+        addGUIEntry(entries, "gui/sprites/hud/experience_bar_progress", "XP Bar Progress");
+
+        addGUIEntry(entries, "gui/sprites/hud/armor_empty", "Armor Empty");
+        addGUIEntry(entries, "gui/sprites/hud/armor_half", "Armor Half");
+        addGUIEntry(entries, "gui/sprites/hud/armor_full", "Armor Full");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/full", "Heart Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/half", "Heart Half");
+
+        addGUIEntry(entries, "gui/sprites/hud/food_empty", "Food Empty");
+        addGUIEntry(entries, "gui/sprites/hud/food_half", "Food Half");
+        addGUIEntry(entries, "gui/sprites/hud/food_full", "Food Full");
+
+        addGUIEntry(entries, "gui/sprites/hud/air", "Air Bubble");
+        addGUIEntry(entries, "gui/sprites/hud/air_bursting", "Air Bubble Bursting");
+
+
+        addGUIEntry(entries, "gui/container/inventory", "Inventory");
+        addGUIEntry(entries, "gui/container/crafting_table", "Crafting Table");
+        addGUIEntry(entries, "gui/container/furnace", "Furnace");
+        addGUIEntry(entries, "gui/container/blast_furnace", "Blast Furnace");
+        addGUIEntry(entries, "gui/container/smoker", "Smoker");
+
+        addGUIEntry(entries, "gui/container/generic_54", "Large Chest");
+        addGUIEntry(entries, "gui/container/shulker_box", "Shulker Box UI");
+        addGUIEntry(entries, "gui/container/dispenser", "Dispenser/Dropper");
+        addGUIEntry(entries, "gui/container/hopper", "Hopper");
+
+        addGUIEntry(entries, "gui/container/brewing_stand", "Brewing Stand");
+        addGUIEntry(entries, "gui/container/enchanting_table", "Enchanting Table");
+        addGUIEntry(entries, "gui/container/anvil", "Anvil");
+        addGUIEntry(entries, "gui/container/beacon", "Beacon");
+
+        addGUIEntry(entries, "gui/container/villager", "Villager Trading");
+        addGUIEntry(entries, "gui/container/grindstone", "Grindstone");
+        addGUIEntry(entries, "gui/container/loom", "Loom");
+        addGUIEntry(entries, "gui/container/cartography_table", "Cartography Table");
+        addGUIEntry(entries, "gui/container/stonecutter", "Stonecutter");
+        addGUIEntry(entries, "gui/container/smithing", "Smithing Table");
+
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_inventory", "Creative Inventory BG");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_items", "Creative Items BG");
+        addGUIEntry(entries, "gui/container/creative_inventory/tab_item_search", "Creative Search BG");
+
+
+        addGUIEntry(entries, "gui/sprites/widget/button", "Button");
+        addGUIEntry(entries, "gui/sprites/widget/button_highlighted", "Button Highlighted");
+        addGUIEntry(entries, "gui/sprites/widget/button_disabled", "Button Disabled");
+
+        addGUIEntry(entries, "gui/sprites/widget/slider", "Slider");
+        addGUIEntry(entries, "gui/sprites/widget/slider_highlighted", "Slider Highlighted");
+        addGUIEntry(entries, "gui/sprites/widget/slider_handle", "Slider Handle");
+        addGUIEntry(entries, "gui/sprites/widget/slider_handle_highlighted", "Slider Handle HL");
+
+        addGUIEntry(entries, "gui/sprites/widget/text_field", "Text Field");
+        addGUIEntry(entries, "gui/sprites/widget/text_field_highlighted", "Text Field HL");
+
+
+        addGUIEntry(entries, "gui/title/minecraft", "Title Logo");
+        addGUIEntry(entries, "gui/title/edition", "Edition Badge");
+
+        // ICON
+        addGUIEntry(entries, "gui/sprites/icon/accessibility", "Accessibility");
+        addGUIEntry(entries, "gui/sprites/icon/chat_modified", "Chat Modified");
+        addGUIEntry(entries, "gui/sprites/icon/checkmark", "Checkmark");
+        addGUIEntry(entries, "gui/sprites/icon/draft_report", "Draft Report");
+        addGUIEntry(entries, "gui/sprites/icon/info", "Info");
+        addGUIEntry(entries, "gui/sprites/icon/invite", "Invite");
+        addGUIEntry(entries, "gui/sprites/icon/language", "Language");
+        addGUIEntry(entries, "gui/sprites/icon/link", "Link");
+        addGUIEntry(entries, "gui/sprites/icon/link_highlighted", "Link Highlighted");
+        addGUIEntry(entries, "gui/sprites/icon/new_realm", "New Realm");
+        addGUIEntry(entries, "gui/sprites/icon/news", "News");
         addGUIEntry(entries, "gui/sprites/icon/ping_1", "Ping 1");
         addGUIEntry(entries, "gui/sprites/icon/ping_2", "Ping 2");
         addGUIEntry(entries, "gui/sprites/icon/ping_3", "Ping 3");
         addGUIEntry(entries, "gui/sprites/icon/ping_4", "Ping 4");
         addGUIEntry(entries, "gui/sprites/icon/ping_5", "Ping 5");
         addGUIEntry(entries, "gui/sprites/icon/ping_unknown", "Ping Unknown");
-        addGUIEntry(entries, "gui/sprites/icon/search", "Search Icon");
+        addGUIEntry(entries, "gui/sprites/icon/search", "Search");
         addGUIEntry(entries, "gui/sprites/icon/trial_available", "Trial Available");
         addGUIEntry(entries, "gui/sprites/icon/unseen_notification", "Unseen Notification");
         addGUIEntry(entries, "gui/sprites/icon/video_link", "Video Link");
@@ -257,9 +407,9 @@ public class BrowseScreen extends Screen {
 
         // PENDING INVITE
         addGUIEntry(entries, "gui/sprites/pending_invite/accept", "Invite Accept");
-        addGUIEntry(entries, "gui/sprites/pending_invite/accept_highlighted", "Invite Accept HL");
+        addGUIEntry(entries, "gui/sprites/pending_invite/accept_highlighted", "Invite Accept Highlighted");
         addGUIEntry(entries, "gui/sprites/pending_invite/reject", "Invite Reject");
-        addGUIEntry(entries, "gui/sprites/pending_invite/reject_highlighted", "Invite Reject HL");
+        addGUIEntry(entries, "gui/sprites/pending_invite/reject_highlighted", "Invite Reject Highlighted");
 
         // PLAYER LIST
         addGUIEntry(entries, "gui/sprites/player_list/make_operator", "Make Operator");
@@ -272,6 +422,30 @@ public class BrowseScreen extends Screen {
         addGUIEntry(entries, "gui/sprites/realm_status/expires_soon", "Realm Expires Soon");
         addGUIEntry(entries, "gui/sprites/realm_status/open", "Realm Open");
 
+        // RECIPE BOOK
+        addGUIEntry(entries, "gui/sprites/recipe_book/button", "Recipe Button");
+        addGUIEntry(entries, "gui/sprites/recipe_book/button_highlighted", "Recipe Button Highlighted");
+        addGUIEntry(entries, "gui/sprites/recipe_book/crafting_overlay", "Crafting Overlay");
+        addGUIEntry(entries, "gui/sprites/recipe_book/crafting_overlay_disabled", "Crafting Overlay Disabled");
+        addGUIEntry(entries, "gui/sprites/recipe_book/crafting_overlay_disabled_highlighted", "Crafting Overlay Disabled HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/crafting_overlay_highlighted", "Crafting Overlay HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/filter_disabled", "Filter Disabled");
+        addGUIEntry(entries, "gui/sprites/recipe_book/filter_disabled_highlighted", "Filter Disabled HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/filter_enabled", "Filter Enabled");
+        addGUIEntry(entries, "gui/sprites/recipe_book/filter_enabled_highlighted", "Filter Enabled HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_filter_disabled", "Furnace Filter Disabled");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_filter_disabled_highlighted", "Furnace Filter Disabled HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_filter_enabled", "Furnace Filter Enabled");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_filter_enabled_highlighted", "Furnace Filter Enabled HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_overlay", "Furnace Overlay");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_overlay_disabled", "Furnace Overlay Disabled");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_overlay_disabled_highlighted", "Furnace Overlay Disabled HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/furnace_overlay_highlighted", "Furnace Overlay HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/page_backward", "Page Backward");
+        addGUIEntry(entries, "gui/sprites/recipe_book/page_backward_highlighted", "Page Backward HL");
+        addGUIEntry(entries, "gui/sprites/recipe_book/page_forward", "Page Forward");
+        addGUIEntry(entries, "gui/sprites/recipe_book/page_forward_highlighted", "Page Forward HL");
+
         // SERVER LIST
         addGUIEntry(entries, "gui/sprites/server_list/join", "Server Join");
         addGUIEntry(entries, "gui/sprites/server_list/join_highlighted", "Server Join HL");
@@ -281,20 +455,20 @@ public class BrowseScreen extends Screen {
         addGUIEntry(entries, "gui/sprites/server_list/move_up_highlighted", "Server Move Up HL");
 
         // SOCIAL INTERACTIONS
-        addGUIEntry(entries, "gui/sprites/social_interactions/mute_button", "Mute Button");
-        addGUIEntry(entries, "gui/sprites/social_interactions/mute_button_highlighted", "Mute Button HL");
-        addGUIEntry(entries, "gui/sprites/social_interactions/report_button", "Report Button");
-        addGUIEntry(entries, "gui/sprites/social_interactions/report_button_disabled", "Report Button Disabled");
-        addGUIEntry(entries, "gui/sprites/social_interactions/report_button_highlighted", "Report Button HL");
-        addGUIEntry(entries, "gui/sprites/social_interactions/unmute_button", "Unmute Button");
-        addGUIEntry(entries, "gui/sprites/social_interactions/unmute_button_highlighted", "Unmute Button HL");
+        addGUIEntry(entries, "gui/sprites/social_interactions/mute_button", "Mute");
+        addGUIEntry(entries, "gui/sprites/social_interactions/mute_button_highlighted", "Mute HL");
+        addGUIEntry(entries, "gui/sprites/social_interactions/report_button", "Report");
+        addGUIEntry(entries, "gui/sprites/social_interactions/report_button_disabled", "Report Disabled");
+        addGUIEntry(entries, "gui/sprites/social_interactions/report_button_highlighted", "Report HL");
+        addGUIEntry(entries, "gui/sprites/social_interactions/unmute_button", "Unmute");
+        addGUIEntry(entries, "gui/sprites/social_interactions/unmute_button_highlighted", "Unmute HL");
 
         // SPECTATOR
         addGUIEntry(entries, "gui/sprites/spectator/close", "Spectator Close");
-        addGUIEntry(entries, "gui/sprites/spectator/scroll_left", "Spectator Scroll Left");
-        addGUIEntry(entries, "gui/sprites/spectator/scroll_right", "Spectator Scroll Right");
-        addGUIEntry(entries, "gui/sprites/spectator/teleport_to_player", "Teleport To Player");
-        addGUIEntry(entries, "gui/sprites/spectator/teleport_to_team", "Teleport To Team");
+        addGUIEntry(entries, "gui/sprites/spectator/scroll_left", "Scroll Left");
+        addGUIEntry(entries, "gui/sprites/spectator/scroll_right", "Scroll Right");
+        addGUIEntry(entries, "gui/sprites/spectator/teleport_to_player", "Teleport Player");
+        addGUIEntry(entries, "gui/sprites/spectator/teleport_to_team", "Teleport Team");
 
         // STATISTICS
         addGUIEntry(entries, "gui/sprites/statistics/block_mined", "Blocks Mined");
@@ -312,10 +486,121 @@ public class BrowseScreen extends Screen {
         addGUIEntry(entries, "gui/sprites/toast/movement_keys", "Toast Movement Keys");
         addGUIEntry(entries, "gui/sprites/toast/recipe_book", "Toast Recipe Book");
         addGUIEntry(entries, "gui/sprites/toast/right_click", "Toast Right Click");
-        addGUIEntry(entries, "gui/sprites/toast/social_interactions", "Toast Social Interactions");
+        addGUIEntry(entries, "gui/sprites/toast/social_interactions", "Toast Social");
         addGUIEntry(entries, "gui/sprites/toast/system", "Toast System");
         addGUIEntry(entries, "gui/sprites/toast/tree", "Toast Tree");
         addGUIEntry(entries, "gui/sprites/toast/wooden_planks", "Toast Planks");
+
+        // HUD (extended)
+        addGUIEntry(entries, "gui/sprites/hud/hotbar_offhand_left", "Hotbar Offhand Left");
+        addGUIEntry(entries, "gui/sprites/hud/hotbar_offhand_right", "Hotbar Offhand Right");
+
+        addGUIEntry(entries, "gui/sprites/hud/crosshair_attack_indicator_background", "Crosshair Attack BG");
+        addGUIEntry(entries, "gui/sprites/hud/crosshair_attack_indicator_full", "Crosshair Attack Full");
+        addGUIEntry(entries, "gui/sprites/hud/crosshair_attack_indicator_progress", "Crosshair Attack Progress");
+
+        addGUIEntry(entries, "gui/sprites/hud/hotbar_attack_indicator_background", "Hotbar Attack BG");
+        addGUIEntry(entries, "gui/sprites/hud/hotbar_attack_indicator_progress", "Hotbar Attack Progress");
+
+        addGUIEntry(entries, "gui/sprites/hud/jump_bar_background", "Jump Bar BG");
+        addGUIEntry(entries, "gui/sprites/hud/jump_bar_cooldown", "Jump Bar Cooldown");
+        addGUIEntry(entries, "gui/sprites/hud/jump_bar_progress", "Jump Bar Progress");
+
+        addGUIEntry(entries, "gui/sprites/hud/food_empty_hunger", "Food Empty Hunger");
+        addGUIEntry(entries, "gui/sprites/hud/food_half_hunger", "Food Half Hunger");
+        addGUIEntry(entries, "gui/sprites/hud/food_full_hunger", "Food Full Hunger");
+
+        // HEARTS (hud/heart)
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_full", "Absorbing Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_full_blinking", "Absorbing Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_half", "Absorbing Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_half_blinking", "Absorbing Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_hardcore_full", "Absorbing Hardcore Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_hardcore_full_blinking", "Absorbing Hardcore Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_hardcore_half", "Absorbing Hardcore Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/absorbing_hardcore_half_blinking", "Absorbing Hardcore Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/container", "Heart Container");
+        addGUIEntry(entries, "gui/sprites/hud/heart/container_blinking", "Heart Container Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/container_hardcore", "Heart Container Hardcore");
+        addGUIEntry(entries, "gui/sprites/hud/heart/container_hardcore_blinking", "Heart Container Hardcore Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_full", "Frozen Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_full_blinking", "Frozen Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_half", "Frozen Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_half_blinking", "Frozen Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_hardcore_full", "Frozen Hardcore Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_hardcore_full_blinking", "Frozen Hardcore Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_hardcore_half", "Frozen Hardcore Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/frozen_hardcore_half_blinking", "Frozen Hardcore Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/full_blinking", "Heart Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/half_blinking", "Heart Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/hardcore_full", "Hardcore Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/hardcore_full_blinking", "Hardcore Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/hardcore_half", "Hardcore Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/hardcore_half_blinking", "Hardcore Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_full", "Poisoned Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_full_blinking", "Poisoned Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_half", "Poisoned Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_half_blinking", "Poisoned Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_hardcore_full", "Poisoned Hardcore Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_hardcore_full_blinking", "Poisoned Hardcore Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_hardcore_half", "Poisoned Hardcore Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/poisoned_hardcore_half_blinking", "Poisoned Hardcore Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/vehicle_container", "Vehicle Container");
+        addGUIEntry(entries, "gui/sprites/hud/heart/vehicle_full", "Vehicle Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/vehicle_half", "Vehicle Half");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_full", "Withered Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_full_blinking", "Withered Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_half", "Withered Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_half_blinking", "Withered Half Blinking");
+
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_hardcore_full", "Withered Hardcore Full");
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_hardcore_full_blinking", "Withered Hardcore Full Blinking");
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_hardcore_half", "Withered Hardcore Half");
+        addGUIEntry(entries, "gui/sprites/hud/heart/withered_hardcore_half_blinking", "Withered Hardcore Half Blinking");
+
+        // TRANSFERABLE LIST
+        addGUIEntry(entries, "gui/sprites/transferable_list/move_down", "Move Down");
+        addGUIEntry(entries, "gui/sprites/transferable_list/move_down_highlighted", "Move Down HL");
+        addGUIEntry(entries, "gui/sprites/transferable_list/move_up", "Move Up");
+        addGUIEntry(entries, "gui/sprites/transferable_list/move_up_highlighted", "Move Up HL");
+        addGUIEntry(entries, "gui/sprites/transferable_list/select", "Select");
+        addGUIEntry(entries, "gui/sprites/transferable_list/select_highlighted", "Select HL");
+        addGUIEntry(entries, "gui/sprites/transferable_list/unselect", "Unselect");
+        addGUIEntry(entries, "gui/sprites/transferable_list/unselect_highlighted", "Unselect HL");
+
+        // WIDGET (extra)
+        addGUIEntry(entries, "gui/sprites/widget/checkbox_selected_highlighted", "Checkbox Selected HL");
+        addGUIEntry(entries, "gui/sprites/widget/cross_button", "Cross Button");
+        addGUIEntry(entries, "gui/sprites/widget/cross_button_highlighted", "Cross Button HL");
+
+        addGUIEntry(entries, "gui/sprites/widget/locked_button", "Locked Button");
+        addGUIEntry(entries, "gui/sprites/widget/locked_button_disabled", "Locked Button Disabled");
+        addGUIEntry(entries, "gui/sprites/widget/locked_button_highlighted", "Locked Button HL");
+
+        addGUIEntry(entries, "gui/sprites/widget/page_backward", "Page Backward");
+        addGUIEntry(entries, "gui/sprites/widget/page_backward_highlighted", "Page Backward HL");
+        addGUIEntry(entries, "gui/sprites/widget/page_forward", "Page Forward");
+        addGUIEntry(entries, "gui/sprites/widget/page_forward_highlighted", "Page Forward HL");
+
+        addGUIEntry(entries, "gui/sprites/widget/scroller", "Scroller");
+        addGUIEntry(entries, "gui/sprites/widget/scroller_background", "Scroller Background");
+
+        addGUIEntry(entries, "gui/sprites/widget/slot_frame", "Slot Frame");
+
+        addGUIEntry(entries, "gui/sprites/widget/unlocked_button", "Unlocked Button");
+        addGUIEntry(entries, "gui/sprites/widget/unlocked_button_disabled", "Unlocked Button Disabled");
+        addGUIEntry(entries, "gui/sprites/widget/unlocked_button_highlighted", "Unlocked Button HL");
 
         // WORLD LIST
         addGUIEntry(entries, "gui/sprites/world_list/error", "World Error");
@@ -327,12 +612,48 @@ public class BrowseScreen extends Screen {
         addGUIEntry(entries, "gui/sprites/world_list/warning", "World Warning");
         addGUIEntry(entries, "gui/sprites/world_list/warning_highlighted", "World Warning HL");
 
+        // BOSS BAR
+        addGUIEntry(entries, "gui/sprites/boss_bar/blue_background", "Boss Blue BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/blue_progress", "Boss Blue Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/green_background", "Boss Green BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/green_progress", "Boss Green Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_6_background", "Boss Notched 6 BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_6_progress", "Boss Notched 6 Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_10_background", "Boss Notched 10 BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_10_progress", "Boss Notched 10 Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_12_background", "Boss Notched 12 BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_12_progress", "Boss Notched 12 Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_20_background", "Boss Notched 20 BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/notched_20_progress", "Boss Notched 20 Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/pink_background", "Boss Pink BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/pink_progress", "Boss Pink Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/purple_background", "Boss Purple BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/purple_progress", "Boss Purple Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/red_background", "Boss Red BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/red_progress", "Boss Red Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/white_background", "Boss White BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/white_progress", "Boss White Progress");
+
+        addGUIEntry(entries, "gui/sprites/boss_bar/yellow_background", "Boss Yellow BG");
+        addGUIEntry(entries, "gui/sprites/boss_bar/yellow_progress", "Boss Yellow Progress");
+
         // GAMEMODE SWITCHER
         addGUIEntry(entries, "gui/sprites/gamemode_switcher/selection", "Gamemode Selection");
         addGUIEntry(entries, "gui/sprites/gamemode_switcher/slot", "Gamemode Slot");
+
         return entries;
     }
 
+    /*
     private List<BrowseEntry> buildGuiEntriesAuto() {
         List<BrowseEntry> entries = new ArrayList<>();
         MinecraftClient client = MinecraftClient.getInstance();
@@ -341,8 +662,7 @@ public class BrowseScreen extends Screen {
             ResourceManager resourceManager = client.getResourceManager();
 
             Collection<Identifier> resources = resourceManager.findResources(
-                    "textures/gui/sprites",
-                    id -> id.getPath().endsWith(".png")
+                    "textures/gui/sprites"
             );
 
             Set<String> seen = new HashSet<>();
@@ -374,7 +694,7 @@ public class BrowseScreen extends Screen {
         }
 
         return entries;
-    }
+    }*/
 
     private List<BrowseEntry> buildNotNormalEntries() {
         List<BrowseEntry> entries = new ArrayList<>();
@@ -398,7 +718,6 @@ public class BrowseScreen extends Screen {
         // Sheep Wool
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_wool.png"), "Sheep Wool", EntryType.MOB, new ItemStack(net.minecraft.item.Items.SHEEP_SPAWN_EGG)));
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_wool_undercoat.png"), "Sheep Wool Undercoat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.SHEEP_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_fur.png"), "Sheep Fur (Legacy)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.SHEEP_SPAWN_EGG)));
 
         // Cow variants
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cow/temperate_cow.png"), "Cow (Temperate)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.COW_SPAWN_EGG)));
@@ -429,8 +748,6 @@ public class BrowseScreen extends Screen {
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_spotted.png"), "Wolf (Spotted)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.WOLF_SPAWN_EGG)));
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_striped.png"), "Wolf (Striped)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.WOLF_SPAWN_EGG)));
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_woods.png"), "Wolf (Woods)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_tame.png"), "Wolf (Tame Collar)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_angry.png"), "Wolf (Angry)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.WOLF_SPAWN_EGG)));
 
         // Cat variants
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/tabby.png"), "Cat (Tabby)", EntryType.MOB, new ItemStack(net.minecraft.item.Items.CAT_SPAWN_EGG)));
@@ -875,6 +1192,14 @@ public class BrowseScreen extends Screen {
             } else {
                 client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
             }
+        } else if (entry.type == EntryType.PARTICLE) {
+            if (useExternal) {
+                if (!openExternalForDirectTexture(entry.id, entry.name)) {
+                    client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+                }
+            } else {
+                client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+            }
         }
     }
 
@@ -1036,7 +1361,8 @@ public class BrowseScreen extends Screen {
         ITEM("Item"),
         MOB("Mob"),
         GUI("GUI"),
-        ENTITY("Entity");
+        ENTITY("Entity"),
+        PARTICLE("Particle");
 
         final String displayName;
         EntryType(String displayName) { this.displayName = displayName; }

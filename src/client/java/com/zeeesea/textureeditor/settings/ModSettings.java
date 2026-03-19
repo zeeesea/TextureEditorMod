@@ -65,6 +65,7 @@ public class ModSettings {
         keybinds.put("undo", GLFW.GLFW_KEY_Z);
         keybinds.put("redo", GLFW.GLFW_KEY_Y);
         keybinds.put("grid", GLFW.GLFW_KEY_G);
+        keybinds.put("browse", GLFW.GLFW_KEY_LEFT_CONTROL);
         save();
     }
 
