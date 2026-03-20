@@ -14,6 +14,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.toast.SystemToast;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import com.zeeesea.textureeditor.screen.QuickSelectWheel.Slice;
 
 import java.util.List;
 
@@ -68,18 +69,7 @@ public abstract class AbstractEditorScreen extends Screen {
     private static final Identifier PICKER_HUE_TEX_ID = Identifier.of("textureeditor", "picker_hue");
     private boolean pickerHueBarBuilt = false;
 
-    // Continuous drawing: track last drawn pixel for line interpolation
     private int lastDrawX = -1, lastDrawY = -1;
-
-//    protected static final int[] PALETTE = {
-//            0xFF000000, 0xFF404040, 0xFF808080, 0xFFC0C0C0, 0xFFFFFFFF,
-//            0xFFFF0000, 0xFFFF8000, 0xFFFFFF00, 0xFF80FF00, 0xFF00FF00,
-//            0xFF00FF80, 0xFF00FFFF, 0xFF0080FF, 0xFF0000FF, 0xFF8000FF,
-//            0xFFFF00FF, 0xFFFF0080, 0xFF800000, 0xFF804000, 0xFF808000,
-//            0xFF408000, 0xFF008000, 0xFF008040, 0xFF008080, 0xFF004080,
-//            0xFF000080, 0xFF400080, 0xFF800080, 0xFF800040, 0xFF663300,
-//            0xFFCC6600, 0xFFFFCC99, 0xFF336633, 0xFF66CCCC, 0xFF6666CC,
-//    };
 
     protected static final int[] PALETTE = {
             0xFF000000, 0xFF404040, 0xFF808080, 0xFFC0C0C0, 0xFFFFFFFF,
@@ -97,6 +87,8 @@ public abstract class AbstractEditorScreen extends Screen {
     };
 
     protected TextFieldWidget hexInput;
+
+    protected QuickSelectWheel quickSelectWheel = new QuickSelectWheel(50);
 
     protected AbstractEditorScreen(Text title) {
         super(title);
@@ -469,6 +461,8 @@ public abstract class AbstractEditorScreen extends Screen {
         int lsw = getLeftSidebarWidth();
         int rsw = getRightSidebarWidth();
         context.fill(0, 0, this.width, this.height, bg);
+        if (currentTool == EditorTool.LINE && lineFirstClick)
+            context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFFFF00, false);
         drawCanvas(context, mouseX, mouseY);
         context.fill(0, 0, lsw, this.height, bg);
         context.fill(this.width - rsw, 0, this.width, this.height, bg);
@@ -497,8 +491,11 @@ public abstract class AbstractEditorScreen extends Screen {
             context.createNewRootLayer();
             drawLayerPanel(context);
         }
-        if (currentTool == EditorTool.LINE && lineFirstClick)
-            context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFFFF00, false);
+
+        // Render the quick select wheel if visible
+        if (quickSelectWheel != null) {
+            quickSelectWheel.render(context, textRenderer, mouseX, mouseY);
+        }
 
         renderExtra(context, mouseX, mouseY);
     }
@@ -805,6 +802,10 @@ public abstract class AbstractEditorScreen extends Screen {
         if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
         if (currentPanel == PanelType.LAYER_PANEL && btn == 0 && handleLayerPanelClick(mx, my)) return true;
         if (btn == 0 && handleHistoryClick(mx, my)) return true;
+        if (btn == 2) {
+            quickSelectWheel.activate((int)mx, (int)my);
+            return true;
+        }
         if (btn == 1) {
             isPanning = true;
             panStartMouseX = mx; panStartMouseY = my;
@@ -830,6 +831,14 @@ public abstract class AbstractEditorScreen extends Screen {
         double mx = click.x(); double my = click.y(); int btn = click.button();
         if (handleExtraRelease(mx, my, btn)) return true;
         if (btn == 1) { isPanning = false; return true; }
+        if (btn == 2) {
+            QuickSelectWheel.Slice selected = quickSelectWheel.getSelectedSlice();
+            if (selected != null && selected.toTool() != null) {
+                currentTool = selected.toTool();
+            }
+            quickSelectWheel.deactivate();
+            return true;
+        }
         lastDrawX = -1;
         lastDrawY = -1;
         return super.mouseReleased(click);
@@ -838,6 +847,10 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
         double mx = click.x(); double my = click.y(); int btn = click.button();
+
+        //Block input if mouse wheel visible
+        if (quickSelectWheel.isVisible()) return true;
+
         if (btn == 1 && isPanning) {
             panOffsetX = panStartOffsetX + (int) (mx - panStartMouseX);
             panOffsetY = panStartOffsetY + (int) (my - panStartMouseY);
@@ -919,6 +932,9 @@ public abstract class AbstractEditorScreen extends Screen {
 
     @Override
     public boolean keyReleased(net.minecraft.client.input.KeyInput keyInput) {
+        int kc = keyInput.key();
+        ModSettings s = ModSettings.getInstance();
+
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
         if (previewKey != null && previewKey.matchesKey(keyInput)) {
             previewingOriginal = false;
