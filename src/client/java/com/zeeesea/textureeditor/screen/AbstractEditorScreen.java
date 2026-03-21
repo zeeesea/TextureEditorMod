@@ -1129,6 +1129,11 @@ public abstract class AbstractEditorScreen extends Screen {
         return 20;
     }
 
+    public void setTint(int tint) {
+        this.blockTint = tint | 0xFF000000;
+        this.isTinted = true;
+    }
+
     private int getPaletteEndY() {
         int cs = getPaletteCellSize();
         int cols = getPaletteColumns();

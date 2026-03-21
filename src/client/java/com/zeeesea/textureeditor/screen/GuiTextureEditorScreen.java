@@ -323,6 +323,21 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
             }
         } catch (Exception ignored) {}
 
+        if (id.getPath().startsWith("textures/") && id.getPath().endsWith(".png")) {
+            String spritePath = id.getPath()
+                    .substring("textures/".length(), id.getPath().length() - ".png".length());
+            Identifier spriteId = Identifier.of(id.getNamespace(), spritePath);
+            try {
+                var blockAtlas = (net.minecraft.client.texture.SpriteAtlasTexture)
+                        client.getTextureManager().getTexture(
+                                net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+                var sprite = blockAtlas.getSprite(spriteId);
+                if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
+                    return org.apache.commons.lang3.tuple.Pair.of(blockAtlas, sprite);
+                }
+            } catch (Exception ignored) {}
+        }
+
         return null;
     }
 
