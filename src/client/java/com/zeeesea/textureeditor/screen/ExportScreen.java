@@ -27,7 +27,7 @@ public class ExportScreen extends Screen {
     private TextFieldWidget authorInput;
     private PixelCanvas iconCanvas;
     private String statusMessage = "";
-    private int statusColor = 0xFFFFFF;
+    private int statusColor = 0xFF00FF00;
 
     // Icon canvas settings
     private static final int ICON_SIZE = 64;
@@ -150,7 +150,7 @@ public class ExportScreen extends Screen {
 
         // Status message
         if (!statusMessage.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer, statusMessage, this.width / 2, this.height - 65, statusColor);
+            context.drawCenteredTextWithShadow(textRenderer, statusMessage, this.width / 2, this.height - 50, statusColor);
         }
     }
 
@@ -278,10 +278,10 @@ public class ExportScreen extends Screen {
                 iconCanvas.getPixels(), ICON_SIZE, ICON_SIZE);
         if (result != null) {
             statusMessage = Text.translatable("textureeditor.status.exported_to", result.getName()).getString();
-            statusColor = 0x55FF55;
+            statusColor = 0xFF00FF00;
         } else {
             statusMessage = Text.translatable("textureeditor.status.export_failed").getString();
-            statusColor = 0xFF5555;
+            statusColor = 0xFFFF0000;
         }
     }
 
