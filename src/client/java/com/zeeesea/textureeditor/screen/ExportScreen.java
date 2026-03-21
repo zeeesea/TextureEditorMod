@@ -28,7 +28,7 @@ public class ExportScreen extends Screen {
     private TextFieldWidget authorInput;
     private PixelCanvas iconCanvas;
     private String statusMessage = "";
-    private int statusColor = 0xFFFFFF;
+    private int statusColor = 0xFF00FF00;
 
     // Icon canvas settings
     private static final int ICON_SIZE = 64;
@@ -128,6 +128,10 @@ public class ExportScreen extends Screen {
         context.drawText(textRenderer, Text.translatable("textureeditor.label.description"), this.width / 2 - 100, 65, 0xFFCCCCCC, false);
         context.drawText(textRenderer, Text.translatable("textureeditor.label.author"), this.width / 2 - 100, 100, 0xFFCCCCCC, false);
 
+        System.out.println(this.height);
+
+
+
         // Draw "Pack Icon (optional):" label
         context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_icon"), iconScreenX, 135, 0xFFCCCCCC, false);
 
@@ -151,9 +155,9 @@ public class ExportScreen extends Screen {
 
         // Status message
         if (!statusMessage.isEmpty()) {
-            context.createNewRootLayer();
-            context.drawCenteredTextWithShadow(textRenderer, statusMessage, this.width / 2, this.height - 65, statusColor);
+            context.drawCenteredTextWithShadow(textRenderer, Text.literal(statusMessage), this.width / 2, this.height - 50, statusColor);
         }
+
     }
 
     private void drawIconCanvas(DrawContext context, int mouseX, int mouseY) {
@@ -280,15 +284,12 @@ public class ExportScreen extends Screen {
                 iconCanvas.getPixels(), ICON_SIZE, ICON_SIZE);
 
         if (result != null) {
-            System.out.println(result.getAbsolutePath());
-            statusMessage = Text.translatable("textureeditor.status.exported_to", result.getAbsolutePath()).getString();
-            statusColor = 0x55FF55;
+            statusMessage = Text.translatable("textureeditor.status.exported_to", result.getName()).getString();
+            statusColor = 0xFF00FF00;
         } else {
-            System.out.println("EXPORT FAILED!! HELLLLL NAW");
             statusMessage = Text.translatable("textureeditor.status.export_failed").getString();
-            statusColor = 0xFF5555;
+            statusColor = 0xFFFF0000;
         }
-        System.out.println("Status: " +  statusMessage);
     }
 
     @Override

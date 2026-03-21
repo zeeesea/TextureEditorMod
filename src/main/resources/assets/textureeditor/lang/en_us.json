@@ -129,7 +129,7 @@
   "textureeditor.label.author": "Author:",
   "textureeditor.label.pack_icon": "Pack Icon (draw below):",
   "textureeditor.status.enter_pack_name": "Please enter a pack name!",
-  "textureeditor.status.exported_to": "Exported to: %s",
+  "textureeditor.status.exported_to": "Exported to Resource Pack Folder as: %s",
   "textureeditor.status.export_failed": "Export failed! No modified textures.",
 
   "textureeditor.default.pack_name": "My Texture Pack",

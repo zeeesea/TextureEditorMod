@@ -129,7 +129,7 @@
   "textureeditor.label.author": "Autor:",
   "textureeditor.label.pack_icon": "Paket-Icon (unten zeichnen):",
   "textureeditor.status.enter_pack_name": "Bitte einen Paket-Namen eingeben!",
-  "textureeditor.status.exported_to": "Exportiert nach: %s",
+  "textureeditor.status.exported_to": "Exportiert zu dem Resource Pack Ordner als: %s",
   "textureeditor.status.export_failed": "Export fehlgeschlagen! Keine geänderten Texturen.",
 
   "textureeditor.default.pack_name": "Mein Texturepack",
