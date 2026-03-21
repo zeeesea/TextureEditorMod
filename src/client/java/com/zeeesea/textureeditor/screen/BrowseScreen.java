@@ -10,10 +10,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.SpawnEggItem;
+import net.minecraft.item.*;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -699,6 +696,14 @@ public class BrowseScreen extends Screen {
     private List<BrowseEntry> buildNotNormalEntries() {
         List<BrowseEntry> entries = new ArrayList<>();
 
+        //Grass Overhang
+        entries.add(new BrowseEntry(
+                Identifier.of("minecraft", "textures/block/grass_block_side_overlay.png"),
+                "Grass Overhang",
+                EntryType.GUI,
+                new ItemStack(Items.GRASS_BLOCK)
+        ));
+
         // Boats
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/oak.png"), "Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.OAK_BOAT)));
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/spruce.png"), "Spruce Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.SPRUCE_BOAT)));
@@ -1187,10 +1192,10 @@ public class BrowseScreen extends Screen {
         } else if (entry.type == EntryType.GUI) {
             if (useExternal) {
                 if (!openExternalForDirectTexture(entry.id, entry.name)) {
-                    client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+                    client.setScreen(createGuiEditorWithTint(entry));
                 }
             } else {
-                client.setScreen(new GuiTextureEditorScreen(entry.id, entry.name, this));
+                client.setScreen(createGuiEditorWithTint(entry));
             }
         } else if (entry.type == EntryType.PARTICLE) {
             if (useExternal) {
@@ -1246,6 +1251,26 @@ public class BrowseScreen extends Screen {
     }
 
     // --- External editor helpers ---
+
+    private GuiTextureEditorScreen createGuiEditorWithTint(BrowseEntry entry) {
+        GuiTextureEditorScreen screen = new GuiTextureEditorScreen(entry.id, entry.name, this);
+
+        // Tint für bekannte tinted Block-Texturen setzen
+        if (entry.id.getPath().contains("grass_block_side_overlay") ||
+                entry.id.getPath().contains("grass_block_top")) {
+            if (client.world != null && client.player != null) {
+                net.minecraft.block.BlockState grassState =
+                        net.minecraft.block.Blocks.GRASS_BLOCK.getDefaultState();
+                int color = client.getBlockColors().getColor(
+                        grassState, client.world, client.player.getBlockPos(), 0);
+                if (color != -1) {
+                    screen.setTint(color);
+                }
+            }
+        }
+
+        return screen;
+    }
 
     private void openExternalForBlock(Block block) {
         TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), Direction.UP);

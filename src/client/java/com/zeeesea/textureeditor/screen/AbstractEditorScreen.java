@@ -1017,14 +1017,19 @@ public abstract class AbstractEditorScreen extends Screen {
         switch (currentTool) {
             case PENCIL -> {
                 canvas.saveSnapshot();
-                if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, btn == 1 ? 0 : storeColor);
-                else canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor);
+                if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, btn == 1 ? 0 : currentColor);
+                else canvas.drawPixel(px, py, btn == 1 ? 0 : currentColor);
                 setColor(currentColor, true);
             }
             case BRUSH -> {
                 canvas.saveSnapshot();
-                if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, storeColor, variation);
-                else canvas.drawBrushPixel(px, py, storeColor, variation);
+                if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation);
+                else canvas.drawBrushPixel(px, py, currentColor, variation);
+                setColor(currentColor, true);
+            }
+            case FILL -> {
+                canvas.saveSnapshot();
+                canvas.floodFill(px, py, currentColor);
                 setColor(currentColor, true);
             }
             case ERASER -> {
@@ -1032,7 +1037,6 @@ public abstract class AbstractEditorScreen extends Screen {
                 if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize);
                 else canvas.erasePixel(px, py);
             }
-            case FILL -> { canvas.saveSnapshot(); canvas.floodFill(px, py, storeColor); setColor(currentColor, true); }
             case EYEDROPPER -> {
                 int raw = canvas.pickColorComposited(px, py);
                 if (raw == 0x00000000) {
@@ -1117,6 +1121,11 @@ public abstract class AbstractEditorScreen extends Screen {
         int cs = getPaletteCellSize();
         int cols = getPaletteColumns();
         return 30 + ((PALETTE.length + cols - 1) / cols) * (cs + 2);
+    }
+
+    public void setTint(int tint) {
+        this.blockTint = tint | 0xFF000000;
+        this.isTinted = true;
     }
 
     @Override
