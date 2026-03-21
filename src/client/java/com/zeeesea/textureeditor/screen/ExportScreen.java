@@ -27,7 +27,7 @@ public class ExportScreen extends Screen {
     private TextFieldWidget authorInput;
     private PixelCanvas iconCanvas;
     private String statusMessage = "";
-    private int statusColor = 0xFFFFFF;
+    private int statusColor = 0xFF00FF00;
 
     // Icon canvas settings
     private static final int ICON_SIZE = 64;
@@ -265,7 +265,7 @@ public class ExportScreen extends Screen {
         String name = packNameInput.getText().trim();
         if (name.isEmpty()) {
             statusMessage = "Please enter a pack name!";
-            statusColor = 0xFF5555;
+            statusColor = 0xFFFF5555;
             return;
         }
 
@@ -278,10 +278,10 @@ public class ExportScreen extends Screen {
                 iconCanvas.getPixels(), ICON_SIZE, ICON_SIZE);
         if (result != null) {
             statusMessage = "Exported to: " + result.getName();
-            statusColor = 0x55FF55;
+            statusColor = 0xFF00FF00;
         } else {
             statusMessage = "Export failed! No modified textures.";
-            statusColor = 0xFF5555;
+            statusColor = 0xFFFF0000;
         }
     }
 
