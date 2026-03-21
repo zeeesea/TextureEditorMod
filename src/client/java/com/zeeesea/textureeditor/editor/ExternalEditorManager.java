@@ -272,8 +272,16 @@ public class ExternalEditorManager {
                     img.setColorArgb(x, y, pixels[x][y]);
             var tex = client.getTextureManager().getTexture(textureId);
             if (tex != null) {
-                tex.bindTexture();
-                img.upload(0, 0, 0, false);
+                // If the existing texture is a NativeImageBackedTexture we can call upload()
+                if (tex instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                    nibt.setImage(img);
+                    nibt.upload();
+                } else {
+                    // Fallback: bind the texture by GL id and sub-upload the native image
+                    com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();
+                    ((net.minecraft.client.texture.AbstractTexture)tex).bindTexture();
+                    com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, 0, 0, false);
+                }
             }
         }
     }

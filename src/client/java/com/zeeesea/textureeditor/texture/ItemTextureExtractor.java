@@ -1,9 +1,11 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
+import com.zeeesea.textureeditor.util.ReflectionHelpers;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
@@ -48,18 +50,25 @@ public class ItemTextureExtractor {
         // Try block item first
         net.minecraft.block.Block block = net.minecraft.block.Block.getBlockFromItem(stack.getItem());
         if (block != net.minecraft.block.Blocks.AIR) {
-            BakedModel model = client.getBlockRenderManager().getModel(block.getDefaultState());
-            if (model != null) {
-                // Try null direction first (flat items), then each face
-                List<BakedQuad> quads = model.getQuads(null, null, Random.create());
+            BlockStateModel blockModel = client.getBlockRenderManager().getModel(block.getDefaultState());
+            if (blockModel != null) {
+                List<BlockModelPart> parts = blockModel.getParts(Random.create());
+                List<BakedQuad> quads = new java.util.ArrayList<>();
+                for (BlockModelPart part : parts) {
+                    List<BakedQuad> q = part.getQuads(null);
+                    if (q != null) quads.addAll(q);
+                }
                 if (quads.isEmpty()) {
                     for (Direction dir : Direction.values()) {
-                        quads = model.getQuads(block.getDefaultState(), dir, Random.create());
+                        for (BlockModelPart part : parts) {
+                            List<BakedQuad> q = part.getQuads(dir);
+                            if (q != null) quads.addAll(q);
+                        }
                         if (!quads.isEmpty()) break;
                     }
                 }
                 if (!quads.isEmpty()) {
-                    Sprite sprite = quads.getFirst().getSprite();
+                    Sprite sprite = quads.get(0).sprite();
                     if (!sprite.getContents().getId().getPath().equals("missingno")) {
                         System.out.println("[TextureEditor] Found sprite via block model: " + sprite.getContents().getId());
                         return extractFromSprite(sprite);
@@ -70,29 +79,35 @@ public class ItemTextureExtractor {
 
         // Strategy 3: Try model via BakedModelManager
         Identifier modelId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath());
-        BakedModel model = client.getBakedModelManager().getModel(modelId);
-        if (model != null) {
-            List<BakedQuad> quads = model.getQuads(null, null, Random.create());
-            if (quads.isEmpty()) {
-                for (Direction dir : Direction.values()) {
-                    quads = model.getQuads(null, dir, Random.create());
-                    if (!quads.isEmpty()) break;
+        try {
+            var itemModel = client.getBakedModelManager().getItemModel(modelId);
+            if (itemModel instanceof net.minecraft.client.render.item.model.BasicItemModel basic) {
+                Object baked = ReflectionHelpers.getField(basic, "model");
+                if (baked instanceof net.minecraft.client.render.model.BakedModel bm) {
+                    List<BakedQuad> quads = bm.getQuads(null, null, Random.create());
+                    if (quads.isEmpty()) {
+                        for (Direction dir : Direction.values()) {
+                            quads = bm.getQuads(null, dir, Random.create());
+                            if (!quads.isEmpty()) break;
+                        }
+                    }
+                    if (!quads.isEmpty()) {
+                        Sprite sprite = quads.get(0).sprite();
+                        if (!sprite.getContents().getId().getPath().equals("missingno")) {
+                            System.out.println("[TextureEditor] Found sprite via model manager: " + sprite.getContents().getId());
+                            return extractFromSprite(sprite);
+                        }
+                    }
                 }
             }
-            if (!quads.isEmpty()) {
-                Sprite sprite = quads.getFirst().getSprite();
-                if (!sprite.getContents().getId().getPath().equals("missingno")) {
-                    System.out.println("[TextureEditor] Found sprite via model manager: " + sprite.getContents().getId());
-                    return extractFromSprite(sprite);
-                }
-            }
+        } catch (Throwable ignored) {
         }
 
         // Strategy 4: Fallback to Particle Sprite (fixes Leaves and other complex blocks)
         if (block != net.minecraft.block.Blocks.AIR) {
-            BakedModel blockModel = client.getBlockRenderManager().getModel(block.getDefaultState());
-            if (blockModel != null) {
-                Sprite particle = blockModel.getParticleSprite();
+            BlockStateModel blockModel2 = client.getBlockRenderManager().getModel(block.getDefaultState());
+            if (blockModel2 != null) {
+                Sprite particle = blockModel2.particleSprite();
                 if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
                     System.out.println("[TextureEditor] Found sprite via particle texture: " + particle.getContents().getId());
                     return extractFromSprite(particle);

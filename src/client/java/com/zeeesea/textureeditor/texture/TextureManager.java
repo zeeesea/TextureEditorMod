@@ -115,15 +115,35 @@ public class TextureManager {
         RenderSystem.assertOnRenderThread();
         SpriteAtlasTexture atlas = (SpriteAtlasTexture) client.getTextureManager()
                 .getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        atlas.bindTexture();
 
+        // Try to update the CPU-side sprite contents so the atlas shows the change without direct OpenGL upload
         try (NativeImage img = new NativeImage(width, height, false)) {
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
                     img.setColorArgb(x, y, pixels[x][y]);
                 }
             }
-            img.upload(0, atlasX, atlasY, false);
+
+            try {
+                Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(Identifier.of(spriteId.getNamespace(), spriteId.getPath()));
+                if (sprite != null) {
+                    var contents = sprite.getContents();
+                    var cpuImg = ((com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor)contents).getImage();
+                    if (cpuImg != null) {
+                        cpuImg.copyFrom(img);
+                    } else {
+                        // Fallback: register a dynamic texture so the image is visible
+                        net.minecraft.client.texture.NativeImageBackedTexture dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> Identifier.of(spriteId.getNamespace(), spriteId.getPath()).toString(), img);
+                        client.getTextureManager().registerTexture(Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png"), dynamicTex);
+                        dynamicTex.upload();
+                    }
+                }
+            } catch (Throwable t) {
+                // If anything fails, fallback to dynamic texture
+                net.minecraft.client.texture.NativeImageBackedTexture dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> Identifier.of(spriteId.getNamespace(), spriteId.getPath()).toString(), img);
+                client.getTextureManager().registerTexture(Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png"), dynamicTex);
+                dynamicTex.upload();
+            }
         }
 
         if (spriteId.getPath().startsWith("item/")) {
@@ -219,7 +239,7 @@ public class TextureManager {
         // Bind the block atlas texture
         SpriteAtlasTexture atlas = (SpriteAtlasTexture) client.getTextureManager()
                 .getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        atlas.bindTexture();
+        ((net.minecraft.client.texture.AbstractTexture)atlas).bindTexture();
 
         // Upload the base (level 0) image
         try (NativeImage img = new NativeImage(width, height, false)) {
@@ -228,7 +248,7 @@ public class TextureManager {
                     img.setColorArgb(x, y, pixels[x][y]);
                 }
             }
-            img.upload(0, atlasX, atlasY, false);
+            com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, atlasX, atlasY, false);
         }
 
         // Generate and upload mipmap levels so the texture is visible at distance
@@ -263,7 +283,7 @@ public class TextureManager {
                         mipImg.setColorArgb(x, y, mipPixels[x][y]);
                     }
                 }
-                mipImg.upload(level, atlasX >> level, atlasY >> level, false);
+                com.zeeesea.textureeditor.util.NativeImageCompat.upload(mipImg, level, atlasX >> level, atlasY >> level, false);
             }
 
             currentPixels = mipPixels;

@@ -124,8 +124,9 @@ public class SkyEditorScreen extends AbstractEditorScreen {
             for (int x = 0; x < canvas.getWidth(); x++)
                 for (int y = 0; y < canvas.getHeight(); y++)
                     img.setColorArgb(x, y, canvas.getPixels()[x][y]);
-            var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(img);
+            var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> textureId.toString(), img);
             client.getTextureManager().registerTexture(textureId, dynamicTex);
+            dynamicTex.upload();
         });
     }
 

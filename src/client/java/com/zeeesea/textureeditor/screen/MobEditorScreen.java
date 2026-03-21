@@ -150,7 +150,16 @@ public class MobEditorScreen extends AbstractEditorScreen {
                     for (int y = 0; y < canvas.getHeight(); y++)
                         img.setColorArgb(x, y, canvas.getPixels()[x][y]);
                 var tex = client.getTextureManager().getTexture(textureId);
-                if (tex != null) { tex.bindTexture(); img.upload(0, 0, 0, false); }
+                if (tex != null) {
+                    if (tex instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                        nibt.setImage(img);
+                        nibt.upload();
+                    } else {
+                        com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();
+                        ((net.minecraft.client.texture.AbstractTexture)tex).bindTexture();
+                        com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, 0, 0, false);
+                    }
+                }
             }
         });
     }

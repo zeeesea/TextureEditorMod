@@ -3,7 +3,8 @@ package com.zeeesea.textureeditor.texture;
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.model.BakedModel;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
@@ -28,20 +29,22 @@ public class TextureExtractor {
      */
     public static List<BlockFaceTexture> extractAll(BlockState state, Direction face) {
         MinecraftClient client = MinecraftClient.getInstance();
-        BakedModel model = client.getBlockRenderManager().getModel(state);
+        BlockStateModel model = client.getBlockRenderManager().getModel(state);
         List<BlockFaceTexture> results = new java.util.ArrayList<>();
         java.util.Set<Identifier> seen = new java.util.HashSet<>();
 
-        // Get quads for the specific face
-        List<BakedQuad> quads = model.getQuads(state, face, Random.create());
-
-        // Also check null-direction quads (some overlay quads use null direction)
-        List<BakedQuad> nullQuads = model.getQuads(state, null, Random.create());
-        List<BakedQuad> allQuads = new java.util.ArrayList<>(quads);
-        allQuads.addAll(nullQuads);
+        // Get quads for the specific face by collecting parts
+        List<BakedQuad> allQuads = new java.util.ArrayList<>();
+        List<BlockModelPart> parts = model.getParts(Random.create());
+        for (BlockModelPart part : parts) {
+            List<BakedQuad> q = part.getQuads(face);
+            if (q != null) allQuads.addAll(q);
+            List<BakedQuad> nullQ = part.getQuads(null);
+            if (nullQ != null) allQuads.addAll(nullQ);
+        }
 
         for (BakedQuad quad : allQuads) {
-            Sprite sprite = quad.getSprite();
+            Sprite sprite = quad.sprite();
             if (sprite.getContents().getId().getPath().equals("missingno")) continue;
             Identifier spriteId = sprite.getContents().getId();
             Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");

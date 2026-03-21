@@ -269,12 +269,12 @@ public class ExternalEditorSession {
                     uploaded = tryUploadToAtlas(client, img, derivedId);
                 }
                 if (!uploaded) {
-                    // Fallback: register as dynamic texture
+                    // Fallback: register as dynamic texture using the Supplier<String> constructor available in this workspace
                     net.minecraft.client.texture.NativeImageBackedTexture dynamicTex =
-                            new net.minecraft.client.texture.NativeImageBackedTexture(img);
+                            new net.minecraft.client.texture.NativeImageBackedTexture(() -> textureId.toString(), img);
                     client.getTextureManager().registerTexture(textureId, dynamicTex);
-                    dynamicTex.bindTexture();
-                    img.upload(0, 0, 0, false);
+                    // upload() will push the current image to the GPU
+                    dynamicTex.upload();
                     System.out.println("[TextureEditor] Applied GUI texture as dynamic: " + textureId);
                 }
             }
@@ -288,15 +288,19 @@ public class ExternalEditorSession {
                         img.setColorArgb(x, y, newPixels[x][y]);
                 var tex = client.getTextureManager().getTexture(textureId);
                 if (tex != null) {
-                    tex.bindTexture();
-                    img.upload(0, 0, 0, false);
+                    if (tex instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                        nibt.setImage(img);
+                        nibt.upload();
+                    } else {
+                        com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();
+                        ((net.minecraft.client.texture.AbstractTexture)tex).bindTexture();
+                        com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, 0, 0, false);
+                    }
                 } else {
                     net.minecraft.client.texture.NativeImageBackedTexture dynamicTex =
-                            new net.minecraft.client.texture.NativeImageBackedTexture(
-                                    new net.minecraft.client.texture.NativeImage(newW, newH, false));
+                            new net.minecraft.client.texture.NativeImageBackedTexture(() -> textureId.toString(), img);
                     client.getTextureManager().registerTexture(textureId, dynamicTex);
-                    dynamicTex.bindTexture();
-                    img.upload(0, 0, 0, false);
+                    dynamicTex.upload();
                 }
             }
         }
@@ -311,10 +315,10 @@ public class ExternalEditorSession {
         var blockAtlas = client.getBakedModelManager().getAtlas(
                 net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
         var sprite = blockAtlas.getSprite(id);
-        if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")
+            if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")
                 && sprite.getContents().getId().equals(id)) {
-            blockAtlas.bindTexture();
-            img.upload(0, sprite.getX(), sprite.getY(), false);
+            ((net.minecraft.client.texture.AbstractTexture)blockAtlas).bindTexture();
+            com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, sprite.getX(), sprite.getY(), false);
             System.out.println("[TextureEditor] Uploaded GUI sprite to block atlas: " + id);
             return true;
         }
@@ -324,10 +328,10 @@ public class ExternalEditorSession {
         var tex = client.getTextureManager().getTexture(guiAtlasId);
         if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture guiAtlas) {
             sprite = guiAtlas.getSprite(id);
-            if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")
+                if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")
                     && sprite.getContents().getId().equals(id)) {
-                guiAtlas.bindTexture();
-                img.upload(0, sprite.getX(), sprite.getY(), false);
+                ((net.minecraft.client.texture.AbstractTexture)guiAtlas).bindTexture();
+                com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, sprite.getX(), sprite.getY(), false);
                 System.out.println("[TextureEditor] Uploaded GUI sprite to GUI atlas: " + id);
                 return true;
             }
@@ -337,8 +341,8 @@ public class ExternalEditorSession {
                 Identifier shortId = Identifier.of(id.getNamespace(), shortPath);
                 sprite = guiAtlas.getSprite(shortId);
                 if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                    guiAtlas.bindTexture();
-                    img.upload(0, sprite.getX(), sprite.getY(), false);
+                    ((net.minecraft.client.texture.AbstractTexture)guiAtlas).bindTexture();
+                    com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, sprite.getX(), sprite.getY(), false);
                     System.out.println("[TextureEditor] Uploaded GUI sprite to GUI atlas (short ID): " + shortId);
                     return true;
                 }
