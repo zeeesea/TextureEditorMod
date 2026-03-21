@@ -271,7 +271,7 @@ public class ExportScreen extends Screen {
         String name = packNameInput.getText().trim();
         if (name.isEmpty()) {
             statusMessage = Text.translatable("textureeditor.status.enter_pack_name").getString();
-            statusColor = 0xFF5555;
+            statusColor = 0xFFFF5555;
             return;
         }
 
