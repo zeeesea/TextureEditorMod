@@ -2,7 +2,7 @@
 	"schemaVersion": 1,
 	"id": "textureeditor",
 	"version": "${version}",
-	"name": "Texture Editor",
+	"name": "Live Texture Editor",
 	"description": "Edit block, item, entity, and GUI textures directly in-game. Draw with pencil, brush, fill, line tools, export as resource packs, and see changes live — no restart required.",
 	"authors": [
 		"zeee"
