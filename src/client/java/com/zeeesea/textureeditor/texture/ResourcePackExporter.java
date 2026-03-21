@@ -59,7 +59,7 @@ public class ResourcePackExporter {
             // Write pack.mcmeta
             JsonObject packMcmeta = new JsonObject();
             JsonObject pack = new JsonObject();
-            pack.addProperty("pack_format", 46); // 1.21.4
+            pack.addProperty("pack_format", 55);
             // Build description with author if provided
             String desc = description != null && !description.isEmpty() ? description : packName;
             if (author != null && !author.isEmpty()) {
