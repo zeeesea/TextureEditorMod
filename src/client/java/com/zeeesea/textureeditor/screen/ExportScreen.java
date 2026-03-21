@@ -14,6 +14,7 @@ import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
+import java.sql.SQLOutput;
 
 /**
  * Export screen where the user can name their texture pack, set description/author,
@@ -150,6 +151,7 @@ public class ExportScreen extends Screen {
 
         // Status message
         if (!statusMessage.isEmpty()) {
+            context.createNewRootLayer();
             context.drawCenteredTextWithShadow(textRenderer, statusMessage, this.width / 2, this.height - 65, statusColor);
         }
     }
@@ -276,13 +278,17 @@ public class ExportScreen extends Screen {
 
         File result = ResourcePackExporter.export(name, description, author,
                 iconCanvas.getPixels(), ICON_SIZE, ICON_SIZE);
+
         if (result != null) {
-            statusMessage = Text.translatable("textureeditor.status.exported_to", result.getName()).getString();
+            System.out.println(result.getAbsolutePath());
+            statusMessage = Text.translatable("textureeditor.status.exported_to", result.getAbsolutePath()).getString();
             statusColor = 0x55FF55;
         } else {
+            System.out.println("EXPORT FAILED!! HELLLLL NAW");
             statusMessage = Text.translatable("textureeditor.status.export_failed").getString();
             statusColor = 0xFF5555;
         }
+        System.out.println("Status: " +  statusMessage);
     }
 
     @Override
