@@ -22,10 +22,10 @@ public final class NativeImageCompat {
             int w = img.getWidth();
             int h = img.getHeight();
             com.mojang.blaze3d.opengl.GlStateManager._texSubImage2D(
-                    com.mojang.blaze3d.platform.GlConst.GL_TEXTURE_2D,
+                    com.mojang.blaze3d.opengl.GlConst.GL_TEXTURE_2D,
                     level, x, y, w, h,
-                    com.mojang.blaze3d.platform.GlConst.GL_RGBA,
-                    com.mojang.blaze3d.platform.GlConst.GL_UNSIGNED_BYTE,
+                    com.mojang.blaze3d.opengl.GlConst.GL_RGBA,
+                    com.mojang.blaze3d.opengl.GlConst.GL_UNSIGNED_BYTE,
                     img.imageId()
             );
         } catch (Throwable t) {

@@ -107,7 +107,7 @@ public class EditorScreen extends AbstractEditorScreen {
             if (lastSlash >= 0) spriteName = spriteName.substring(lastSlash + 1);
             layerLabel = " \u00a7b[" + spriteName + " " + (faceTextureIndex + 1) + "/" + faceTextures.size() + "]";
         }
-        return "Block Editor - " + name + " (" + face.getName() + ")" + tintLabel + layerLabel;
+        return "Block Editor - " + name + " (" + face.name() + ")" + tintLabel + layerLabel;
     }
 
     @Override
@@ -123,11 +123,11 @@ public class EditorScreen extends AbstractEditorScreen {
         // Face cycle button — only at scale <= 4
         if (showFaceButton()) {
             addDrawableChild(ButtonWidget.builder(
-                    Text.literal("Face: " + face.getName().toUpperCase()),
+                    Text.literal("Face: " + face.name().toUpperCase()),
                     btn -> {
                         Direction[] dirs = Direction.values();
                         face = dirs[(face.ordinal() + 1) % dirs.length];
-                        btn.setMessage(Text.literal("Face: " + face.getName().toUpperCase()));
+                        btn.setMessage(Text.literal("Face: " + face.name().toUpperCase()));
                         faceTextureIndex = 0; // Reset layer index on face switch
                         switchFace(face);
                     }

@@ -4,7 +4,6 @@ import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.model.BlockModelPart;
-import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
@@ -29,7 +28,7 @@ public class TextureExtractor {
      */
     public static List<BlockFaceTexture> extractAll(BlockState state, Direction face) {
         MinecraftClient client = MinecraftClient.getInstance();
-        BlockStateModel model = client.getBlockRenderManager().getModel(state);
+        net.minecraft.client.render.model.BlockStateModel model = client.getBlockRenderManager().getModel(state);
         List<BlockFaceTexture> results = new java.util.ArrayList<>();
         java.util.Set<Identifier> seen = new java.util.HashSet<>();
 
@@ -59,7 +58,7 @@ public class TextureExtractor {
 
         // If we still have nothing, try particle sprite
         if (results.isEmpty()) {
-            Sprite particle = model.getParticleSprite();
+            Sprite particle = model.particleSprite();
             if (particle != null && !particle.getContents().getId().getPath().equals("missingno")) {
                 BlockFaceTexture tex = extractFromSprite(particle);
                 if (tex != null) results.add(tex);

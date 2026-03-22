@@ -279,7 +279,8 @@ public class ExternalEditorManager {
                 } else {
                     // Fallback: bind the texture by GL id and sub-upload the native image
                     com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();
-                    ((net.minecraft.client.texture.AbstractTexture)tex).bindTexture();
+                    // AbstractTexture.bindTexture() was removed/changed; use GlStateManager to bind by GL id
+                    com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(tex));
                     com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, 0, 0, false);
                 }
             }

@@ -156,7 +156,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
                         nibt.upload();
                     } else {
                         com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();
-                        ((net.minecraft.client.texture.AbstractTexture)tex).bindTexture();
+                        com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(tex));
                         com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, 0, 0, false);
                     }
                 }

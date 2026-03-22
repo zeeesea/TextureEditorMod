@@ -99,3 +99,22 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+// Prevent accidentally compiling local copies of Minecraft game classes placed under
+// the project 'net/' folder. These shadow the real game classes and cause
+// runtime NoSuchMethodError / linkage issues. Exclude them from both main and
+// client source sets so the loader's Minecraft classes are used instead.
+sourceSets {
+	main {
+		java {
+			exclude 'net/**'
+		}
+	}
+	// Loom creates a 'client' source set when using splitEnvironmentSourceSets()
+	// exclude the same path there as well.
+	client {
+		java {
+			exclude 'net/**'
+		}
+	}
+}

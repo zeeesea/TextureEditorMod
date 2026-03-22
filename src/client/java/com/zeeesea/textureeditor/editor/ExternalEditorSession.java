@@ -293,7 +293,7 @@ public class ExternalEditorSession {
                         nibt.upload();
                     } else {
                         com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();
-                        ((net.minecraft.client.texture.AbstractTexture)tex).bindTexture();
+                                com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(tex));
                         com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, 0, 0, false);
                     }
                 } else {
@@ -317,7 +317,7 @@ public class ExternalEditorSession {
         var sprite = blockAtlas.getSprite(id);
             if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")
                 && sprite.getContents().getId().equals(id)) {
-            ((net.minecraft.client.texture.AbstractTexture)blockAtlas).bindTexture();
+            com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(blockAtlas));
             com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, sprite.getX(), sprite.getY(), false);
             System.out.println("[TextureEditor] Uploaded GUI sprite to block atlas: " + id);
             return true;
@@ -330,7 +330,7 @@ public class ExternalEditorSession {
             sprite = guiAtlas.getSprite(id);
                 if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")
                     && sprite.getContents().getId().equals(id)) {
-                ((net.minecraft.client.texture.AbstractTexture)guiAtlas).bindTexture();
+                com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(guiAtlas));
                 com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, sprite.getX(), sprite.getY(), false);
                 System.out.println("[TextureEditor] Uploaded GUI sprite to GUI atlas: " + id);
                 return true;
@@ -340,8 +340,8 @@ public class ExternalEditorSession {
                 String shortPath = id.getPath().substring("gui/sprites/".length());
                 Identifier shortId = Identifier.of(id.getNamespace(), shortPath);
                 sprite = guiAtlas.getSprite(shortId);
-                if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                    ((net.minecraft.client.texture.AbstractTexture)guiAtlas).bindTexture();
+                    if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
+                    com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(guiAtlas));
                     com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, sprite.getX(), sprite.getY(), false);
                     System.out.println("[TextureEditor] Uploaded GUI sprite to GUI atlas (short ID): " + shortId);
                     return true;

@@ -4,12 +4,13 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.util.Identifier;
-import org.lwjgl.opengl.GL11;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -29,11 +30,47 @@ public class TextureManager {
 
     // Whether we're currently showing original textures (preview mode)
     private boolean previewingOriginals = false;
+    // Debugging: dump NativeImage PNGs to disk when enabled
+    public static volatile boolean DEBUG_DUMP = false;
+    public static volatile String DEBUG_DUMP_DIR = "run/textureeditor_dumps";
 
     private TextureManager() {}
 
     public static TextureManager getInstance() {
         return INSTANCE;
+    }
+
+    /**
+     * Dump a NativeImage to a PNG file when DEBUG_DUMP is enabled. Uses NativeImage.getColorArgb
+     * to produce a BufferedImage and writes it with ImageIO. Safe no-op when disabled.
+     */
+    private static void dumpIfEnabled(NativeImage img, String tag) {
+        if (!DEBUG_DUMP || img == null) return;
+        try {
+            File dir = new File(DEBUG_DUMP_DIR);
+            if (!dir.exists()) dir.mkdirs();
+            long ts = System.currentTimeMillis();
+            String safeTag = tag.replaceAll("[^A-Za-z0-9_.-]", "_");
+            int w = img.getWidth();
+            int h = img.getHeight();
+            File out = new File(dir, ts + "_" + safeTag + "_" + w + "x" + h + ".png");
+            System.out.println("[TextureEditor] dumping image tag=" + tag + " size=" + w + "x" + h + " -> " + out.getAbsolutePath());
+            BufferedImage bi = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            for (int x = 0; x < w; x++) {
+                for (int y = 0; y < h; y++) {
+                    try {
+                        bi.setRGB(x, y, img.getColorArgb(x, y));
+                    } catch (Throwable t) {
+                        // fallback: fully transparent pixel on error
+                        bi.setRGB(x, y, 0x00000000);
+                    }
+                }
+            }
+            ImageIO.write(bi, "PNG", out);
+            System.out.println("[TextureEditor] dumped image: " + out.getAbsolutePath());
+        } catch (Throwable t) {
+            System.out.println("[TextureEditor] dump failed: " + t.getMessage());
+        }
     }
 
     /**
@@ -124,13 +161,17 @@ public class TextureManager {
                 }
             }
 
+            // Debug dump of the CPU-side image before any upload/register fallback
+            dumpIfEnabled(img, "reupload_preupload_" + spriteId.getPath());
+
             try {
-                Sprite sprite = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(Identifier.of(spriteId.getNamespace(), spriteId.getPath()));
-                if (sprite != null) {
-                    var contents = sprite.getContents();
+                Sprite found = client.getSpriteAtlas(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE).apply(Identifier.of(spriteId.getNamespace(), spriteId.getPath()));
+                if (found != null) {
+                    var contents = found.getContents();
                     var cpuImg = ((com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor)contents).getImage();
                     if (cpuImg != null) {
                         cpuImg.copyFrom(img);
+                        dumpIfEnabled(cpuImg, "reupload_spritecontents_aftercopy_" + spriteId.getPath());
                     } else {
                         // Fallback: register a dynamic texture so the image is visible
                         net.minecraft.client.texture.NativeImageBackedTexture dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> Identifier.of(spriteId.getNamespace(), spriteId.getPath()).toString(), img);
@@ -165,6 +206,8 @@ public class TextureManager {
                 image.setColorArgb(x, y, pixels[x][y]);
             }
         }
+        // Dump the sprite's CPU-side NativeImage after writing so we can compare
+        dumpIfEnabled(image, "spritecontents_afterwrite_x" + sprite.getX() + "y" + sprite.getY());
     }
 
     /**
@@ -233,67 +276,81 @@ public class TextureManager {
         int atlasX = sprite.getX();
         int atlasY = sprite.getY();
 
-        // Create a NativeImage and upload to the atlas
-        RenderSystem.assertOnRenderThread();
+        // Create a NativeImage and upload to the atlas. The actual GL bind/upload
+        // operations are recorded to the render thread below with RenderSystem.recordRenderCall.
 
-        // Bind the block atlas texture
+        // Ensure bind + upload happen on the render thread in order. Create and upload
+        // NativeImage(s) inside the recorded render call so the correct atlas is bound
+        // when glTexSubImage2D is invoked.
         SpriteAtlasTexture atlas = (SpriteAtlasTexture) client.getTextureManager()
                 .getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-        ((net.minecraft.client.texture.AbstractTexture)atlas).bindTexture();
 
-        // Upload the base (level 0) image
-        try (NativeImage img = new NativeImage(width, height, false)) {
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    img.setColorArgb(x, y, pixels[x][y]);
-                }
-            }
-            com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, atlasX, atlasY, false);
-        }
+        RenderSystem.queueFencedTask(() -> {
+            try {
+                // Bind the atlas via its AbstractTexture.bindTexture so the texture
+                // is bound in the same manner the engine expects.
+                // AbstractTexture.bindTexture may not exist in some mappings; bind by GL id instead
+                com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(atlas));
 
-        // Generate and upload mipmap levels so the texture is visible at distance
-        int mipWidth = width;
-        int mipHeight = height;
-        int[][] currentPixels = pixels;
-        int level = 1;
-
-        while (mipWidth > 1 && mipHeight > 1) {
-            int newW = mipWidth / 2;
-            int newH = mipHeight / 2;
-            if (newW < 1 || newH < 1) break;
-
-            int[][] mipPixels = new int[newW][newH];
-            for (int x = 0; x < newW; x++) {
-                for (int y = 0; y < newH; y++) {
-                    // Average 2x2 block of pixels
-                    int sx = x * 2;
-                    int sy = y * 2;
-                    mipPixels[x][y] = averageColors(
-                            currentPixels[sx][sy],
-                            sx + 1 < mipWidth ? currentPixels[sx + 1][sy] : currentPixels[sx][sy],
-                            sy + 1 < mipHeight ? currentPixels[sx][sy + 1] : currentPixels[sx][sy],
-                            sx + 1 < mipWidth && sy + 1 < mipHeight ? currentPixels[sx + 1][sy + 1] : currentPixels[sx][sy]
-                    );
-                }
-            }
-
-            try (NativeImage mipImg = new NativeImage(newW, newH, false)) {
-                for (int x = 0; x < newW; x++) {
-                    for (int y = 0; y < newH; y++) {
-                        mipImg.setColorArgb(x, y, mipPixels[x][y]);
+                // Upload the base (level 0) image
+                try (NativeImage img = new NativeImage(width, height, false)) {
+                    for (int x = 0; x < width; x++) {
+                        for (int y = 0; y < height; y++) {
+                            img.setColorArgb(x, y, pixels[x][y]);
+                        }
                     }
+                    dumpIfEnabled(img, "gpu_upload_before_level0_" + spriteId.getPath());
+                    com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, atlasX, atlasY, false);
                 }
-                com.zeeesea.textureeditor.util.NativeImageCompat.upload(mipImg, level, atlasX >> level, atlasY >> level, false);
+
+                // Generate and upload mipmap levels so the texture is visible at distance
+                int mipWidth = width;
+                int mipHeight = height;
+                int[][] currentPixels = pixels;
+                int level = 1;
+
+                while (mipWidth > 1 && mipHeight > 1) {
+                    int newW = mipWidth / 2;
+                    int newH = mipHeight / 2;
+                    if (newW < 1 || newH < 1) break;
+
+                    int[][] mipPixels = new int[newW][newH];
+                    for (int x = 0; x < newW; x++) {
+                        for (int y = 0; y < newH; y++) {
+                            // Average 2x2 block of pixels
+                            int sx = x * 2;
+                            int sy = y * 2;
+                            mipPixels[x][y] = averageColors(
+                                    currentPixels[sx][sy],
+                                    sx + 1 < mipWidth ? currentPixels[sx + 1][sy] : currentPixels[sx][sy],
+                                    sy + 1 < mipHeight ? currentPixels[sx][sy + 1] : currentPixels[sx][sy],
+                                    sx + 1 < mipWidth && sy + 1 < mipHeight ? currentPixels[sx + 1][sy + 1] : currentPixels[sx][sy]
+                            );
+                        }
+                    }
+
+                    try (NativeImage mipImg = new NativeImage(newW, newH, false)) {
+                        for (int x = 0; x < newW; x++) {
+                            for (int y = 0; y < newH; y++) {
+                                mipImg.setColorArgb(x, y, mipPixels[x][y]);
+                            }
+                        }
+                        dumpIfEnabled(mipImg, "gpu_upload_before_level" + level + "_" + spriteId.getPath());
+                        com.zeeesea.textureeditor.util.NativeImageCompat.upload(mipImg, level, atlasX >> level, atlasY >> level, false);
+                    }
+
+                    currentPixels = mipPixels;
+                    mipWidth = newW;
+                    mipHeight = newH;
+                    level++;
+
+                    // Minecraft typically uses 4 mipmap levels max
+                    if (level > 4) break;
+                }
+            } catch (Throwable t) {
+                System.out.println("[TextureEditor] render-thread upload failed: " + t.getMessage());
             }
-
-            currentPixels = mipPixels;
-            mipWidth = newW;
-            mipHeight = newH;
-            level++;
-
-            // Minecraft typically uses 4 mipmap levels max
-            if (level > 4) break;
-        }
+        });
 
         if (spriteId.getPath().startsWith("item/")) {
             ItemModelRebaker.rebake(spriteId);

@@ -83,20 +83,25 @@ public class ItemTextureExtractor {
             var itemModel = client.getBakedModelManager().getItemModel(modelId);
             if (itemModel instanceof net.minecraft.client.render.item.model.BasicItemModel basic) {
                 Object baked = ReflectionHelpers.getField(basic, "model");
-                if (baked instanceof net.minecraft.client.render.model.BakedModel bm) {
-                    List<BakedQuad> quads = bm.getQuads(null, null, Random.create());
-                    if (quads.isEmpty()) {
-                        for (Direction dir : Direction.values()) {
-                            quads = bm.getQuads(null, dir, Random.create());
-                            if (!quads.isEmpty()) break;
+                if (baked != null) {
+                    try {
+                        java.lang.reflect.Method getQuads = baked.getClass().getMethod("getQuads", net.minecraft.block.BlockState.class, Direction.class, Random.class);
+                        @SuppressWarnings("unchecked")
+                        java.util.List<BakedQuad> quads = (java.util.List<BakedQuad>) getQuads.invoke(baked, null, null, Random.create());
+                        if (quads == null || quads.isEmpty()) {
+                            for (Direction dir : Direction.values()) {
+                                quads = (java.util.List<BakedQuad>) getQuads.invoke(baked, null, dir, Random.create());
+                                if (quads != null && !quads.isEmpty()) break;
+                            }
                         }
-                    }
-                    if (!quads.isEmpty()) {
-                        Sprite sprite = quads.get(0).sprite();
-                        if (!sprite.getContents().getId().getPath().equals("missingno")) {
-                            System.out.println("[TextureEditor] Found sprite via model manager: " + sprite.getContents().getId());
-                            return extractFromSprite(sprite);
+                        if (quads != null && !quads.isEmpty()) {
+                            Sprite sprite = quads.get(0).sprite();
+                            if (!sprite.getContents().getId().getPath().equals("missingno")) {
+                                System.out.println("[TextureEditor] Found sprite via model manager: " + sprite.getContents().getId());
+                                return extractFromSprite(sprite);
+                            }
                         }
+                    } catch (Throwable ignored) {
                     }
                 }
             }

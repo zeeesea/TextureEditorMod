@@ -5,12 +5,9 @@ import com.zeeesea.textureeditor.util.ReflectionHelpers;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.item.model.BasicItemModel;
 import net.minecraft.client.render.item.model.ItemModel;
-import net.minecraft.client.render.model.BakedModel;
-import net.minecraft.client.render.model.BakedModelManager;
+// Avoid referencing client-only BakedModel at compile time in some environments.
+// We'll treat runtime models as Object and use reflection where necessary.
 import net.minecraft.client.render.model.BakedQuad;
-import net.minecraft.client.render.model.Baker;
-import net.minecraft.client.render.model.ModelBakeSettings;
-import net.minecraft.client.render.model.ModelRotation;
 import net.minecraft.client.render.model.ModelTextures;
 import net.minecraft.client.render.model.json.GeneratedItemModel;
 import net.minecraft.client.texture.Sprite;
@@ -84,11 +81,10 @@ public final class ItemModelRebaker {
 
         for (Map.Entry<Identifier, ItemModel> entry : bakedItemModels.entrySet()) {
             if (!(entry.getValue() instanceof BasicItemModel basicItemModel)) continue;
-
             Object bakedModel = ReflectionHelpers.getField(basicItemModel, "model");
-            if (bakedModel == null || !(bakedModel instanceof BakedModel)) continue;
+            if (bakedModel == null) continue;
 
-            for (Identifier sid : collectSpriteIds((BakedModel) bakedModel)) {
+            for (Identifier sid : collectSpriteIds(bakedModel)) {
                 newIndex.computeIfAbsent(sid, ignored -> new ArrayList<>()).add(entry.getKey());
             }
         }
@@ -97,7 +93,7 @@ public final class ItemModelRebaker {
     }
 
     private static void rebakeBasicItemModel(BasicItemModel basicItemModel, Identifier changedSpriteId) {
-        BakedModel oldModel = (BakedModel) ReflectionHelpers.getField(basicItemModel, "model");
+        Object oldModel = ReflectionHelpers.getField(basicItemModel, "model");
         if (oldModel == null) return;
 
         Set<Identifier> usedSprites = collectSpriteIds(oldModel);
@@ -130,23 +126,41 @@ public final class ItemModelRebaker {
         // compiling and avoid depending on mappings for baker helpers, skip the dynamic
         // rebake in this environment.
         System.out.println("[TextureEditor] ItemModelRebaker: dynamic rebake skipped in development environment for " + changedSpriteId);
-        return;
     }
 
-    private static Set<Identifier> collectSpriteIds(BakedModel bakedModel) {
+    private static Set<Identifier> collectSpriteIds(Object bakedModel) {
         Set<Identifier> ids = new LinkedHashSet<>();
         Random rand = Random.create();
 
-        for (BakedQuad quad : bakedModel.getQuads(null, null, rand)) {
-            Sprite sprite = quad.sprite();
-            if (sprite != null) ids.add(sprite.getContents().getId());
-        }
+        if (bakedModel == null) return ids;
 
-        for (Direction side : Direction.values()) {
-            for (BakedQuad quad : bakedModel.getQuads(null, side, rand)) {
-                Sprite sprite = quad.sprite();
-                if (sprite != null) ids.add(sprite.getContents().getId());
+        try {
+            java.lang.reflect.Method getQuads = bakedModel.getClass().getMethod("getQuads", net.minecraft.block.BlockState.class, Direction.class, Random.class);
+
+            @SuppressWarnings("unchecked")
+            java.util.List<Object> baseQuads = (java.util.List<Object>) getQuads.invoke(bakedModel, null, null, rand);
+            if (baseQuads != null) {
+                for (Object q : baseQuads) {
+                    if (q instanceof BakedQuad quad) {
+                        Sprite sprite = quad.sprite();
+                        if (sprite != null) ids.add(sprite.getContents().getId());
+                    }
+                }
             }
+
+            for (Direction side : Direction.values()) {
+                @SuppressWarnings("unchecked")
+                java.util.List<Object> sideQuads = (java.util.List<Object>) getQuads.invoke(bakedModel, null, side, rand);
+                if (sideQuads != null) {
+                    for (Object q : sideQuads) {
+                        if (q instanceof BakedQuad quad) {
+                            Sprite sprite = quad.sprite();
+                            if (sprite != null) ids.add(sprite.getContents().getId());
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
         }
 
         return ids;

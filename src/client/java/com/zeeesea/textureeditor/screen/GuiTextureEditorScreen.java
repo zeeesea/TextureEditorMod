@@ -218,7 +218,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                 net.minecraft.client.texture.SpriteAtlasTexture atlas = atlasAndSprite.getLeft();
                 net.minecraft.client.texture.Sprite sprite = atlasAndSprite.getRight();
                 System.out.println("[TextureEditor] Updating sprite in atlas: " + spriteId);
-                ((net.minecraft.client.texture.AbstractTexture)atlas).bindTexture();
+                com.mojang.blaze3d.opengl.GlStateManager._bindTexture(com.zeeesea.textureeditor.util.TextureCompat.getGlId(atlas));
                 com.zeeesea.textureeditor.util.NativeImageCompat.upload(img, 0, sprite.getX(), sprite.getY(), false);
             } else {
                 net.minecraft.client.texture.NativeImageBackedTexture dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> fullTextureId.toString(), img);
