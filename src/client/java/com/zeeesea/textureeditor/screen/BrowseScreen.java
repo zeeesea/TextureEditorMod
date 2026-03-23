@@ -852,6 +852,9 @@ public class BrowseScreen extends Screen {
         // Special
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/cat_collar.png"), "Cat Collar", EntryType.MOB, new ItemStack(net.minecraft.item.Items.CAT_SPAWN_EGG)));
 
+        //Drowned
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie/drowned_outer_layer.png"), "Drowned Outer Layer", EntryType.MOB, new ItemStack(Items.DROWNED_SPAWN_EGG)));
+
         return entries;
     }
 
