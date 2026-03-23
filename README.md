@@ -1,8 +1,6 @@
 
 <img width="3840" height="874" alt="minecraft_title" src="https://github.com/user-attachments/assets/89398087-b6f7-4b8e-9875-f1b8a27cbc97" />
 
-# 🎨 In-Game Texture Editor Mod
-
 ![Fabric](https://img.shields.io/badge/Loader-Fabric-beige?style=for-the-badge&logo=fabric)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-green?style=for-the-badge&logo=minecraft)
 
