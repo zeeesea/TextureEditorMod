@@ -866,25 +866,18 @@ public class BrowseScreen extends Screen {
         // Armor textures from assets/minecraft/textures/models/armor
         addEntityArmorEntry(entries, "chainmail_layer_1");
         addEntityArmorEntry(entries, "chainmail_layer_2");
-        addEntityArmorEntry(entries, "chainmail_piglin_helmet");
         addEntityArmorEntry(entries, "diamond_layer_1");
         addEntityArmorEntry(entries, "diamond_layer_2");
-        addEntityArmorEntry(entries, "diamond_piglin_helmet");
         addEntityArmorEntry(entries, "gold_layer_1");
         addEntityArmorEntry(entries, "gold_layer_2");
-        addEntityArmorEntry(entries, "gold_piglin_helmet");
         addEntityArmorEntry(entries, "iron_layer_1");
         addEntityArmorEntry(entries, "iron_layer_2");
-        addEntityArmorEntry(entries, "iron_piglin_helmet");
         addEntityArmorEntry(entries, "leather_layer_1");
         addEntityArmorEntry(entries, "leather_layer_1_overlay");
         addEntityArmorEntry(entries, "leather_layer_2");
         addEntityArmorEntry(entries, "leather_layer_2_overlay");
-        addEntityArmorEntry(entries, "leather_piglin_helmet");
-        addEntityArmorEntry(entries, "leather_piglin_helmet_overlay");
         addEntityArmorEntry(entries, "netherite_layer_1");
         addEntityArmorEntry(entries, "netherite_layer_2");
-        addEntityArmorEntry(entries, "netherite_piglin_helmet");
         addEntityArmorEntry(entries, "piglin_leather_layer_1");
         addEntityArmorEntry(entries, "piglin_leather_layer_1_overlay");
         addEntityArmorEntry(entries, "turtle_layer_1");
@@ -1080,15 +1073,109 @@ public class BrowseScreen extends Screen {
             }
         } else if (entry.type == EntryType.ITEM && entry.stack != null) {
             // Don't call ItemTextureExtractor.extract() here — it's expensive and called every frame.
-            // Instead check common texture path patterns.
+            // Instead check common texture path patterns for item textures.
             Identifier itemId = Registries.ITEM.getId(entry.stack.getItem());
             Identifier texId = Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
             if (TextureManager.getInstance().getPixels(texId) != null) return true;
-        } else if (entry.type == EntryType.MOB || entry.type == EntryType.GUI || entry.type == EntryType.ENTITY) {
+
+        } else if (entry.type == EntryType.MOB) {
+            // MOB entries can be either direct texture IDs (some special entries) or spawn-egg items.
+            // If this entry contains a spawn egg item, check the shared spawn_egg sprite and common entity texture paths.
+            if (entry.stack != null) {
+                try {
+                    if (entry.stack.getItem() instanceof net.minecraft.item.SpawnEggItem) {
+                        // Shared spawn egg sprite (tinted)
+                        Identifier spawnTex = Identifier.of("minecraft", "textures/item/spawn_egg.png");
+                        if (TextureManager.getInstance().getPixels(spawnTex) != null) return true;
+
+                        // Also try common entity texture candidates derived from the spawn egg item id
+                        Identifier itemId2 = Registries.ITEM.getId(entry.stack.getItem());
+                        String path = itemId2.getPath();
+                        if (path.endsWith("_spawn_egg")) {
+                            String entityName = path.substring(0, path.length() - "_spawn_egg".length());
+                            Identifier ent1 = Identifier.of(itemId2.getNamespace(), "textures/entity/" + entityName + ".png");
+                            if (TextureManager.getInstance().getPixels(ent1) != null) return true;
+                            Identifier ent2 = Identifier.of(itemId2.getNamespace(), "textures/entity/" + entityName + "/" + entityName + ".png");
+                            if (TextureManager.getInstance().getPixels(ent2) != null) return true;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // Fallback: treat the entry id as a texture path (existing behavior)
             Identifier fullId = asFullTextureId(entry.id);
             if (TextureManager.getInstance().getPixels(fullId) != null) return true;
+
+        } else if (entry.type == EntryType.GUI || entry.type == EntryType.ENTITY) {
+            Identifier fullId = asFullTextureId(entry.id);
+            if (TextureManager.getInstance().getPixels(fullId) != null) return true;
+
+            // If this might be an armor model texture, also check common alias paths
+            try {
+                if (fullId.getPath().startsWith("textures/models/armor/") && fullId.getPath().endsWith(".png")) {
+                    for (Identifier alt : generateArmorAliasCandidates(fullId)) {
+                        if (TextureManager.getInstance().getPixels(alt) != null) return true;
+                    }
+                }
+            } catch (Exception ignored) {}
         }
         return false;
+    }
+
+    /**
+     * Generate common alternative texture IDs for armor model textures.
+     * Mirrors logic used in GuiTextureEditorScreen.addArmorAliasCandidates.
+     */
+    private java.util.List<Identifier> generateArmorAliasCandidates(Identifier baseId) {
+        java.util.List<Identifier> candidates = new java.util.ArrayList<>();
+        String path = baseId.getPath();
+        if (!path.startsWith("textures/models/armor/") || !path.endsWith(".png")) return candidates;
+
+        String name = path.substring("textures/models/armor/".length(), path.length() - 4);
+        String suffix = "";
+        if (name.endsWith("_overlay")) {
+            suffix = "_overlay";
+            name = name.substring(0, name.length() - "_overlay".length());
+        }
+
+        if (name.endsWith("_layer_1")) {
+            String rawMaterial = name.substring(0, name.length() - "_layer_1".length());
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid/", rawMaterial, suffix);
+            return candidates;
+        }
+        if (name.endsWith("_layer_2")) {
+            String rawMaterial = name.substring(0, name.length() - "_layer_2".length());
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid_leggings/", rawMaterial, suffix);
+            return candidates;
+        }
+
+        if (name.contains("_piglin_helmet")) {
+            String rawMaterial = name.replace("_piglin_helmet", "");
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/piglin_head/", rawMaterial, suffix);
+            addEquipmentCandidate(candidates, baseId, "textures/entity/equipment/humanoid/", rawMaterial, suffix);
+            return candidates;
+        }
+
+        return candidates;
+    }
+
+    private String normalizeArmorMaterial(String material) {
+        String normalized = material;
+        if (normalized.startsWith("piglin_")) {
+            normalized = normalized.substring("piglin_".length());
+        }
+        if ("turtle".equals(normalized)) {
+            normalized = "turtle_scute";
+        }
+        return normalized;
+    }
+
+    private void addEquipmentCandidate(java.util.List<Identifier> candidates, Identifier baseId, String folderPath, String rawMaterial, String suffix) {
+        String normalized = normalizeArmorMaterial(rawMaterial);
+        candidates.add(Identifier.of(baseId.getNamespace(), folderPath + rawMaterial + suffix + ".png"));
+        if (!normalized.equals(rawMaterial)) {
+            candidates.add(Identifier.of(baseId.getNamespace(), folderPath + normalized + suffix + ".png"));
+        }
     }
 
     private void drawRectOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int c) {

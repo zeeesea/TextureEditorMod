@@ -35,7 +35,7 @@ public class MobPreviewWidget {
 
     public void setPosition(int x, int y, int width, int height) {
         this.x = x;
-        this.y = y + 30; // weiter unten (default y + 30)
+        this.y = y + 30; // offset downwards (default y + 30)
         this.width = width;
         this.height = height;
     }
@@ -129,7 +129,7 @@ public class MobPreviewWidget {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double ha, double va) {
         if (!visible) return false;
-        // Nur zoomen, wenn Maus im Preview-Bereich
+        // Only zoom when the mouse is inside the preview area
         if (mouseX >= x - 2 && mouseX <= x + width + 2 && mouseY >= y - 16 && mouseY <= y + height + 2) {
             if (va > 0) scale = Math.min(MAX_SCALE, scale + 0.1f);
             else if (va < 0) scale = Math.max(MIN_SCALE, scale - 0.1f);

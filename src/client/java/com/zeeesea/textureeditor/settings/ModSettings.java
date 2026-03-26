@@ -31,7 +31,9 @@ public class ModSettings {
     public boolean confirmResetAll = true;
     public int maxUndoSteps = 50;
     public int colorHistorySize = 20;
-    public float brushVariation = 0.15f; // ±15% brightness variation for brush tool
+    public float brushVariation = 0.15f; // legacy, kept for compatibility
+    // Global variation percent applied to tools; 0.0 means OFF
+    public float variationPercent = 0.15f; // fraction (0.0-1.0)
 
     public boolean multiplayerSync = false;
 
@@ -61,11 +63,12 @@ public class ModSettings {
         keybinds.put("fill", GLFW.GLFW_KEY_F);
         keybinds.put("eyedropper", GLFW.GLFW_KEY_I);
         keybinds.put("line", GLFW.GLFW_KEY_L);
-        keybinds.put("brush", GLFW.GLFW_KEY_V);
+        // brush key removed; variation is now a global toggle
+        keybinds.put("rectangle", GLFW.GLFW_KEY_T);
         keybinds.put("undo", GLFW.GLFW_KEY_Z);
         keybinds.put("redo", GLFW.GLFW_KEY_Y);
         keybinds.put("grid", GLFW.GLFW_KEY_G);
-        keybinds.put("browse", GLFW.GLFW_KEY_LEFT_CONTROL);
+        keybinds.put("browse", GLFW.GLFW_KEY_LEFT_SHIFT);
         save();
     }
 

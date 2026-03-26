@@ -35,6 +35,9 @@ public class MobEditorScreen extends AbstractEditorScreen {
         this.entityName = entity.getType().getName().getString();
         this.parent = parent;
         this.zoom = 6; // mob textures are usually 64x64
+        // initialize preview widget early so General-tab buttons can safely toggle it
+        this.mobPreview = new MobPreviewWidget(entity);
+        this.mobPreview.setPosition(115, 30, 140, 160);
     }
 
 
@@ -76,37 +79,60 @@ public class MobEditorScreen extends AbstractEditorScreen {
     @Override
     protected Screen getBackScreen() { return parent; }
 
-    @Override protected int getMaxZoom() { return 20; }
+    @Override protected int getMaxZoom() { return 1024; }
     @Override protected int getMinZoom() { return 1; }
     @Override protected int getZoomStep() { return 1; }
 
     @Override
     protected int addExtraButtons(int toolY) {
-        // 3D Preview toggle
-        mobPreview = new MobPreviewWidget(entity);
-        mobPreview.setPosition(115, 30, 140, 160);
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.preview_3d"), btn -> {mobPreview.toggleVisible(); mobPreviewActive = mobPreview.isVisible(); })
-                .position(this.width - 195, this.height - 26).size(60, 20).build());
-
-        // "Edit Item" button — switch to item editor for entities with item form
-        if (EntityMapper.hasItemMode(entity)) {
-            int rsw = getRightSidebarWidth();
-            int resetBtnW = rsw - 10;
-            int tbh = getToolButtonHeight();
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_item"), btn -> {
-                ItemStack itemStack = EntityMapper.getItemFromEntity(entity);
-                if (itemStack != null) {
-                    MinecraftClient.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
-                }
-            }).position(this.width - rsw + 5, this.height - 148).size(resetBtnW, tbh).build());
-        }
-
+        // No absolute-positioned controls here any more; controls live in the General tab via addExtraLeftGeneralButtons
         return toolY;
     }
 
     @Override
+    protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
+        int px = x;
+        // 3D Preview toggle in general tab
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.preview_3d"), btn -> {
+            if (mobPreview == null) {
+                mobPreview = new MobPreviewWidget(entity);
+                mobPreview.setPosition(115, 30, 140, 160);
+            }
+            mobPreview.toggleVisible(); mobPreviewActive = mobPreview.isVisible();
+        })
+                .position(px, y).size(w, bh).build());
+        y += bh + 4;
+
+        // Edit Item button if this entity maps to an item
+        if (EntityMapper.hasItemMode(entity)) {
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_item"), btn -> {
+                ItemStack itemStack = EntityMapper.getItemFromEntity(entity);
+                if (itemStack != null) MinecraftClient.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
+            }).position(px, y).size(w, bh).build());
+            y += bh + 4;
+        }
+        return y;
+    }
+
+    @Override
     protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
-        if (mobPreview != null) mobPreview.render(context, mouseX, mouseY);
+        if (mobPreview != null) {
+            // Compute dynamic position: if the left panel is collapsed, move preview to the left side;
+            // otherwise keep it near the right area so it doesn't overlap the panels.
+            int pw = 140, ph = 160;
+            int px;
+            if (!leftOpen) {
+                // left panel is collapsed — place preview near left edge (after the toggle)
+                px = 18; // small offset to avoid the toggle button at x=0
+            } else {
+                // left panel open — place preview on the right side, avoiding the right sidebar
+                px = this.width - getRightSidebarWidth() - pw - 12;
+            }
+            // Clamp to screen
+            if (px < 2) px = 2;
+            mobPreview.setPosition(px, 30, pw, ph);
+            mobPreview.render(context, mouseX, mouseY);
+        }
     }
 
     @Override

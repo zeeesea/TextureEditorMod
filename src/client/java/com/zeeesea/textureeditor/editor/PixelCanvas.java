@@ -67,7 +67,10 @@ public class PixelCanvas {
     public int getPixel(int x, int y) {
         if (x < 0 || x >= width || y < 0 || y >= height) return 0;
         if (!cacheValid) {
-            flattenedCache = layerStack.getCompositeLayer().getPixels();
+            // Use full flatten (alpha compositing) so semi-transparent pixels
+            // on upper layers correctly blend with lower layers instead of
+            // simply taking the topmost non-transparent pixel.
+            flattenedCache = layerStack.flatten();
             cacheValid = true;
         }
         return flattenedCache[x][y];
@@ -253,6 +256,39 @@ public class PixelCanvas {
     }
 
     /**
+     * Compute the set of coordinates that would be affected by a flood fill on the active layer
+     * starting at (x,y). Returns a list of int[]{px,py} positions. Does not modify the canvas.
+     */
+    public java.util.List<int[]> computeFloodRegion(int x, int y) {
+        java.util.List<int[]> acc = new java.util.ArrayList<>();
+        Layer active = layerStack.getActiveLayer();
+        if (active == null) return acc;
+        if (x < 0 || x >= width || y < 0 || y >= height) return acc;
+        int targetColor = active.getPixel(x, y);
+
+        Queue<int[]> queue = new LinkedList<>();
+        queue.add(new int[]{x, y});
+        boolean[][] visited = new boolean[width][height];
+
+        while (!queue.isEmpty()) {
+            int[] pos = queue.poll();
+            int px = pos[0], py = pos[1];
+            if (px < 0 || px >= width || py < 0 || py >= height) continue;
+            if (visited[px][py]) continue;
+            if (active.getPixel(px, py) != targetColor) continue;
+
+            visited[px][py] = true;
+            acc.add(new int[]{px, py});
+
+            queue.add(new int[]{px + 1, py});
+            queue.add(new int[]{px - 1, py});
+            queue.add(new int[]{px, py + 1});
+            queue.add(new int[]{px, py - 1});
+        }
+        return acc;
+    }
+
+    /**
      * Draw a line using Bresenham's algorithm on active layer.
      */
     public void drawLine(int x0, int y0, int x1, int y1, int color) {
@@ -269,6 +305,174 @@ public class PixelCanvas {
             if (e2 > -dy) { err -= dy; x0 += sx; }
             if (e2 < dx) { err += dx; y0 += sy; }
         }
+    }
+
+    /**
+     * Draw a line with given integer thickness (in pixels) by drawing pixel areas along the Bresenham line.
+     */
+    public void drawLineThickness(int x0, int y0, int x1, int y1, int color, int size) {
+        int dx = Math.abs(x1 - x0);
+        int dy = Math.abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1;
+        int sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy;
+
+        while (true) {
+            drawPixelArea(x0, y0, size, color);
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
+    }
+
+    /**
+     * Draw a line with given thickness and optional variation. If variation <= 0 the draw is solid.
+     */
+    public void drawLineThickness(int x0, int y0, int x1, int y1, int color, int size, float variation) {
+        int dx = Math.abs(x1 - x0);
+        int dy = Math.abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1;
+        int sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy;
+
+        while (true) {
+            if (variation > 0f) drawBrushArea(x0, y0, size, color, variation);
+            else drawPixelArea(x0, y0, size, color);
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
+    }
+
+    /**
+     * Draw a line (1px thickness) with optional variation.
+     */
+    public void drawLine(int x0, int y0, int x1, int y1, int color, float variation) {
+        if (variation > 0f) {
+            int dx = Math.abs(x1 - x0);
+            int dy = Math.abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
+
+            while (true) {
+                drawBrushPixel(x0, y0, color, variation);
+                if (x0 == x1 && y0 == y1) break;
+                int e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 < dx) { err += dx; y0 += sy; }
+            }
+        } else {
+            drawLine(x0, y0, x1, y1, color);
+        }
+    }
+
+    /**
+     * Draw a filled rectangle on the active layer defined by two corners (inclusive).
+     */
+    public void drawRect(int x0, int y0, int x1, int y1, int color) {
+        // Draw only the 1px outline of the rectangle defined by two corners (inclusive).
+        int sx = Math.min(x0, x1);
+        int ex = Math.max(x0, x1);
+        int sy = Math.min(y0, y1);
+        int ey = Math.max(y0, y1);
+        // Top and bottom edges
+        for (int x = sx; x <= ex; x++) {
+            setPixel(x, sy, color);
+            setPixel(x, ey, color);
+        }
+        // Left and right edges
+        for (int y = sy; y <= ey; y++) {
+            setPixel(sx, y, color);
+            setPixel(ex, y, color);
+        }
+    }
+
+    /**
+     * Draw a rectangle outline with given thickness (in pixels). Thickness is applied by painting
+     * pixel areas along the edges.
+     */
+    public void drawRectOutlineThickness(int x0, int y0, int x1, int y1, int color, int size) {
+        int sx = Math.min(x0, x1);
+        int ex = Math.max(x0, x1);
+        int sy = Math.min(y0, y1);
+        int ey = Math.max(y0, y1);
+        // Top and bottom edges
+        for (int x = sx; x <= ex; x++) {
+            drawPixelArea(x, sy, size, color);
+            if (ey != sy) drawPixelArea(x, ey, size, color);
+        }
+        // Left and right edges
+        for (int y = sy; y <= ey; y++) {
+            drawPixelArea(sx, y, size, color);
+            if (ex != sx) drawPixelArea(ex, y, size, color);
+        }
+    }
+
+    /**
+     * Draw a rectangle outline with thickness and optional variation.
+     */
+    public void drawRectOutlineThickness(int x0, int y0, int x1, int y1, int color, int size, float variation) {
+        int sx = Math.min(x0, x1);
+        int ex = Math.max(x0, x1);
+        int sy = Math.min(y0, y1);
+        int ey = Math.max(y0, y1);
+        // Top and bottom edges
+        for (int x = sx; x <= ex; x++) {
+            if (variation > 0f) {
+                drawBrushArea(x, sy, size, color, variation);
+                if (ey != sy) drawBrushArea(x, ey, size, color, variation);
+            } else {
+                drawPixelArea(x, sy, size, color);
+                if (ey != sy) drawPixelArea(x, ey, size, color);
+            }
+        }
+        // Left and right edges
+        for (int y = sy; y <= ey; y++) {
+            if (variation > 0f) {
+                drawBrushArea(sx, y, size, color, variation);
+                if (ex != sx) drawBrushArea(ex, y, size, color, variation);
+            } else {
+                drawPixelArea(sx, y, size, color);
+                if (ex != sx) drawPixelArea(ex, y, size, color);
+            }
+        }
+    }
+
+    /**
+     * Flood fill with optional variation applied when setting pixels.
+     */
+    public void floodFill(int x, int y, int color, float variation) {
+        Layer active = layerStack.getActiveLayer();
+        if (active == null) return;
+        if (x < 0 || x >= width || y < 0 || y >= height) return;
+        int targetColor = active.getPixel(x, y);
+        if (targetColor == color) return;
+
+        Queue<int[]> queue = new LinkedList<>();
+        queue.add(new int[]{x, y});
+        boolean[][] visited = new boolean[width][height];
+
+        while (!queue.isEmpty()) {
+            int[] pos = queue.poll();
+            int px = pos[0], py = pos[1];
+            if (px < 0 || px >= width || py < 0 || py >= height) continue;
+            if (visited[px][py]) continue;
+            if (active.getPixel(px, py) != targetColor) continue;
+
+            visited[px][py] = true;
+            if (variation > 0f) drawBrushPixel(px, py, color, variation);
+            else active.setPixel(px, py, color);
+
+            queue.add(new int[]{px + 1, py});
+            queue.add(new int[]{px - 1, py});
+            queue.add(new int[]{px, py + 1});
+            queue.add(new int[]{px, py - 1});
+        }
+        dirty = true;
+        invalidateCache();
     }
 
     /**

@@ -70,7 +70,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
     protected int getBackgroundColor() { return 0xFF0A0A1E; }
 
     @Override
-    protected int getMaxZoom() { return 20; }
+    protected int getMaxZoom() { return 1024; }
 
     @Override
     protected int getMinZoom() { return 1; }
@@ -148,15 +148,32 @@ public class SkyEditorScreen extends AbstractEditorScreen {
             int idx = (currentSkyTexture.ordinal() - 1 + textures.length) % textures.length;
             switchTexture(textures[idx]);
         }).position(skyBtnX, 5).size(60, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.sky." + currentSkyTexture.key), btn -> {
-            int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
-            switchTexture(textures[idx]);
-        }).position(skyBtnX + 64, 5).size(110, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
             int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
             switchTexture(textures[idx]);
         }).position(skyBtnX + 178, 5).size(60, 20).build());
         return toolY;
+    }
+
+    @Override
+    protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
+        // Place small prev/next controls inside the General tab area
+        SkyTexture[] textures = SkyTexture.values();
+        int btnW = Math.max(48, (w - 4) / 3);
+        int px = x;
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.prev"), btn -> {
+            int idx = (currentSkyTexture.ordinal() - 1 + textures.length) % textures.length;
+            switchTexture(textures[idx]);
+        }).position(px, y).size(btnW, bh).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.sky." + currentSkyTexture.key), btn -> {
+            int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
+            switchTexture(textures[idx]);
+        }).position(px + btnW + 4, y).size(Math.min(80, w - btnW - 4), bh).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
+            int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
+            switchTexture(textures[idx]);
+        }).position(px + btnW + 8 + Math.min(80, w - btnW - 4), y).size(btnW, bh).build());
+        return y + bh + 4;
     }
 
     @Override

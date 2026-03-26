@@ -59,11 +59,12 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     @Override
     protected String getEditorTitle() { return Text.translatable("textureeditor.screen.item.editor_title", itemName).getString(); }
 
-    @Override
-    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_item").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
+
+    @Override
+    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_item").getString(); }
 
     @Override
     protected int addExtraButtons(int toolY) {

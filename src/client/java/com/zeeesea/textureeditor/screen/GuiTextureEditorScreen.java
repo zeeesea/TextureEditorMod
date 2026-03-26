@@ -187,16 +187,17 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
     @Override
     protected String getEditorTitle() { return Text.translatable("textureeditor.screen.gui.editor_title", displayName).getString(); }
 
-    @Override
+    //@Override
     protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
 
-    @Override protected int getMaxZoom() { return 20; }
+    @Override protected int getMaxZoom() { return 100; }
     @Override protected int getMinZoom() { return 1; }
     @Override protected int getZoomStep() { return 1; }
 
+    /*
     @Override
     protected int addExtraButtons(int toolY) {
         // If this is the elytra entity texture, add a button to switch to item view
@@ -209,7 +210,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
             }).position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
         }
         return toolY;
-    }
+    }*/
 
     @Override
     protected void applyLive() {

@@ -14,28 +14,29 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.toast.SystemToast;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import com.zeeesea.textureeditor.screen.QuickSelectWheel.Slice;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
 /**
- * Base class for all texture editor screens.
- * Contains shared UI: canvas rendering, tools, palette, color picker, layer panel, zoom/pan, etc.
- * Subclasses override loadTexture(), applyLive(), resetCurrent(), resetAll(), and addExtraButtons().
+ * Redesigned base class for all texture editor screens.
+ * Features collapsible left/right panels with tabs.
+ * Left: General (actions) | Tools
+ * Right: Color (picker + palette) | Layers
  */
 public abstract class AbstractEditorScreen extends Screen {
 
-    // Texture data (set by subclass in loadTexture())
+    // ── Texture data ──────────────────────────────────────────────────────────
     protected Identifier spriteId;
     protected Identifier textureId;
     protected PixelCanvas canvas;
     protected int[][] originalPixels;
 
-    // Tint support (used by block editors)
+    // ── Tint ──────────────────────────────────────────────────────────────────
     protected int blockTint = -1;
     protected boolean isTinted = false;
 
-    // Editor state
+    // ── Editor state ─────────────────────────────────────────────────────────
     protected EditorTool currentTool = EditorTool.PENCIL;
     protected int currentColor = 0xFFFF0000;
     protected int zoom = 12;
@@ -43,158 +44,212 @@ public abstract class AbstractEditorScreen extends Screen {
     protected int toolSize = 1;
     protected boolean previewingOriginal = false;
 
-    // Canvas rendering position
+    // ── Canvas position ───────────────────────────────────────────────────────
     protected int canvasBaseX, canvasBaseY;
     protected int panOffsetX = 0, panOffsetY = 0;
     protected int canvasScreenX, canvasScreenY;
-
-    // Panning state
     protected boolean isPanning = false;
     private double panStartMouseX, panStartMouseY;
     private int panStartOffsetX, panStartOffsetY;
 
-    // Line tool
+    // ── Line tool ─────────────────────────────────────────────────────────────
     private int lineStartX = -1, lineStartY = -1;
     private boolean lineFirstClick = false;
+    // ── Rectangle tool ─────────────────────────────────────────────────-------
+    private int rectStartX = -1, rectStartY = -1;
+    private boolean rectFirstClick = false;
+    // Preview coordinates for live previewing of line/rectangle tools
+    private int previewEndX = -1, previewEndY = -1;
 
-    protected PanelType currentPanel = PanelType.NONE;
-    protected enum PanelType { NONE, COLOR_PANEL, LAYER_PANEL }
+    // Color picker drag-capture flags (keep interaction captured while dragging inside picker)
+    private boolean pickingSv = false, pickingHue = false, pickingAlpha = false;
+
+    // ── Panel system ──────────────────────────────────────────────────────────
+    // Left panel tabs
+    protected enum LeftTab { GENERAL, TOOLS }
+    protected LeftTab leftTab = LeftTab.TOOLS;
+    protected boolean leftOpen = true;
+
+    // Right panel tabs
+    protected enum RightTab { COLOR, LAYERS }
+    protected RightTab rightTab = RightTab.COLOR;
+    protected boolean rightOpen = true;
+
+    // Session-persistent panel state (keeps panel open/tab choices for the JVM session)
+    private static boolean sessionLeftOpen = true;
+    private static LeftTab sessionLeftTab = LeftTab.TOOLS;
+    private static boolean sessionRightOpen = true;
+    private static RightTab sessionRightTab = RightTab.COLOR;
+
+    // Panel widths (base value). Use getPanelWidth() to compute a responsive width at runtime.
+    private static final int PANEL_W = 120;
+    private static final int TAB_H = 22;
+    private static final int TOGGLE_BTN_W = 14;
+
+    /** Return an appropriate panel width for the current screen size / GUI scale to avoid overlap. */
+    protected int getPanelWidth() {
+        // Use the base PANEL_W but clamp it so panels never take more than a quarter of the screen
+        int max = Math.max(80, this.width / 4);
+        return Math.min(PANEL_W, max);
+    }
+
+    /** Allowed maximum zoom for the current layout: permit zoom up to getMaxZoom() but also consider very large desired zoom. */
+    protected int getAllowedMaxZoom() {
+        if (canvas == null) return getMaxZoom();
+        int lw = (leftOpen ? getPanelWidth() : TOGGLE_BTN_W) + TOGGLE_BTN_W;
+        int rw = (rightOpen ? getPanelWidth() : TOGGLE_BTN_W) + TOGGLE_BTN_W;
+        int availW = this.width - lw - rw - 20;
+        int availH = this.height - 60;
+        int fitZoom = Math.min(availW / Math.max(1, canvas.getWidth()), availH / Math.max(1, canvas.getHeight()));
+        if (fitZoom < getMinZoom()) fitZoom = getMinZoom();
+        return Math.max(getMaxZoom(), fitZoom);
+    }
+
+    // ── Color picker state ────────────────────────────────────────────────────
     private float pickerHue = 0f, pickerSat = 1f, pickerVal = 1f;
+    private float pickerAlpha = 1f;
     private float cachedPickerHue = -1f;
-    private static final int PICKER_SV_W = 120, PICKER_SV_H = 80;
-    // Cached picker textures for performance (avoids thousands of fill() calls per frame)
+    // Shrink the picker widths so the controls fit inside the panel width
+    private static final int PICKER_SV_W = 64, PICKER_SV_H = 80;
+    private static final int HUE_W = 8, ALPHA_W = 8;
     private net.minecraft.client.texture.NativeImageBackedTexture pickerSvTexture = null;
     private net.minecraft.client.texture.NativeImageBackedTexture pickerHueTexture = null;
-    private static final Identifier PICKER_SV_TEX_ID = Identifier.of("textureeditor", "picker_sv");
-    private static final Identifier PICKER_HUE_TEX_ID = Identifier.of("textureeditor", "picker_hue");
+    private net.minecraft.client.texture.NativeImageBackedTexture pickerAlphaTexture = null;
     private boolean pickerHueBarBuilt = false;
+    private boolean pickerAlphaBarBuilt = false;
+    private static final Identifier PICKER_SV_ID   = Identifier.of("textureeditor", "picker_sv");
+    private static final Identifier PICKER_HUE_ID  = Identifier.of("textureeditor", "picker_hue");
+    private static final Identifier PICKER_ALPHA_ID = Identifier.of("textureeditor", "picker_alpha");
 
-    private int lastDrawX = -1, lastDrawY = -1;
+    // ── Hex input ─────────────────────────────────────────────────────────────
+    protected TextFieldWidget hexInput;
+    // When programmatically updating the hex input we suppress its change callback
+    private boolean suppressHexCallback = false;
+    // Size slider reference so we can programmatically update it when toolSize changes
+    private net.minecraft.client.gui.widget.SliderWidget sizeSlider = null;
+    // When programmatically updating the size slider, suppress its applyValue callback
+    private boolean suppressSizeSliderCallback = false;
+    // (No separate alpha slider widget — the alpha bar at the right of the picker
+    // is the single alpha control used.)
 
+    // ── Palette ───────────────────────────────────────────────────────────────
     protected static final int[] PALETTE = {
             0xFF000000, 0xFF404040, 0xFF808080, 0xFFC0C0C0, 0xFFFFFFFF,
-
             0xFFFF0000, 0xFFFF8000, 0xFFFFFF00, 0xFF80FF00,
             0xFF00FF00, 0xFF00FF80, 0xFF00FFFF, 0xFF0080FF,
             0xFF0000FF, 0xFF8000FF, 0xFFFF00FF, 0xFFFF0080,
-
             0xFF800000, 0xFF804000, 0xFF808000, 0xFF408000,
             0xFF008000, 0xFF008040, 0xFF008080, 0xFF004080,
             0xFF000080, 0xFF400080, 0xFF800080, 0xFF800040,
-
-            0xFFFFB3B3, 0xFFFFD9B3, 0xFFFFFFB3, 0xFFB3FFB3,
-            0xFFB3FFFF
+            0xFFFFB3B3, 0xFFFFD9B3, 0xFFFFFFB3, 0xFFB3FFB3, 0xFFB3FFFF
     };
 
-    protected TextFieldWidget hexInput;
+    // ── Canvas texture cache ──────────────────────────────────────────────────
+    private net.minecraft.client.texture.NativeImageBackedTexture canvasTexture = null;
+    private static final Identifier CANVAS_TEX_ID = Identifier.of("textureeditor", "canvas_preview");
+    private long lastCanvasHash = 0;
+    private boolean canvasTextureDirty = true;
 
+    // ── Drawing interpolation ─────────────────────────────────────────────────
+    private int lastDrawX = -1, lastDrawY = -1;
+
+    // ── Quick select wheel ────────────────────────────────────────────────────
     protected QuickSelectWheel quickSelectWheel = new QuickSelectWheel(50);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Constructor
+    // ─────────────────────────────────────────────────────────────────────────
 
     protected AbstractEditorScreen(Text title) {
         super(title);
     }
 
-    // --- Abstract methods for subclasses ---
+    // ─────────────────────────────────────────────────────────────────────────
+    // Abstract / overrideable
+    // ─────────────────────────────────────────────────────────────────────────
 
     protected abstract void loadTexture();
     protected abstract void applyLive();
     protected abstract void resetCurrent();
     protected abstract String getEditorTitle();
 
-    protected Screen getBackScreen() { return null; }
-    protected int addExtraButtons(int toolY) { return toolY; }
-    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {}
-    protected boolean handleExtraClick(double mx, double my, int btn) { return false; }
-    protected boolean handleExtraRelease(double mx, double my, int btn) { return false; }
+    protected Screen getBackScreen()                                           { return null; }
+    protected int    addExtraLeftGeneralButtons(int y, int x, int w, int bh)  { return y; }
+    protected int    addExtraToolButtons(int y, int x, int w, int bh)         { return y; }
+    protected void   renderExtra(DrawContext ctx, int mx, int my)             {}
+    protected boolean handleExtraClick(double mx, double my, int btn)         { return false; }
+    protected boolean handleExtraRelease(double mx, double my, int btn)       { return false; }
     protected boolean handleExtraDrag(double mx, double my, int btn, double dx, double dy) { return false; }
     protected boolean handleExtraScroll(double mx, double my, double ha, double va) { return false; }
-    //protected int getBackgroundColor() { return 0xFF1A1A2E; }
-    protected int getBackgroundColor() { return 0xFF161626; }
-    protected int getMaxZoom() { return 40; }
-    protected int getMinZoom() { return 2; }
-    protected int getZoomStep() { return 2; }
-    protected String getResetCurrentLabel() { return "Reset"; }
-    protected boolean usesTint() { return isTinted; }
 
-    // --- Scale helpers ---
+    protected int  getBackgroundColor() { return 0xFF0F0F1A; }
+    // Increased default max zoom to allow deep zooming into very small textures
+    protected int  getMaxZoom()         { return 4096; }
+    protected int  getMinZoom()         { return 1; }
+    protected int  getZoomStep()        { return 1; }
+    protected boolean usesTint()        { return isTinted; }
 
-    /** Get the current GUI scale */
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
     protected int getGuiScale() {
         return (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
     }
 
-    /** Left sidebar width — narrower at high scales */
-    protected int getLeftSidebarWidth() {
-        int scale = getGuiScale();
-        if (scale >= 5) return 70;
-        if (scale >= 4) return 85;
-        return 110;
-    }
-
-    /** Right sidebar width — narrower at high scales */
-    protected int getRightSidebarWidth() {
-        int scale = getGuiScale();
-        if (scale >= 5) return 80;
-        if (scale >= 4) return 95;
-        return 120;
-    }
-
-    /** Tool button width — narrower at high scales */
-    protected int getToolButtonWidth() {
-        int scale = getGuiScale();
-        if (scale >= 5) return 65;
-        if (scale >= 4) return 80;
-        return 100;
-    }
-
-    /** Tool button height */
     protected int getToolButtonHeight() {
-        int scale = getGuiScale();
-        if (scale >= 4) return 18;
-        return 20;
+        return getGuiScale() >= 4 ? 18 : 20;
     }
 
-    /** Grid + Zoom buttons: shown at scale 1-4, but hidden if scale >= 3 on FHD or smaller */
-    protected boolean showExtraButtons() {
-        int scale = getGuiScale();
-        int height = MinecraftClient.getInstance().getWindow().getHeight();
-        // On FHD (1080p) or smaller, hide these buttons at scale 3+ to save vertical space
-        if (height <= 1080 && scale >= 3) return false;
-        return scale <= 4;
+    private String getVarLabel() {
+        int pct = (int)(ModSettings.getInstance().variationPercent * 100);
+        if (pct <= 0) return "Variation: OFF";
+        return "Variation: " + pct + "%";
     }
 
-    /** Face button: shown at scale 1-4, hidden at 5+ */
-    protected boolean showFaceButton() {
-        return getGuiScale() <= 4;
+    // Deterministic variation for preview: adjust RGB by a pseudo-random factor based on coordinates
+    private int applyPreviewVariation(int baseColor, int x, int y, float var) {
+        int a = (baseColor >> 24) & 0xFF;
+        int r = (baseColor >> 16) & 0xFF;
+        int g = (baseColor >> 8) & 0xFF;
+        int b = baseColor & 0xFF;
+        // simple hash
+        int h = (x * 73856093) ^ (y * 19349663);
+        float rand = ((h & 0xFFFF) / (float)0xFFFF) * 2f - 1f; // [-1..1]
+        float offset = rand * var;
+        r = clamp((int)(r + r * offset), 0, 255);
+        g = clamp((int)(g + g * offset), 0, 255);
+        b = clamp((int)(b + b * offset), 0, 255);
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    /** Undo/Redo buttons: shown at scale 1-4, hidden at 5+ */
-    private boolean showUndoRedo() {
-        return getGuiScale() <= 4;
+    private int clamp(int v, int lo, int hi) {
+        if (v < lo) return lo;
+        if (v > hi) return hi;
+        return v;
     }
 
-    /** Color history: shown at scale 1-4, hidden at 5+ */
-    private boolean showColorHistory() {
-        int scale = getGuiScale();
-        int height = MinecraftClient.getInstance().getWindow().getHeight();
-        if (height <= 1080 && scale >= 3) return false;
-        return scale <= 4;
-    }
+    protected boolean showFaceButton() { return getGuiScale() <= 4; }
 
-    // --- Tint helpers ---
+    /** Effective left panel width (0 if closed) */
+    private int leftW() { return leftOpen ? getPanelWidth() : TOGGLE_BTN_W; }
+    /** Effective right panel width (0 if closed) */
+    private int rightW() { return rightOpen ? getPanelWidth() : TOGGLE_BTN_W; }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tint
+    // ─────────────────────────────────────────────────────────────────────────
 
     protected int applyTint(int pixel) {
         if (!isTinted) return pixel;
-        int a = (pixel >> 24) & 0xFF;
-        int r = (pixel >> 16) & 0xFF, g = (pixel >> 8) & 0xFF, b = pixel & 0xFF;
+        int a = (pixel >> 24) & 0xFF, r = (pixel >> 16) & 0xFF, g = (pixel >> 8) & 0xFF, b = pixel & 0xFF;
         int tr = (blockTint >> 16) & 0xFF, tg = (blockTint >> 8) & 0xFF, tb = blockTint & 0xFF;
         return (a << 24) | ((r * tr / 255) << 16) | ((g * tg / 255) << 8) | (b * tb / 255);
     }
 
     protected int removeTint(int color) {
         if (!isTinted) return color;
-        int a = (color >> 24) & 0xFF;
-        int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
+        int a = (color >> 24) & 0xFF, r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
         int tr = (blockTint >> 16) & 0xFF, tg = (blockTint >> 8) & 0xFF, tb = blockTint & 0xFF;
         r = tr > 0 ? Math.min(255, r * 255 / tr) : r;
         g = tg > 0 ? Math.min(255, g * 255 / tg) : g;
@@ -202,591 +257,782 @@ public abstract class AbstractEditorScreen extends Screen {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    // --- Init ---
+    public void setTint(int tint) {
+        this.blockTint = tint | 0xFF000000;
+        this.isTinted = true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Init
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public void removed() {
         super.removed();
-        // Clean up cached canvas texture
-        if (canvasTexture != null) {
-            canvasTexture.close();
-            canvasTexture = null;
-        }
-        // Clean up picker textures
-        if (pickerSvTexture != null) {
-            pickerSvTexture.close();
-            pickerSvTexture = null;
-        }
-        if (pickerHueTexture != null) {
-            pickerHueTexture.close();
-            pickerHueTexture = null;
-        }
+        if (canvasTexture    != null) { canvasTexture.close();    canvasTexture    = null; }
+        if (pickerSvTexture  != null) { pickerSvTexture.close();  pickerSvTexture  = null; }
+        if (pickerHueTexture != null) { pickerHueTexture.close(); pickerHueTexture = null; }
+        if (pickerAlphaTexture != null) { pickerAlphaTexture.close(); pickerAlphaTexture = null; }
     }
 
     @Override
     protected void init() {
-        // Reset cached textures on re-init (screen resize, etc.)
         canvasTextureDirty = true;
-        pickerHueBarBuilt = false;
+        pickerHueBarBuilt  = false;
+        pickerAlphaBarBuilt = false;
 
         loadTexture();
-        if (canvas == null) {
-            canvas = new PixelCanvas(16, 16);
-            originalPixels = new int[16][16];
+        if (canvas == null) { canvas = new PixelCanvas(16, 16); originalPixels = new int[16][16]; }
+
+        // Restore panel open/tab state from session (keeps user's UI choices while the game is running)
+        this.leftOpen = sessionLeftOpen;
+        this.leftTab = sessionLeftTab;
+        this.rightOpen = sessionRightOpen;
+        this.rightTab = sessionRightTab;
+
+        recalcCanvasPos();
+
+        ModSettings s = ModSettings.getInstance();
+        currentTool = EditorTool.getToolByName(s.defaultTool);
+        ColorHistory.setMaxHistory(s.colorHistorySize);
+        showGrid = s.gridOnByDefault;
+
+        buildWidgets();
+    }
+
+    private void buildWidgets() {
+        ModSettings s = ModSettings.getInstance();
+        int bh = getToolButtonHeight();
+
+        // ── LEFT panel toggle button ──────────────────────────────────────────
+        addDrawableChild(ButtonWidget.builder(
+                Text.literal(leftOpen ? "<" : ">"),
+                btn -> { leftOpen = !leftOpen; sessionLeftOpen = leftOpen; clearChildren(); recalcCanvasPos(); buildWidgets(); }
+        ).position(leftOpen ? getPanelWidth() : 0, 0).size(TOGGLE_BTN_W, bh).build());
+
+        if (leftOpen) {
+            // Tab buttons
+            addDrawableChild(ButtonWidget.builder(Text.literal("General"),
+                            btn -> { leftTab = LeftTab.GENERAL; sessionLeftTab = leftTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
+                    .position(0, bh).size(getPanelWidth() / 2, TAB_H).build());
+            addDrawableChild(ButtonWidget.builder(Text.literal("Tools"),
+                            btn -> { leftTab = LeftTab.TOOLS; sessionLeftTab = leftTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
+                    .position(getPanelWidth() / 2, bh).size(getPanelWidth() / 2, TAB_H).build());
+
+            int py = bh + TAB_H + 4;
+
+            if (leftTab == LeftTab.GENERAL) {
+                // General tab
+                py = buildGeneralTab(py, 4, getPanelWidth() - 8, bh, s);
+            } else {
+                // Tools tab
+                py = buildToolsTab(py, 4, getPanelWidth() - 8, bh, s);
+            }
         }
 
-        int canvasPixelSize = Math.min(zoom, Math.min(
-                (this.width - getLeftSidebarWidth() - getRightSidebarWidth() - 20) / canvas.getWidth(),
-                (this.height - 80) / canvas.getHeight()
-        ));
-        if (canvasPixelSize < getMinZoom()) canvasPixelSize = getMinZoom();
-        zoom = canvasPixelSize;
+        // ── RIGHT panel toggle button ─────────────────────────────────────────
+        int rtx = this.width - rightW();
+        addDrawableChild(ButtonWidget.builder(
+                Text.literal(rightOpen ? ">" : "<"),
+                btn -> { rightOpen = !rightOpen; sessionRightOpen = rightOpen; clearChildren(); recalcCanvasPos(); buildWidgets(); }
+        ).position(rtx, 0).size(TOGGLE_BTN_W, bh).build());
 
-        int lsw = getLeftSidebarWidth();
-        int rsw = getRightSidebarWidth();
-        canvasBaseX = lsw + 10 + (this.width - lsw - rsw - 20 - canvas.getWidth() * zoom) / 2;
-        canvasBaseY = 30 + (this.height - 80 - canvas.getHeight() * zoom) / 2;
-        canvasScreenX = canvasBaseX + panOffsetX;
-        canvasScreenY = canvasBaseY + panOffsetY;
+        if (rightOpen) {
+            int rpx = this.width - getPanelWidth();
+            // Tab buttons
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.picker"),
+                            btn -> { rightTab = RightTab.COLOR; sessionRightTab = rightTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
+                    .position(rpx, bh).size(getPanelWidth() / 2, TAB_H).build());
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.layers"),
+                            btn -> { rightTab = RightTab.LAYERS; sessionRightTab = rightTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
+                    .position(rpx + getPanelWidth() / 2, bh).size(getPanelWidth() / 2, TAB_H).build());
 
-        ModSettings settings = ModSettings.getInstance();
-        currentTool = EditorTool.getToolByName(settings.defaultTool);
-        ColorHistory.setMaxHistory(settings.colorHistorySize);
-        showGrid = settings.gridOnByDefault;
-
-        // Tool buttons
-        int toolY = 30;
-        int tbw = getToolButtonWidth();
-        int tbh = getToolButtonHeight();
-        for (EditorTool tool : EditorTool.values()) {
-            final EditorTool t = tool;
-            String keyHint = settings.showToolHints ? getToolKeyHint(tool) : "";
-            String labelKey = "textureeditor.tool." + tool.name().toLowerCase();
-            Text label = keyHint.isEmpty() ? Text.translatable(labelKey) : Text.translatable(labelKey).copy().append(" (" + keyHint + ")");
-            addDrawableChild(ButtonWidget.builder(label, btn -> currentTool = t)
-                    .position(5, toolY).size(tbw, tbh).build());
-            toolY += tbh + 4;
+            if (rightTab == RightTab.COLOR) {
+                buildColorTab(rpx, bh + TAB_H + 4, PANEL_W - 8, bh);
+            }
+            // Layers tab has no persistent buttons (all drawn manually)
         }
 
-        toolY += 10;
+        // ── Top bar: title + close ────────────────────────────────────────────
+        addDrawableChild(ButtonWidget.builder(Text.literal("X"),
+                        btn -> { if (s.autoApplyLive) applyLive(); this.close(); })
+                .position(this.width - rightW() - 24, 0).size(22, bh).build());
+    }
 
-        // Undo/Redo — only at scale <= 3
-        if (showUndoRedo()) {
-            String undoHint = settings.showToolHints ? settings.getKeyName("undo") : "";
-            String redoHint = settings.showToolHints ? settings.getKeyName("redo") : "";
-            Text undoText = undoHint.isEmpty() ? Text.translatable("textureeditor.button.undo") : Text.translatable("textureeditor.button.undo").copy().append(" (" + undoHint + ")");
-            Text redoText = redoHint.isEmpty() ? Text.translatable("textureeditor.button.redo") : Text.translatable("textureeditor.button.redo").copy().append(" (" + redoHint + ")");
-            int halfBtnW = (tbw - 4) / 2;
-            addDrawableChild(ButtonWidget.builder(undoText, btn -> canvas.undo())
-                    .position(5, toolY).size(halfBtnW, tbh).build());
-            addDrawableChild(ButtonWidget.builder(redoText, btn -> canvas.redo())
-                    .position(5 + halfBtnW + 4, toolY).size(halfBtnW, tbh).build());
-            toolY += tbh + 4;
+    // ─────────────────────────────────────────────────────────────────────────
+    // General tab
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private int buildGeneralTab(int py, int px, int w, int bh, ModSettings s) {
+        addDrawableChild(ButtonWidget.builder(
+                        Text.translatable("textureeditor.button.apply_live").styled(st -> st.withColor(0xFF44FF44)),
+                        btn -> applyLive())
+                .position(px, py).size(w, bh).build());
+        py += bh + 2;
+
+        addDrawableChild(ButtonWidget.builder(
+                        Text.translatable("textureeditor.button.export_pack").styled(st -> st.withColor(0xFFFFCC44)),
+                        btn -> MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
+                .position(px, py).size(w, bh).build());
+        py += bh + 2;
+
+        addDrawableChild(ButtonWidget.builder(
+                        Text.translatable("textureeditor.button.browse").styled(st -> st.withColor(0xFFFF66CC)),
+                        btn -> {
+                            if (s.autoApplyLive) applyLive();
+                            Screen bs = getBackScreen();
+                            MinecraftClient.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
+                        })
+                .position(px, py).size(w, bh).build());
+        py += bh + 8;
+
+        // Separator
+        py += 2;
+        addDrawableChild(ButtonWidget.builder(
+                                Text.literal(getResetCurrentLabel()).styled(st -> st.withColor(0xFFFF9944)),
+                        btn -> resetCurrent())
+                .position(px, py).size(w, bh).build());
+        py += bh + 2;
+
+        addDrawableChild(ButtonWidget.builder(
+                        Text.translatable("textureeditor.button.reset_all").styled(st -> st.withColor(0xFFFF4444)),
+                        btn -> MinecraftClient.getInstance().setScreen(new ConfirmResetAllScreen(this)))
+                .position(px, py).size(w, bh).build());
+        py += bh + 8;
+
+        // Extra buttons from subclass (face selector etc.)
+        py = addExtraLeftGeneralButtons(py, px, w, bh);
+
+        return py;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tools tab
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private int buildToolsTab(int py, int px, int w, int bh, ModSettings s) {
+        // Tool buttons (2 per row to save space)
+        EditorTool[] tools = EditorTool.values();
+        for (int i = 0; i < tools.length; i += 2) {
+            int hw = (w - 2) / 2;
+            final EditorTool t1 = tools[i];
+            String h1 = s.showToolHints ? s.getKeyName(t1.name().toLowerCase()) : "";
+            String l1 = t1.getDisplayName() + (h1.isEmpty() ? "" : " (" + h1 + ")");
+            addDrawableChild(ButtonWidget.builder(Text.literal(l1), btn -> currentTool = t1)
+                    .position(px, py).size(hw, bh).build());
+            if (i + 1 < tools.length) {
+                final EditorTool t2 = tools[i + 1];
+                String h2 = s.showToolHints ? s.getKeyName(t2.name().toLowerCase()) : "";
+                String l2 = t2.getDisplayName() + (h2.isEmpty() ? "" : " (" + h2 + ")");
+                addDrawableChild(ButtonWidget.builder(Text.literal(l2), btn -> currentTool = t2)
+                        .position(px + hw + 2, py).size(hw, bh).build());
+            }
+            py += bh + 2;
         }
+        py += 4;
 
-        // Grid + Zoom — only at scale <= 3
-        if (showExtraButtons()) {
-            String gridHint = settings.showToolHints ? settings.getKeyName("grid") : "";
-            Text gridText = gridHint.isEmpty() ? Text.translatable("textureeditor.button.grid") : Text.translatable("textureeditor.button.grid").copy().append(" (" + gridHint + ")");
-            addDrawableChild(ButtonWidget.builder(gridText, btn -> showGrid = !showGrid)
-                    .position(5, toolY).size(tbw, tbh).build());
-            toolY += tbh + 4;
-            int halfBtnW = (tbw - 4) / 2;
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.zoom_in"), btn -> {
-                if (zoom < getMaxZoom()) { zoom += getZoomStep(); recalcCanvasPos(); }
-            }).position(5, toolY).size(halfBtnW, tbh).build());
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.zoom_out"), btn -> {
-                if (zoom > getMinZoom()) { zoom -= getZoomStep(); recalcCanvasPos(); }
-            }).position(5 + halfBtnW + 4, toolY).size(halfBtnW, tbh).build());
-            toolY += tbh + 10;
-        }
+        // Undo / Redo
+        int hw = (w - 2) / 2;
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.undo"), btn -> canvas.undo())
+                .position(px, py).size(hw, bh).build());
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.redo"), btn -> canvas.redo())
+                .position(px + hw + 2, py).size(hw, bh).build());
+        py += bh + 4;
 
-        // Tool size cycle button
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.size", toolSize), btn -> {
-            toolSize = switch (toolSize) {
-                case 1 -> 2;
-                case 2 -> 3;
-                case 3 -> 5;
-                default -> 1;
-            };
-            btn.setMessage(Text.translatable("textureeditor.button.size", toolSize));
-        }).position(5, toolY).size(tbw, tbh).build());
-        toolY += tbh + 4;
+        // Grid toggle
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.grid"), btn -> showGrid = !showGrid)
+                .position(px, py).size(w, bh).build());
+        py += bh + 2;
 
-        // Extra buttons from subclass (face selector, etc.)
-        toolY = addExtraButtons(toolY);
 
-        // Reset buttons (bottom-right)
-        int resetBtnW = rsw - 10;
-        int resetX = this.width - rsw + 5;
-        int resetBaseY = this.height - 100;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.reset"), btn -> resetCurrent())
-                .position(resetX, resetBaseY).size(resetBtnW, tbh).build());
-        addDrawableChild(ButtonWidget.builder(
-                Text.translatable("textureeditor.button.reset_all").styled(s -> s.withColor(0xFFFF4444)),
-                btn -> doResetAll())
-                .position(resetX, resetBaseY + tbh + 4).size(resetBtnW, tbh).build());
+        // Tool size slider
+        sizeSlider = new net.minecraft.client.gui.widget.SliderWidget(
+                px, py, w, bh, Text.literal("Size: " + toolSize + "px"), (toolSize - 1) / 9.0) {
+            @Override protected void updateMessage() { setMessage(Text.literal("Size: " + toolSize + "px")); }
+            @Override protected void applyValue() {
+                if (suppressSizeSliderCallback) return;
+                toolSize = (int)(value * 9) + 1;
+            }
+        };
+        addDrawableChild(sizeSlider);
+        py += bh + 4;
 
-        // Bottom-left action buttons
-        addDrawableChild(ButtonWidget.builder(
-                Text.translatable("textureeditor.button.apply_live").styled(s -> s.withColor(0xFF44FF44)),
-                btn -> applyLive())
-                .position(5, this.height - 78).size(tbw, tbh).build());
-        addDrawableChild(ButtonWidget.builder(
-                Text.translatable("textureeditor.button.export_pack").styled(s -> s.withColor(0xFFFFCC44)),
-                btn -> MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
-                .position(5, this.height - 54).size(tbw, tbh).build());
-        addDrawableChild(ButtonWidget.builder(
-                Text.translatable("textureeditor.button.browse").styled(s -> s.withColor(0xFFFF66CC)),
-                btn -> {
-                    if (settings.autoApplyLive) this.applyLive();
-                    Screen bs = getBackScreen();
-                    if (bs != null) MinecraftClient.getInstance().setScreen(bs);
-                    else MinecraftClient.getInstance().setScreen(new BrowseScreen());
-                })
-                .position(5, this.height - 30).size(tbw, tbh).build());
+        // Variation percent slider (0..100). When value == 0 show "OFF" instead of "0%".
+        net.minecraft.client.gui.widget.SliderWidget varSlider = new net.minecraft.client.gui.widget.SliderWidget(px, py, w, bh, Text.literal(getVarLabel()), ModSettings.getInstance().variationPercent) {
+            @Override protected void updateMessage() { setMessage(Text.literal(getVarLabel())); }
+            @Override protected void applyValue() { ModSettings.getInstance().variationPercent = (float)this.value; ModSettings.getInstance().save(); }
+        };
+        addDrawableChild(varSlider);
+        py += bh + 4;
 
-        // Top-right close
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.close"), btn -> {
-            if (settings.autoApplyLive) this.applyLive();
-            this.close();
-        }).position(this.width - 65, 5).size(60, tbh).build());
+        // Helper to display label for variation slider
+        // (kept as a local method below via lambda-like closure through a private helper)
 
-        // Bottom-right: Picker, Layers
-        addDrawableChild(ButtonWidget.builder(
-                Text.translatable("textureeditor.button.picker").styled(s -> s.withColor(0xFF00E6E6)),
-                btn -> {
-                    currentPanel = currentPanel == PanelType.COLOR_PANEL ? PanelType.NONE : PanelType.COLOR_PANEL;
-                    setColor(currentColor, false);
-                })
-                .position(this.width - 65, this.height - 26).size(60, tbh).build());
-        addDrawableChild(ButtonWidget.builder(
-                Text.translatable("textureeditor.button.layers").styled(s -> s.withColor(0xFFFFFF44)),
-                btn -> {
-                    currentPanel = currentPanel == PanelType.LAYER_PANEL ? PanelType.NONE : PanelType.LAYER_PANEL;
-                })
-                .position(this.width - 130, this.height - 26).size(60, tbh).build());
+        // Extra tool buttons from subclass
+        py = addExtraToolButtons(py, px, w, bh);
 
-        // Hex Input
-        int paletteEndY = getPaletteEndY() + 10;
-        int hexW = Math.min(110, getRightSidebarWidth() - 30);
-        hexInput = new TextFieldWidget(this.textRenderer, getPaletteX(), paletteEndY, hexW, 18, Text.literal("Hex"));
+        return py;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Color tab — builds persistent widgets (hex input)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void buildColorTab(int rpx, int py, int pw, int bh) {
+        // Position the hex input so it sits next to the current color swatch
+        int innerX = rpx + 4;
+        int svY = py; // SV starts at py
+        int swatchY = svY + PICKER_SV_H + 6;
+        int swatchW = 28;
+        int innerW = pw - 8;
+        int hexX = innerX + swatchW + 6;
+        int hexW = Math.max(40, innerW - swatchW - 10);
+
+        hexInput = new TextFieldWidget(this.textRenderer, hexX, swatchY, hexW, bh, Text.literal("Hex"));
         hexInput.setMaxLength(9);
-        hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF));
+        hexInput.setText(colorToHex(currentColor));
         hexInput.setChangedListener(text -> {
-            try {
-                String hex = text.startsWith("#") ? text.substring(1) : text;
-                if (hex.length() == 6 || hex.length() == 8)
-                    currentColor = (int) Long.parseLong(hex.length() == 6 ? "FF" + hex : hex, 16);
-            } catch (NumberFormatException ignored) {}
+            // Ignore callbacks triggered by programmatic updates
+            if (suppressHexCallback) return;
+            // Run parser on the client executor to break direct re-entrant
+            // setText() -> onChanged() -> setText() recursion that can
+            // otherwise cause a StackOverflowError in some environments.
+            MinecraftClient.getInstance().execute(() -> {
+                if (hexInput == null) return;
+                if (suppressHexCallback) return;
+                try {
+                    String hex = text.startsWith("#") ? text.substring(1) : text;
+                    if (hex.length() == 6 || hex.length() == 8) {
+                        int parsed = (int) Long.parseLong(hex.length() == 6 ? "FF" + hex : hex, 16);
+                        // Only update when the parsed color differs to avoid needless updates
+                        if (parsed != currentColor) setColor(parsed, false);
+                    }
+                } catch (NumberFormatException ignored) {}
+            });
         });
         addDrawableChild(hexInput);
+        // No extra alpha slider widget; the alpha bar on the right is interactive.
     }
 
-    private String getToolKeyHint(EditorTool tool) {
-        ModSettings s = ModSettings.getInstance();
-        return switch (tool) {
-            case PENCIL -> s.getKeyName("pencil");
-            case BRUSH -> s.getKeyName("brush");
-            case ERASER -> s.getKeyName("eraser");
-            case FILL -> s.getKeyName("fill");
-            case EYEDROPPER -> s.getKeyName("eyedropper");
-            case LINE -> s.getKeyName("line");
-        };
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Canvas texture cache
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Canvas position
+    // ─────────────────────────────────────────────────────────────────────────
 
     protected void recalcCanvasPos() {
-        int lsw = getLeftSidebarWidth();
-        int rsw = getRightSidebarWidth();
-        canvasBaseX = lsw + 10 + (this.width - lsw - rsw - 20 - canvas.getWidth() * zoom) / 2;
-        canvasBaseY = 30 + (this.height - 80 - canvas.getHeight() * zoom) / 2;
+        int lw = leftW() + TOGGLE_BTN_W;
+        int rw = rightW() + TOGGLE_BTN_W;
+        int availW = this.width - lw - rw - 20;
+        int availH = this.height - 60;
+        if (canvas != null) {
+            // compute fitZoom (how large the texture can be to fit the available area)
+            int fitZoom = Math.min(availW / Math.max(1, canvas.getWidth()), availH / Math.max(1, canvas.getHeight()));
+            if (fitZoom < getMinZoom()) fitZoom = getMinZoom();
+            // Allow zoom up to getMaxZoom(); previous logic limited zoom to fitZoom which prevented zooming to single pixels.
+            int allowedMax = Math.max(fitZoom, getMaxZoom());
+            zoom = Math.max(getMinZoom(), Math.min(zoom, allowedMax));
+            canvasBaseX = lw + 10 + (availW - canvas.getWidth() * zoom) / 2;
+            canvasBaseY = 30 + (availH - canvas.getHeight() * zoom) / 2;
+        } else {
+            canvasBaseX = lw + 10;
+            canvasBaseY = 30;
+        }
         canvasScreenX = canvasBaseX + panOffsetX;
         canvasScreenY = canvasBaseY + panOffsetY;
         canvasTextureDirty = true;
     }
 
-    protected boolean isInUIRegion(double mx, double my) {
-        return mx < getLeftSidebarWidth() || mx > this.width - getRightSidebarWidth() || my < 28;
-    }
-
-    protected void doResetAll() {
-        TextureManager.getInstance().clear();
-        MinecraftClient.getInstance().reloadResources();
-        if (originalPixels != null) {
-            canvas.saveSnapshot();
-            for (int x = 0; x < canvas.getWidth(); x++)
-                for (int y = 0; y < canvas.getHeight(); y++)
-                    canvas.setPixel(x, y, originalPixels[x][y]);
-        }
-    }
-
-    protected void setColor(int c, boolean addToHistory) {
-        currentColor = c;
-        if (addToHistory) ColorHistory.getInstance().addColor(c);
-        if (currentPanel == PanelType.COLOR_PANEL) setColorPickerFromInt(c);
-        if (hexInput != null) hexInput.setText(String.format("#%06X", c & 0xFFFFFF));
-    }
-
-    public void setColorPickerFromInt(int color) {
-        int r = (color >> 16) & 0xFF;
-        int g = (color >> 8) & 0xFF;
-        int b = color & 0xFF;
-        float[] hsv = new float[3];
-        rgbToHsv(r, g, b, hsv);
-        pickerHue = hsv[0];
-        pickerSat = hsv[1];
-        pickerVal = hsv[2];
-    }
-
-    private static void rgbToHsv(int r, int g, int b, float[] hsv) {
-        float rf = r / 255f, gf = g / 255f, bf = b / 255f;
-        float max = Math.max(rf, Math.max(gf, bf));
-        float min = Math.min(rf, Math.min(gf, bf));
-        float h, s, v = max;
-        float d = max - min;
-        s = max == 0 ? 0 : d / max;
-        if (d == 0) h = 0;
-        else if (max == rf) h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6f;
-        else if (max == gf) h = ((bf - rf) / d + 2) / 6f;
-        else h = ((rf - gf) / d + 4) / 6f;
-        hsv[0] = h; hsv[1] = s; hsv[2] = v;
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Render
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext ctx, int mx, int my, float delta) {
         int bg = getBackgroundColor();
-        int lsw = getLeftSidebarWidth();
-        int rsw = getRightSidebarWidth();
-        context.fill(0, 0, this.width, this.height, bg);
-        if (currentTool == EditorTool.LINE && lineFirstClick)
-            context.drawText(textRenderer, "Click endpoint...", canvasScreenX, canvasScreenY - 12, 0xFFFFFF00, false);
-        drawCanvas(context, mouseX, mouseY);
-        context.fill(0, 0, lsw, this.height, bg);
-        context.fill(this.width - rsw, 0, this.width, this.height, bg);
-        context.fill(lsw, 0, this.width - rsw, 28, bg);
-        super.render(context, mouseX, mouseY, delta);
+        ctx.fill(0, 0, this.width, this.height, bg);
 
-        context.drawText(textRenderer, getEditorTitle(), 5, 8, 0xFFFFFFFF, true);
-        context.drawText(textRenderer, "Tool: " + currentTool.getDisplayName() +
-                " | Size: " + toolSize + "px" +
-                (canvas != null ? "  |  " + canvas.getWidth() + "x" + canvas.getHeight() : ""), 5, 20, 0xFFCCCCCC, false);
+        drawCanvas(ctx, mx, my);
 
-        drawPalette(context);
-        int paletteX = getPaletteX();
-        int paletteEndY = getPaletteEndY() + 10;
-        // Current color swatch next to hex input
-        int hexW = Math.min(110, getRightSidebarWidth() - 30);
-        context.fill(paletteX + hexW + 4, paletteEndY, paletteX + hexW + 24, paletteEndY + 18, currentColor);
-        drawRectOutline(context, paletteX + hexW + 4, paletteEndY, paletteX + hexW + 24, paletteEndY + 18, 0xFFFFFFFF);
-
-        if (showColorHistory()) drawColorHistory(context);
-        if (currentPanel == PanelType.COLOR_PANEL) {
-            context.createNewRootLayer();
-            drawColorPicker(context);
-        }
-        if (currentPanel == PanelType.LAYER_PANEL) {
-            context.createNewRootLayer();
-            drawLayerPanel(context);
+        // Panel backgrounds
+        if (leftOpen) {
+            ctx.fill(0, 0, PANEL_W + TOGGLE_BTN_W, this.height, 0xFF141420);
+            ctx.fill(PANEL_W + TOGGLE_BTN_W, 0, PANEL_W + TOGGLE_BTN_W + 1, this.height, 0xFF2A2A44);
+            // Tab underline
+            int tabLineX = leftTab == LeftTab.GENERAL ? 0 : PANEL_W / 2;
+            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + PANEL_W / 2, getToolButtonHeight() + TAB_H, 0xFFFFAA00);
+        } else {
+            ctx.fill(0, 0, TOGGLE_BTN_W, this.height, 0xFF141420);
         }
 
-        // Render the quick select wheel if visible
-        if (quickSelectWheel != null) {
-            quickSelectWheel.render(context, textRenderer, mouseX, mouseY);
+        if (rightOpen) {
+            int rpx = this.width - PANEL_W - TOGGLE_BTN_W;
+            ctx.fill(rpx, 0, this.width, this.height, 0xFF141420);
+            ctx.fill(rpx - 1, 0, rpx, this.height, 0xFF2A2A44);
+            int tabLineX = this.width - PANEL_W + (rightTab == RightTab.COLOR ? 0 : PANEL_W / 2);
+            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + PANEL_W / 2, getToolButtonHeight() + TAB_H, 0xFFFFAA00);
+            // Draw color/layer tab content
+            if (rightTab == RightTab.COLOR) drawColorTabContent(ctx, mx, my, this.width - getPanelWidth(), getToolButtonHeight() + TAB_H + 4, getPanelWidth());
+            else drawLayerTabContent(ctx, mx, my, this.width - getPanelWidth(), getToolButtonHeight() + TAB_H + 4, getPanelWidth());
+        } else {
+            ctx.fill(this.width - TOGGLE_BTN_W, 0, this.width, this.height, 0xFF141420);
         }
 
-        renderExtra(context, mouseX, mouseY);
+        // Title bar
+        ctx.fill(leftW() + TOGGLE_BTN_W, 0, this.width - rightW() - TOGGLE_BTN_W, getToolButtonHeight(), 0xFF1A1A30);
+        ctx.drawText(textRenderer, getEditorTitle(), leftW() + TOGGLE_BTN_W + 4, 5, 0xFFDDDDFF, true);
+
+        // Status bar
+        int statusY = this.height - 14;
+        ctx.fill(leftW() + TOGGLE_BTN_W, statusY, this.width - rightW() - TOGGLE_BTN_W, this.height, 0xFF111122);
+        String status = "Tool: " + currentTool.getDisplayName() + " | Size: " + toolSize + "px"
+                + (canvas != null ? " | " + canvas.getWidth() + "×" + canvas.getHeight() : "");
+        if (canvas != null) {
+            int hx = (mx - canvasScreenX) / Math.max(1, zoom);
+            int hy = (my - canvasScreenY) / Math.max(1, zoom);
+            if (hx >= 0 && hx < canvas.getWidth() && hy >= 0 && hy < canvas.getHeight()) {
+                status += " | x:" + hx + ", y:" + hy;
+            }
+        }
+        ctx.drawText(textRenderer, status, leftW() + TOGGLE_BTN_W + 4, statusY + 3, 0xFF888899, false);
+
+        // live preview replaces static "waiting for click" messages
+
+        super.render(ctx, mx, my, delta);
+
+        if (quickSelectWheel != null) quickSelectWheel.render(ctx, textRenderer, mx, my);
+
+        renderExtra(ctx, mx, my);
     }
 
-    // Cached canvas texture for performance on large textures
-    private net.minecraft.client.texture.NativeImageBackedTexture canvasTexture = null;
-    private static final Identifier CANVAS_TEX_ID = Identifier.of("textureeditor", "canvas_preview");
-    private long lastCanvasHash = 0;
-    private boolean canvasTextureDirty = true;
+    // ─────────────────────────────────────────────────────────────────────────
+    // Color tab content (drawn every frame)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void drawColorTabContent(DrawContext ctx, int mx, int my, int rpx, int py, int pw) {
+        int bh = getToolButtonHeight();
+        int innerX = rpx + 4;
+        int innerW = pw - 8;
+
+        // ── SV square ─────────────────────────────────────────────────────────
+        int svX = innerX;
+        int svY = py;
+
+        if (cachedPickerHue != pickerHue || pickerSvTexture == null) {
+            cachedPickerHue = pickerHue;
+            var img = new net.minecraft.client.texture.NativeImage(PICKER_SV_W, PICKER_SV_H, false);
+            for (int y = 0; y < PICKER_SV_H; y++) {
+                float v = 1f - y / (float)(PICKER_SV_H - 1);
+                for (int x = 0; x < PICKER_SV_W; x++) {
+                    float s = x / (float)(PICKER_SV_W - 1);
+                    img.setColorArgb(x, y, hsvToArgb(pickerHue, s, v, 1f));
+                }
+            }
+            if (pickerSvTexture != null) { pickerSvTexture.setImage(img); pickerSvTexture.upload(); }
+            else {
+                pickerSvTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_sv", img);
+                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_SV_ID, pickerSvTexture);
+            }
+        }
+        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
+        drawRectOutline(ctx, svX - 1, svY - 1, svX + PICKER_SV_W + 1, svY + PICKER_SV_H + 1, 0xFF444466);
+
+        // Cursor on SV
+        int scx = svX + (int)(pickerSat * (PICKER_SV_W - 1));
+        int scy = svY + (int)((1f - pickerVal) * (PICKER_SV_H - 1));
+        ctx.fill(scx - 2, scy, scx + 3, scy + 1, 0xFFFFFFFF);
+        ctx.fill(scx, scy - 2, scx + 1, scy + 3, 0xFFFFFFFF);
+
+        // Compute dynamic widths: split the available extra space between hue & alpha
+        int avail = Math.max(0, innerW - PICKER_SV_W - 8);
+        int hueW = Math.max(HUE_W, avail / 2);
+        int alphaW = Math.max(ALPHA_W, avail - hueW);
+
+        // ── Hue bar (vertical) ─────────────────────────────────────────────────
+        int hueX = svX + PICKER_SV_W + 4;
+        int hueY = svY;
+        if (!pickerHueBarBuilt || pickerHueTexture == null || pickerHueTexture.getGlTexture().getWidth(0) != hueW) {
+            var img = new net.minecraft.client.texture.NativeImage(hueW, PICKER_SV_H, false);
+            for (int y = 0; y < PICKER_SV_H; y++) {
+                int c = hsvToArgb(y / (float)(PICKER_SV_H - 1), 1f, 1f, 1f);
+                for (int x = 0; x < hueW; x++) img.setColorArgb(x, y, c);
+            }
+            if (pickerHueTexture != null) { pickerHueTexture.setImage(img); pickerHueTexture.upload(); }
+            else {
+                pickerHueTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_hue", img);
+                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_HUE_ID, pickerHueTexture);
+            }
+            pickerHueBarBuilt = true;
+        }
+        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_HUE_ID, hueX, hueY, 0, 0, hueW, PICKER_SV_H, hueW, PICKER_SV_H, hueW, PICKER_SV_H);
+        drawRectOutline(ctx, hueX - 1, hueY - 1, hueX + hueW + 1, hueY + PICKER_SV_H + 1, 0xFF444466);
+        int hcy = hueY + (int)(pickerHue * (PICKER_SV_H - 1));
+        ctx.fill(hueX - 1, hcy, hueX + hueW + 1, hcy + 1, 0xFFFFFFFF);
+
+        // ── Alpha bar (vertical) ───────────────────────────────────────────────
+        int alphaX = hueX + hueW + 4;
+        int alphaY = svY;
+        // checker background
+        for (int y = 0; y < PICKER_SV_H; y += 4) for (int x2 = 0; x2 < alphaW; x2 += 4)
+            ctx.fill(alphaX + x2, alphaY + y, alphaX + x2 + 4, alphaY + y + 4, ((x2 / 4 + y / 4) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
+
+        if (!pickerAlphaBarBuilt || pickerAlphaTexture == null || pickerAlphaTexture.getGlTexture().getWidth(0) != alphaW) rebuildAlphaBar(alphaW);
+        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
+        drawRectOutline(ctx, alphaX - 1, alphaY - 1, alphaX + alphaW + 1, alphaY + PICKER_SV_H + 1, 0xFF444466);
+        int acy = alphaY + (int)((1f - pickerAlpha) * (PICKER_SV_H - 1));
+        ctx.fill(alphaX - 1, acy, alphaX + alphaW + 1, acy + 1, 0xFFFFFFFF);
+
+        py = svY + PICKER_SV_H + 6;
+
+        // ── Current color swatch ───────────────────────────────────────────────
+        int swatchW = 28;
+        ctx.fill(innerX, py, innerX + swatchW, py + bh, currentColor);
+        drawRectOutline(ctx, innerX, py, innerX + swatchW, py + bh, 0xFF555577);
+
+        // Hex input widget is positioned next to the swatch in buildColorTab();
+        // do not draw the hex text manually to avoid duplication.
+
+        py += bh + 4;
+
+        py += bh + 8;
+
+        // ── Palette ────────────────────────────────────────────────────────────
+        int cols = 5, cs = (innerW - (cols - 1) * 1) / cols;
+        for (int i = 0; i < PALETTE.length; i++) {
+            int col = i % cols, row = i / cols;
+            int px2 = innerX + col * (cs + 1);
+            int py2 = py + row * (cs + 1);
+            ctx.fill(px2, py2, px2 + cs, py2 + cs, PALETTE[i]);
+            if (PALETTE[i] == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + cs + 1, py2 + cs + 1, 0xFFFFFF00);
+        }
+
+        py += ((PALETTE.length + cols - 1) / cols) * (cs + 1) + 4;
+
+        // ── Color history ──────────────────────────────────────────────────────
+        ColorHistory hist = ColorHistory.getInstance();
+        if (hist.size() > 0) {
+            ctx.drawText(textRenderer, "History", innerX, py, 0xFF888899, false);
+            py += 10;
+            List<Integer> colors = hist.getColors();
+            int hcs = Math.max(8, cs - 2);
+            for (int i = 0; i < Math.min(colors.size(), 10); i++) {
+                int col = i % cols, row = i / cols;
+                int px2 = innerX + col * (hcs + 1);
+                int py2 = py + row * (hcs + 1);
+                ctx.fill(px2, py2, px2 + hcs, py2 + hcs, colors.get(i));
+                if (colors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + hcs + 1, py2 + hcs + 1, 0xFFFFFF00);
+            }
+        }
+    }
+
+    private void rebuildAlphaBar(int width) {
+        int r = (currentColor >> 16) & 0xFF, g = (currentColor >> 8) & 0xFF, b = currentColor & 0xFF;
+        var img = new net.minecraft.client.texture.NativeImage(Math.max(1, width), PICKER_SV_H, false);
+        for (int y = 0; y < PICKER_SV_H; y++) {
+            float a = 1f - y / (float)(PICKER_SV_H - 1);
+            int argb = ((int)(a * 255) << 24) | (r << 16) | (g << 8) | b;
+            for (int x = 0; x < Math.max(1, width); x++) img.setColorArgb(x, y, argb);
+        }
+        if (pickerAlphaTexture != null) { pickerAlphaTexture.setImage(img); pickerAlphaTexture.upload(); }
+        else {
+            pickerAlphaTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_alpha", img);
+            MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_ALPHA_ID, pickerAlphaTexture);
+        }
+        pickerAlphaBarBuilt = true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Layer tab content
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void drawLayerTabContent(DrawContext ctx, int mx, int my, int rpx, int py, int pw) {
+        if (canvas == null) return;
+        var stack = canvas.getLayerStack();
+        int innerX = rpx + 4;
+        int innerW = pw - 8;
+        int rowH = 18;
+        int bh = getToolButtonHeight();
+
+        ctx.drawText(textRenderer, "Layers", innerX, py, 0xFFDDDDFF, true);
+        py += 12;
+
+        for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
+            var layer = stack.getLayers().get(i);
+            int rowY = py + (stack.getLayerCount() - 1 - i) * (rowH + 1);
+            boolean active = i == stack.getActiveIndex();
+            ctx.fill(innerX, rowY, innerX + innerW, rowY + rowH, active ? 0xFF2A2A55 : 0xFF1A1A33);
+            if (active) drawRectOutline(ctx, innerX, rowY, innerX + innerW, rowY + rowH, 0xFF6666AA);
+            String eye = layer.isVisible() ? "●" : "○";
+            ctx.drawText(textRenderer, eye, innerX + 2, rowY + 5, layer.isVisible() ? 0xFF55FF55 : 0xFF555555, false);
+            String name = layer.getName().length() > 10 ? layer.getName().substring(0, 10) + ".." : layer.getName();
+            ctx.drawText(textRenderer, name, innerX + 14, rowY + 5, 0xFFDDDDDD, false);
+        }
+
+        py += stack.getLayerCount() * (rowH + 1) + 6;
+
+        // Action buttons 3 per row
+        int btnW = (innerW - 4) / 3;
+        // Row 1: Add, Del, Up
+        ctx.fill(innerX, py, innerX + btnW, py + bh, 0xFF1E3322); ctx.drawText(textRenderer, "+ Add", innerX + 2, py + 4, 0xFF88FF88, false);
+        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, 0xFF331A1A); ctx.drawText(textRenderer, "- Del", innerX + btnW + 4, py + 4, 0xFFFF8888, false);
+        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, 0xFF1A1A33); ctx.drawText(textRenderer, "▲ Up", innerX + 2 * btnW + 6, py + 4, 0xFF8888FF, false);
+        py += bh + 2;
+        // Row 2: Down, Merge, Copy
+        ctx.fill(innerX, py, innerX + btnW, py + bh, 0xFF1A1A33); ctx.drawText(textRenderer, "▼ Dn", innerX + 2, py + 4, 0xFF8888FF, false);
+        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, 0xFF1A2233); ctx.drawText(textRenderer, "Merge", innerX + btnW + 4, py + 4, 0xFF88AAFF, false);
+        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, 0xFF221A33); ctx.drawText(textRenderer, "Copy", innerX + 2 * btnW + 6, py + 4, 0xFFAA88FF, false);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Canvas drawing
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void drawCanvas(DrawContext ctx, int mx, int my) {
         if (canvas == null) return;
-        try {
-            drawCanvasInternal(ctx, mx, my);
-        } catch (Throwable t) {
-            System.out.println("[TextureEditor] ERROR in drawCanvas: " + t.getClass().getName() + ": " + t.getMessage());
-            t.printStackTrace();
-        }
-    }
-
-    private void drawCanvasInternal(DrawContext ctx, int mx, int my) {
-        if (canvas == null) return;
         int w = canvas.getWidth(), h = canvas.getHeight();
+        // Use a safe effective zoom for divisions (zoom should always be >= 1)
+        int effectiveZoom = Math.max(1, zoom);
+        int visMinX = Math.max(0, (-canvasScreenX) / effectiveZoom);
+        int visMinY = Math.max(0, (-canvasScreenY) / effectiveZoom);
+        int visMaxX = Math.min(w, (this.width - canvasScreenX + effectiveZoom - 1) / effectiveZoom);
+        int visMaxY = Math.min(h, (this.height - canvasScreenY + effectiveZoom - 1) / effectiveZoom);
 
-        // Calculate visible pixel range (cull off-screen pixels for performance)
-        int visMinX = Math.max(0, (-canvasScreenX) / zoom);
-        int visMinY = Math.max(0, (-canvasScreenY) / zoom);
-        int visMaxX = Math.min(w, (this.width - canvasScreenX + zoom - 1) / zoom);
-        int visMaxY = Math.min(h, (this.height - canvasScreenY + zoom - 1) / zoom);
-
-        int visW = visMaxX - visMinX;
-        int visH = visMaxY - visMinY;
-
-        // For large textures (>32x32), use cached texture rendering (1 draw call vs thousands of fill calls)
-        // Always use cached texture for large textures regardless of zoom level to prevent watchdog crashes
         if (w * h > 1024) {
-            // Check if canvas changed
             long hash = canvas.getVersion();
             if (hash != lastCanvasHash || canvasTextureDirty || canvasTexture == null) {
-                lastCanvasHash = hash;
-                canvasTextureDirty = false;
-
-                // Build a 1:1 pixel image (NOT zoomed - let drawTexture handle scaling)
+                lastCanvasHash = hash; canvasTextureDirty = false;
                 if (w > 0 && h > 0) {
-                    var canvasImage = new net.minecraft.client.texture.NativeImage(w, h, false);
-                    for (int x = 0; x < w; x++) {
-                        for (int y = 0; y < h; y++) {
-                            int c;
-                            if (previewingOriginal && originalPixels != null && x < originalPixels.length && y < originalPixels[x].length) {
-                                c = originalPixels[x][y];
-                            } else {
-                                c = canvas.getPixel(x, y);
-                            }
-                            int alpha = (c >> 24) & 0xFF;
-                            int display;
-                            if (alpha == 0) {
-                                display = ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
-                            } else if (alpha < 255) {
-                                int checker = ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
-                                int fc = usesTint() ? applyTint(c) : c;
-                                float a = alpha / 255f;
-                                int cr = (int)(((fc >> 16) & 0xFF) * a + ((checker >> 16) & 0xFF) * (1 - a));
-                                int cg = (int)(((fc >> 8) & 0xFF) * a + ((checker >> 8) & 0xFF) * (1 - a));
-                                int cb = (int)((fc & 0xFF) * a + (checker & 0xFF) * (1 - a));
-                                display = 0xFF000000 | (cr << 16) | (cg << 8) | cb;
-                            } else {
-                                display = usesTint() ? applyTint(c) : c;
-                            }
-                            canvasImage.setColorArgb(x, y, display);
-                        }
+                    var img = new net.minecraft.client.texture.NativeImage(w, h, false);
+                    for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) {
+                        int c = previewingOriginal && originalPixels != null ? originalPixels[x][y] : canvas.getPixel(x, y);
+                        img.setColorArgb(x, y, renderPixel(c, x, y));
                     }
                     if (canvasTexture != null) {
-                        var oldTex = canvasTexture.getGlTexture();
-                        if (oldTex != null && (oldTex.getWidth(0) != w || oldTex.getHeight(0) != h)) {
-                            canvasTexture.close();
-                            canvasTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "canvas_preview", canvasImage);
-                            MinecraftClient.getInstance().getTextureManager().registerTexture(CANVAS_TEX_ID, canvasTexture);
-                        } else {
-                            canvasTexture.setImage(canvasImage);
-                            canvasTexture.upload();
-                        }
-                    } else {
-                        canvasTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "canvas_preview", canvasImage);
+                        var gt = canvasTexture.getGlTexture();
+                        if (gt != null && (gt.getWidth(0) != w || gt.getHeight(0) != h)) { canvasTexture.close(); canvasTexture = null; }
+                        else { canvasTexture.setImage(img); canvasTexture.upload(); }
+                    }
+                    if (canvasTexture == null) {
+                        canvasTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "canvas_preview", img);
                         MinecraftClient.getInstance().getTextureManager().registerTexture(CANVAS_TEX_ID, canvasTexture);
                     }
                 }
             }
-
-            // Draw the canvas texture scaled by zoom
-            // Use regionWidth=w, regionHeight=h to sample the entire texture once,
-            // and width=w*zoom, height=h*zoom to scale it up on screen
-            int drawX = canvasScreenX;
-            int drawY = canvasScreenY;
-            int drawW = w * zoom;
-            int drawH = h * zoom;
-            if (drawW > 0 && drawH > 0) {
-                ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, CANVAS_TEX_ID,
-                        drawX, drawY, 0, 0, drawW, drawH, w, h, w, h);
-            }
+            if (w * zoom > 0 && h * zoom > 0)
+                ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, CANVAS_TEX_ID, canvasScreenX, canvasScreenY, 0, 0, w * zoom, h * zoom, w, h, w, h);
         } else {
-            // Small textures: use original fill-based rendering (fine for <=32x32)
             for (int x = visMinX; x < visMaxX; x++) for (int y = visMinY; y < visMaxY; y++) {
+                int c = previewingOriginal && originalPixels != null ? originalPixels[x][y] : canvas.getPixel(x, y);
                 int sx = canvasScreenX + x * zoom, sy = canvasScreenY + y * zoom;
-                int c;
-                if (previewingOriginal && originalPixels != null && x < originalPixels.length && y < originalPixels[x].length) {
-                    c = originalPixels[x][y];
-                } else {
-                    c = canvas.getPixel(x, y);
-                }
                 int alpha = (c >> 24) & 0xFF;
-                if (alpha < 255) {
-                    ctx.fill(sx, sy, sx + zoom, sy + zoom, ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
-                }
-                if (alpha > 0) ctx.fill(sx, sy, sx + zoom, sy + zoom, usesTint() ? applyTint(c) : c);
+                if (alpha < 255) ctx.fill(sx, sy, sx + zoom, sy + zoom, ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
+                if (alpha > 0)   ctx.fill(sx, sy, sx + zoom, sy + zoom, usesTint() ? applyTint(c) : c);
             }
         }
+
         if (showGrid && zoom >= 4) {
-            // Only draw grid lines in visible range
-            for (int x = visMinX; x <= visMaxX; x++) ctx.fill(canvasScreenX + x * zoom, canvasScreenY + visMinY * zoom, canvasScreenX + x * zoom + 1, canvasScreenY + visMaxY * zoom, 0x40FFFFFF);
-            for (int y = visMinY; y <= visMaxY; y++) ctx.fill(canvasScreenX + visMinX * zoom, canvasScreenY + y * zoom, canvasScreenX + visMaxX * zoom, canvasScreenY + y * zoom + 1, 0x40FFFFFF);
+            for (int x = visMinX; x <= visMaxX; x++) ctx.fill(canvasScreenX + x * zoom, canvasScreenY + visMinY * zoom, canvasScreenX + x * zoom + 1, canvasScreenY + visMaxY * zoom, 0x30FFFFFF);
+            for (int y = visMinY; y <= visMaxY; y++) ctx.fill(canvasScreenX + visMinX * zoom, canvasScreenY + y * zoom, canvasScreenX + visMaxX * zoom, canvasScreenY + y * zoom + 1, 0x30FFFFFF);
         }
-        drawRectOutline(ctx, canvasScreenX - 1, canvasScreenY - 1, canvasScreenX + w * zoom + 1, canvasScreenY + h * zoom + 1, 0xFFFFFFFF);
-        // Hover highlight with tool size
-        int hx = (mx - canvasScreenX) / zoom, hy = (my - canvasScreenY) / zoom;
+        drawRectOutline(ctx, canvasScreenX - 1, canvasScreenY - 1, canvasScreenX + w * zoom + 1, canvasScreenY + h * zoom + 1, 0xFF4444AA);
+
+        // Hover highlight
+        int hx = (mx - canvasScreenX) / effectiveZoom, hy = (my - canvasScreenY) / effectiveZoom;
         if (hx >= 0 && hx < w && hy >= 0 && hy < h) {
             int half = toolSize / 2;
-            for (int dx = -half; dx < toolSize - half; dx++) {
-                for (int dy = -half; dy < toolSize - half; dy++) {
-                    int tx = hx + dx, ty = hy + dy;
-                    if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
-                        int sx = canvasScreenX + tx * zoom, sy = canvasScreenY + ty * zoom;
-                        drawRectOutline(ctx, sx, sy, sx + zoom, sy + zoom, 0xFFFFFF00);
+            for (int dx = -half; dx < toolSize - half; dx++) for (int dy = -half; dy < toolSize - half; dy++) {
+                int tx = hx + dx, ty = hy + dy;
+                if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
+                    int sx = canvasScreenX + tx * zoom, sy = canvasScreenY + ty * zoom;
+                    drawRectOutline(ctx, sx, sy, sx + zoom, sy + zoom, 0xAAFFFF00);
+                }
+            }
+        }
+
+        // Preview for line/rectangle tools (draw preview using real color and thickness)
+        if (lineFirstClick && previewEndX >= 0 && previewEndY >= 0) {
+            // draw each pixel of the preview line with thickness, clipped to canvas
+            int half = toolSize / 2;
+            for (int[] pt : bresenhamLine(lineStartX, lineStartY, previewEndX, previewEndY)) {
+                int cx = pt[0], cy = pt[1];
+                // iterate over the square area for the thickness and only draw cells inside canvas
+                for (int dx = -half; dx < toolSize - half; dx++) {
+                    for (int dy = -half; dy < toolSize - half; dy++) {
+                        int tx = cx + dx, ty = cy + dy;
+                        if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
+                        int sx = canvasScreenX + tx * zoom;
+                        int sy = canvasScreenY + ty * zoom;
+                        // apply preview variation if configured (deterministic per-cell based on coords)
+                        float var = ModSettings.getInstance().variationPercent;
+                        int drawColor = currentColor;
+                        if (var > 0f) drawColor = applyPreviewVariation(currentColor, tx, ty, var);
+                        ctx.fill(sx, sy, sx + zoom, sy + zoom, drawColor);
                     }
                 }
             }
         }
-        if (previewingOriginal) {
-            ctx.drawCenteredTextWithShadow(textRenderer, "\u00a7e\u00a7lPREVIEW (Original)", canvasScreenX + (w * zoom) / 2, canvasScreenY - 14, 0xFFFFFF00);
-        }
-    }
+        if (rectFirstClick && previewEndX >= 0 && previewEndY >= 0) {
+            int half = toolSize / 2;
+            // Convert start/end centers to top-left of their brush areas
+            int sTLX = rectStartX - half;
+            int sTLY = rectStartY - half;
+            int eTLX = previewEndX - half;
+            int eTLY = previewEndY - half;
+            // full covered ranges for start and end areas
+            int sMaxX = sTLX + toolSize - 1;
+            int sMaxY = sTLY + toolSize - 1;
+            int eMaxX = eTLX + toolSize - 1;
+            int eMaxY = eTLY + toolSize - 1;
 
-    private void drawPalette(DrawContext ctx) {
-        int cs = getPaletteCellSize();
-        int cols = getPaletteColumns();
-        int px0 = getPaletteX(), py0 = 30;
-        for (int i = 0; i < PALETTE.length; i++) {
-            int c = i % cols, r = i / cols;
-            int px = px0 + c * (cs + 2), py = py0 + r * (cs + 2);
-            ctx.fill(px, py, px + cs, py + cs, PALETTE[i]);
-            if (PALETTE[i] == currentColor) drawRectOutline(ctx, px - 1, py - 1, px + cs + 1, py + cs + 1, 0xFFFFFF00);
-            else drawRectOutline(ctx, px, py, px + cs, py + cs, 0xFF333333);
-        }
-    }
+            int minX = Math.min(sTLX, eTLX);
+            int maxX = Math.max(sMaxX, eMaxX);
+            int minY = Math.min(sTLY, eTLY);
+            int maxY = Math.max(sMaxY, eMaxY);
 
-    private void drawColorHistory(DrawContext ctx) {
-        ColorHistory hist = ColorHistory.getInstance();
-        if (hist.size() == 0) return;
-        int px0 = getPaletteX();
-        int sy = getPaletteEndY() + 50;
-        ctx.drawText(textRenderer, Text.translatable("textureeditor.label.color_history").getString(), px0, sy, 0xFF999999, false);
-        sy += 12;
-        int cols = 5, cs = 18;
-        List<Integer> colors = hist.getColors();
-        for (int i = 0; i < colors.size(); i++) {
-            int c = i % cols, r = i / cols;
-            int px = px0 + c * (cs + 2), py = sy + r * (cs + 2);
-            ctx.fill(px, py, px + cs, py + cs, colors.get(i));
-            if (colors.get(i) == currentColor) drawRectOutline(ctx, px - 1, py - 1, px + cs + 1, py + cs + 1, 0xFFFFFF00);
-            else drawRectOutline(ctx, px, py, px + cs, py + cs, 0xFF333333);
-        }
-    }
+            // Special-case: if the covered box is a single cell, draw filled square
+            if (minX == maxX && minY == maxY) {
+                int cx = minX, cy = minY;
+                if (cx >= 0 && cx < w && cy >= 0 && cy < h) {
+                    int sx = canvasScreenX + cx * zoom;
+                    int sy = canvasScreenY + cy * zoom;
+                    ctx.fill(sx, sy, sx + zoom, sy + zoom, currentColor);
+                }
+                return;
+            }
 
-    private void drawColorPicker(DrawContext ctx) {
-        int lsw = getLeftSidebarWidth();
-        int rsw = getRightSidebarWidth();
-        int canvasAreaCenter = lsw + (this.width - lsw - rsw) / 2;
-        int cpX = canvasAreaCenter - 80, cpY = this.height - 90;
-        int svW = PICKER_SV_W, svH = PICKER_SV_H;
-
-        ctx.fill(cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFF222244);
-        drawRectOutline(ctx, cpX - 2, cpY - 14, cpX + 162, cpY + 82, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, Text.translatable("textureeditor.button.picker").getString(), cpX, cpY - 12, 0xFFFFFFFF, true);
-
-        // Build/update SV gradient texture when hue changes
-        if (cachedPickerHue != pickerHue || pickerSvTexture == null) {
-            cachedPickerHue = pickerHue;
-            var svImage = new net.minecraft.client.texture.NativeImage(svW, svH, false);
-            for (int y = 0; y < svH; y++) {
-                float v = 1f - y / (float) (svH - 1);
-                for (int x = 0; x < svW; x++) {
-                    float s = x / (float) (svW - 1);
-                    svImage.setColorArgb(x, y, hsvToRgb(pickerHue, s, v));
+            // Top and bottom bands
+            for (int tx = minX; tx <= maxX; tx++) {
+                if (tx < 0 || tx >= w) continue;
+                for (int pyOff = minY; pyOff <= Math.min(maxY, minY + toolSize - 1); pyOff++) {
+                    if (pyOff >= 0 && pyOff < h) {
+                        int drawColor = currentColor;
+                        float var = ModSettings.getInstance().variationPercent;
+                        if (var > 0f) drawColor = applyPreviewVariation(currentColor, tx, pyOff, var);
+                        ctx.fill(canvasScreenX + tx * zoom, canvasScreenY + pyOff * zoom, canvasScreenX + (tx+1) * zoom, canvasScreenY + (pyOff+1) * zoom, drawColor);
+                    }
+                }
+                for (int pyOff = Math.max(minY, maxY - (toolSize - 1)); pyOff <= maxY; pyOff++) {
+                    if (pyOff >= 0 && pyOff < h) {
+                        int drawColor = currentColor;
+                        float var = ModSettings.getInstance().variationPercent;
+                        if (var > 0f) drawColor = applyPreviewVariation(currentColor, tx, pyOff, var);
+                        ctx.fill(canvasScreenX + tx * zoom, canvasScreenY + pyOff * zoom, canvasScreenX + (tx+1) * zoom, canvasScreenY + (pyOff+1) * zoom, drawColor);
+                    }
                 }
             }
-            if (pickerSvTexture != null) {
-                pickerSvTexture.setImage(svImage);
-                pickerSvTexture.upload();
-            } else {
-                pickerSvTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_sv", svImage);
-                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_SV_TEX_ID, pickerSvTexture);
-                pickerSvTexture.upload();
-            }
-        }
 
-        // Build hue bar texture once
-        if (!pickerHueBarBuilt || pickerHueTexture == null) {
-            int hueW = 20;
-            var hueImage = new net.minecraft.client.texture.NativeImage(hueW, svH, false);
-            for (int y = 0; y < svH; y++) {
-                float h = y / (float) (svH - 1);
-                int c = hsvToRgb(h, 1f, 1f);
-                for (int x = 0; x < hueW; x++) {
-                    hueImage.setColorArgb(x, y, c);
+            // Left and right bands (exclude corners - they are already drawn)
+            for (int ty = minY + toolSize; ty <= maxY - toolSize; ty++) {
+                if (ty < 0 || ty >= h) continue;
+                // left band
+                for (int pxOff = minX; pxOff < minX + toolSize; pxOff++) {
+                    if (pxOff >= 0 && pxOff < w) {
+                        int drawColor = currentColor;
+                        float var = ModSettings.getInstance().variationPercent;
+                        if (var > 0f) drawColor = applyPreviewVariation(currentColor, pxOff, ty, var);
+                        ctx.fill(canvasScreenX + pxOff * zoom, canvasScreenY + ty * zoom, canvasScreenX + (pxOff+1) * zoom, canvasScreenY + (ty+1) * zoom, drawColor);
+                    }
+                }
+                // right band
+                for (int pxOff = maxX - (toolSize - 1); pxOff <= maxX; pxOff++) {
+                    if (pxOff >= 0 && pxOff < w) {
+                        int drawColor = currentColor;
+                        float var = ModSettings.getInstance().variationPercent;
+                        if (var > 0f) drawColor = applyPreviewVariation(currentColor, pxOff, ty, var);
+                        ctx.fill(canvasScreenX + pxOff * zoom, canvasScreenY + ty * zoom, canvasScreenX + (pxOff+1) * zoom, canvasScreenY + (ty+1) * zoom, drawColor);
+                    }
                 }
             }
-            if (pickerHueTexture != null) {
-                pickerHueTexture.setImage(hueImage);
-                pickerHueTexture.upload();
-            } else {
-                pickerHueTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_hue", hueImage);
-                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_HUE_TEX_ID, pickerHueTexture);
-                pickerHueTexture.upload();
+        }
+
+        // Fill preview: if fill is active (start set, waiting for previewEnd) show affected cells
+        if (!lineFirstClick && !rectFirstClick && currentTool == EditorTool.FILL && previewEndX >= 0 && previewEndY >= 0) {
+            // compute flood region on preview coords
+            var region = canvas.computeFloodRegion(previewEndX, previewEndY);
+            float var = ModSettings.getInstance().variationPercent;
+            for (var p : region) {
+                int tx = p[0], ty = p[1];
+                if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
+                int sx = canvasScreenX + tx * zoom;
+                int sy = canvasScreenY + ty * zoom;
+                int drawColor = currentColor;
+                if (var > 0f) drawColor = applyPreviewVariation(currentColor, tx, ty, var);
+                ctx.fill(sx, sy, sx + zoom, sy + zoom, drawColor);
             }
-            pickerHueBarBuilt = true;
         }
 
-        // Draw SV gradient as single texture (1 draw call instead of ~9600 fill calls!)
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_TEX_ID, cpX, cpY, 0, 0, svW, svH, svW, svH);
-
-        // Draw hue bar as single texture
-        int hueX = cpX + svW + 5, hueW = 20;
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_HUE_TEX_ID, hueX, cpY, 0, 0, hueW, svH, hueW, svH);
-
-        // Cursors
-        int scx = cpX + (int) (pickerSat * (svW - 1)), scy = cpY + (int) ((1f - pickerVal) * (svH - 1));
-        drawRectOutline(ctx, scx - 2, scy - 2, scx + 3, scy + 3, 0xFFFFFFFF);
-        int hcy = cpY + (int) (pickerHue * (svH - 1));
-        ctx.fill(hueX - 1, hcy - 1, hueX + hueW + 1, hcy + 2, 0xFFFFFFFF);
+        if (previewingOriginal)
+            ctx.drawCenteredTextWithShadow(textRenderer, "§e§lPREVIEW", canvasScreenX + (w * zoom) / 2, canvasScreenY - 12, 0xFFFFFF00);
     }
 
-    private void drawLayerPanel(DrawContext ctx) {
-        if (canvas == null) return;
-        var stack = canvas.getLayerStack();
-        int panelW = 150, rowH = 20;
-        int panelH = 30 + stack.getLayerCount() * rowH + 30;
-        int panelX = this.width / 2 - panelW / 2;
-        int panelY = this.height - panelH - 30;
-
-        ctx.fill(panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, 0xEE222244);
-        drawRectOutline(ctx, panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, 0xFFFFFFFF);
-        ctx.drawText(textRenderer, Text.translatable("textureeditor.button.layers"), panelX + 4, panelY + 2, 0xFFFFFF00, true);
-        int listY = panelY + 16;
-        for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
-            var layer = stack.getLayers().get(i);
-            int rowY = listY + (stack.getLayerCount() - 1 - i) * rowH;
-            int bg = (i == stack.getActiveIndex()) ? 0xFF444488 : 0xFF333355;
-            ctx.fill(panelX, rowY, panelX + panelW, rowY + rowH - 1, bg);
-            String eye = layer.isVisible() ? "\u25CF" : "\u25CB";
-            int eyeColor = layer.isVisible() ? 0xFF55FF55 : 0xFFFF5555;
-            ctx.drawText(textRenderer, eye, panelX + 3, rowY + 5, eyeColor, true);
-            String name = layer.getName();
-            if (name.length() > 14) name = name.substring(0, 14) + "..";
-            ctx.drawText(textRenderer, name, panelX + 16, rowY + 5, 0xFFDDDDDD, true);
-            if (i == stack.getActiveIndex())
-                ctx.drawText(textRenderer, "\u25B6", panelX + panelW - 12, rowY + 5, 0xFFFFFF00, true);
+    private int renderPixel(int c, int x, int y) {
+        int alpha = (c >> 24) & 0xFF;
+        if (alpha == 0) return ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
+        if (alpha < 255) {
+            int checker = ((x + y) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
+            int fc = usesTint() ? applyTint(c) : c;
+            float a = alpha / 255f;
+            int cr = (int)(((fc >> 16) & 0xFF) * a + ((checker >> 16) & 0xFF) * (1 - a));
+            int cg = (int)(((fc >> 8) & 0xFF) * a + ((checker >> 8) & 0xFF) * (1 - a));
+            int cb = (int)((fc & 0xFF) * a + (checker & 0xFF) * (1 - a));
+            return 0xFF000000 | (cr << 16) | (cg << 8) | cb;
         }
-        int btnY = listY + stack.getLayerCount() * rowH + 4;
-        ctx.fill(panelX, btnY, panelX + 34, btnY + 18, 0xFF335533);
-        ctx.drawText(textRenderer, "+ Add", panelX + 3, btnY + 4, 0xFFAAFFAA, true);
-        ctx.fill(panelX + 38, btnY, panelX + 76, btnY + 18, 0xFF553333);
-        ctx.drawText(textRenderer, "- Del", panelX + 41, btnY + 4, 0xFFFFAAAA, true);
-        ctx.fill(panelX + 80, btnY, panelX + 110, btnY + 18, 0xFF333355);
-        ctx.drawText(textRenderer, "\u25B2 Up", panelX + 83, btnY + 4, 0xFFAAAAFF, true);
-        ctx.fill(panelX + 114, btnY, panelX + panelW, btnY + 18, 0xFF333355);
-        ctx.drawText(textRenderer, "\u25BC Dn", panelX + 117, btnY + 4, 0xFFAAAAFF, true);
+        return usesTint() ? applyTint(c) : c;
     }
 
-    // --- Input handling ---
+    // ─────────────────────────────────────────────────────────────────────────
+    // Input handling
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private boolean isInUIRegion(double mx, double my) {
+        return mx < leftW() + TOGGLE_BTN_W || mx > this.width - rightW() - TOGGLE_BTN_W || my < getToolButtonHeight() || my > this.height - 14;
+    }
 
     @Override
     public boolean mouseScrolled(double mx, double my, double ha, double va) {
+        try {
+            long handle = MinecraftClient.getInstance().getWindow().getHandle();
+            boolean ctrl = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
+                    || GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+            if (ctrl) {
+                if (va > 0) toolSize = Math.min(10, toolSize + 1);
+                else if (va < 0) toolSize = Math.max(1, toolSize - 1);
+
+                clearChildren();
+                recalcCanvasPos();
+                buildWidgets();
+                return true;
+            }
+        } catch (Exception ignored) {}
+
         if (handleExtraScroll(mx, my, ha, va)) return true;
+
         int oldZoom = zoom;
-        if (va > 0 && zoom < getMaxZoom()) zoom += getZoomStep();
-        else if (va < 0 && zoom > getMinZoom()) zoom -= getZoomStep();
-        if (zoom != oldZoom) {
-            double rx = (mx - canvasScreenX) / (double) (canvas.getWidth() * oldZoom);
-            double ry = (my - canvasScreenY) / (double) (canvas.getHeight() * oldZoom);
+        if (va > 0 && zoom < getAllowedMaxZoom()) {
+            // multiplicative zoom for consistent perceived speed
+            double factor = 1.1;
+            int newZoom = (int)Math.max(getMinZoom(), Math.round(zoom * factor));
+            if (newZoom == zoom) newZoom = Math.min(zoom + getZoomStep(), getAllowedMaxZoom());
+            zoom = Math.min(newZoom, getAllowedMaxZoom());
+        } else if (va < 0 && zoom > getMinZoom()) {
+            double factor = 1.0 / 1.1;
+            int newZoom = (int)Math.max(getMinZoom(), Math.round(zoom * factor));
+            if (newZoom == zoom) newZoom = Math.max(zoom - getZoomStep(), getMinZoom());
+            zoom = Math.max(newZoom, getMinZoom());
+        }
+        if (zoom != oldZoom && canvas != null) {
+            // Use a safe previous zoom value to avoid division by zero
+            int safeOldZoom = Math.max(oldZoom, getMinZoom());
+            double rx = (mx - canvasScreenX) / (double)(canvas.getWidth() * safeOldZoom);
+            double ry = (my - canvasScreenY) / (double)(canvas.getHeight() * safeOldZoom);
             recalcCanvasPos();
-            canvasScreenX = (int) (mx - rx * canvas.getWidth() * zoom);
-            canvasScreenY = (int) (my - ry * canvas.getHeight() * zoom);
+            canvasScreenX = (int)(mx - rx * canvas.getWidth() * zoom);
+            canvasScreenY = (int)(my - ry * canvas.getHeight() * zoom);
             panOffsetX = canvasScreenX - canvasBaseX;
             panOffsetY = canvasScreenY - canvasBaseY;
             canvasTextureDirty = true;
@@ -796,29 +1042,40 @@ public abstract class AbstractEditorScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
-        double mx = click.x(); double my = click.y(); int btn = click.button();
+        double mx = click.x(), my = click.y(); int btn = click.button();
         if (super.mouseClicked(click, bl)) return true;
         if (handleExtraClick(mx, my, btn)) return true;
-        if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
-        if (currentPanel == PanelType.LAYER_PANEL && btn == 0 && handleLayerPanelClick(mx, my)) return true;
-        if (btn == 0 && handleHistoryClick(mx, my)) return true;
-        if (btn == 2) {
-            quickSelectWheel.activate((int)mx, (int)my);
-            return true;
+
+        // Middle click = quick wheel
+        if (btn == 2) { quickSelectWheel.activate((int)mx, (int)my); return true; }
+
+        // Right click = pan
+        if (btn == 1) { isPanning = true; panStartMouseX = mx; panStartMouseY = my; panStartOffsetX = panOffsetX; panStartOffsetY = panOffsetY; return true; }
+
+        // Color picker interactions - begin drag capture if clicking inside picker
+        if (btn == 0 && rightOpen && rightTab == RightTab.COLOR) {
+            if (startColorPickerDrag(mx, my)) return true;
+            if (handlePaletteClick(mx, my)) return true;
+            if (handleHistoryClick(mx, my)) return true;
         }
-        if (btn == 1) {
-            isPanning = true;
-            panStartMouseX = mx; panStartMouseY = my;
-            panStartOffsetX = panOffsetX; panStartOffsetY = panOffsetY;
-            return true;
-        }
-        if (btn == 0 && handlePaletteClick(mx, my)) return true;
+
+        // Layer panel click
+        if (btn == 0 && rightOpen && rightTab == RightTab.LAYERS && handleLayerClick(mx, my)) return true;
+
         if (isInUIRegion(mx, my)) return false;
+
+        // Canvas click
         if (btn == 0 && canvas != null) {
-            int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
+            int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
-                lastDrawX = px;
-                lastDrawY = py;
+                lastDrawX = px; lastDrawY = py;
+                // For LINE/RECTANGLE: start a preview instead of immediate draw
+                if (currentTool == EditorTool.LINE) {
+                    lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = px; previewEndY = py; return true;
+                }
+                if (currentTool == EditorTool.RECTANGLE) {
+                    rectStartX = px; rectStartY = py; rectFirstClick = true; previewEndX = px; previewEndY = py; return true;
+                }
                 handleCanvasClick(px, py, btn);
                 return true;
             }
@@ -828,64 +1085,85 @@ public abstract class AbstractEditorScreen extends Screen {
 
     @Override
     public boolean mouseReleased(net.minecraft.client.gui.Click click) {
-        double mx = click.x(); double my = click.y(); int btn = click.button();
+        double mx = click.x(), my = click.y(); int btn = click.button();
         if (handleExtraRelease(mx, my, btn)) return true;
         if (btn == 1) { isPanning = false; return true; }
-        if (btn == 2) {
-            QuickSelectWheel.Slice selected = quickSelectWheel.getSelectedSlice();
-            if (selected != null && selected.toTool() != null) {
-                currentTool = selected.toTool();
+        // If a color picker drag was active, stop it
+        if (btn == 0 && (pickingSv || pickingHue || pickingAlpha)) { pickingSv = pickingHue = pickingAlpha = false; return true; }
+
+        // Commit previewed shapes on left release
+        if (btn == 0) {
+            if (lineFirstClick && previewEndX >= 0) {
+                if (canvas != null) {
+                    canvas.saveSnapshot();
+                    float variation = ModSettings.getInstance().variationPercent;
+                    if (toolSize > 1 || variation > 0f) canvas.drawLineThickness(lineStartX, lineStartY, previewEndX, previewEndY, currentColor, toolSize, variation);
+                    else canvas.drawLine(lineStartX, lineStartY, previewEndX, previewEndY, currentColor);
+                    canvas.invalidateCache(); canvasTextureDirty = true;
+                }
+                lineFirstClick = false; previewEndX = previewEndY = -1; setColor(currentColor, true); return true;
             }
+            if (rectFirstClick && previewEndX >= 0) {
+                if (canvas != null) {
+                    canvas.saveSnapshot();
+                    float variation = ModSettings.getInstance().variationPercent;
+                    if (toolSize > 1 || variation > 0f) canvas.drawRectOutlineThickness(rectStartX, rectStartY, previewEndX, previewEndY, currentColor, toolSize, variation);
+                    else canvas.drawRectOutlineThickness(rectStartX, rectStartY, previewEndX, previewEndY, currentColor, 1, variation);
+                    canvas.invalidateCache(); canvasTextureDirty = true;
+                }
+                rectFirstClick = false; previewEndX = previewEndY = -1; setColor(currentColor, true); return true;
+            }
+        }
+
+        if (btn == 2) {
+            var sel = quickSelectWheel.getSelectedSlice();
+            if (sel != null && sel.toTool() != null) currentTool = sel.toTool();
             quickSelectWheel.deactivate();
             return true;
         }
-        lastDrawX = -1;
-        lastDrawY = -1;
+        lastDrawX = -1; lastDrawY = -1;
         return super.mouseReleased(click);
     }
 
     @Override
     public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
-        double mx = click.x(); double my = click.y(); int btn = click.button();
-
-        //Block input if mouse wheel visible
+        double mx = click.x(), my = click.y(); int btn = click.button();
         if (quickSelectWheel.isVisible()) return true;
-
         if (btn == 1 && isPanning) {
-            panOffsetX = panStartOffsetX + (int) (mx - panStartMouseX);
-            panOffsetY = panStartOffsetY + (int) (my - panStartMouseY);
+            panOffsetX = panStartOffsetX + (int)(mx - panStartMouseX);
+            panOffsetY = panStartOffsetY + (int)(my - panStartMouseY);
             canvasScreenX = canvasBaseX + panOffsetX;
             canvasScreenY = canvasBaseY + panOffsetY;
             canvasTextureDirty = true;
             return true;
         }
+        // If a color picker drag was started, keep updating it while mouse moves
+        if (pickingSv || pickingHue || pickingAlpha) {
+            updateColorPickerFromMouse(mx, my);
+            return true;
+        }
+        // If left button is down and we're in the color panel, begin a drag-capture (prevents jump when entering slider)
+        if (btn == 0 && rightOpen && rightTab == RightTab.COLOR && startColorPickerDrag(mx, my)) return true;
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
-        if (currentPanel == PanelType.COLOR_PANEL && btn == 0 && handlePickerClick(mx, my)) return true;
         if (isInUIRegion(mx, my)) return super.mouseDragged(click, dx, dy);
-        if (canvas != null) {
-            int px = (int) ((mx - canvasScreenX) / zoom), py = (int) ((my - canvasScreenY) / zoom);
+        if (canvas != null && btn == 0) {
+            int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
-                float variation = ModSettings.getInstance().brushVariation;
-                // Interpolate between last and current position for continuous lines
-                int startX = (lastDrawX >= 0) ? lastDrawX : px;
-                int startY = (lastDrawY >= 0) ? lastDrawY : py;
-                java.util.List<int[]> points = bresenhamLine(startX, startY, px, py);
-                for (int[] pt : points) {
+                // If previewing a shape, update preview end coordinate and do not draw to canvas
+                if (lineFirstClick || rectFirstClick) { previewEndX = px; previewEndY = py; return true; }
+
+                float variation = ModSettings.getInstance().variationPercent;
+                int sx = lastDrawX >= 0 ? lastDrawX : px, sy = lastDrawY >= 0 ? lastDrawY : py;
+                for (int[] pt : bresenhamLine(sx, sy, px, py)) {
                     int ix = pt[0], iy = pt[1];
                     if (ix < 0 || ix >= canvas.getWidth() || iy < 0 || iy >= canvas.getHeight()) continue;
                     if (currentTool == EditorTool.PENCIL) {
-                        if (toolSize > 1) canvas.drawPixelArea(ix, iy, toolSize, currentColor);
-                        else canvas.drawPixel(ix, iy, currentColor);
-                    } else if (currentTool == EditorTool.BRUSH) {
-                        if (toolSize > 1) canvas.drawBrushArea(ix, iy, toolSize, currentColor, variation);
-                        else canvas.drawBrushPixel(ix, iy, currentColor, variation);
-                    } else if (currentTool == EditorTool.ERASER) {
-                        if (toolSize > 1) canvas.erasePixelArea(ix, iy, toolSize);
-                        else canvas.erasePixel(ix, iy);
+                        if (variation > 0f) { if (toolSize > 1) canvas.drawBrushArea(ix, iy, toolSize, currentColor, variation); else canvas.drawBrushPixel(ix, iy, currentColor, variation); }
+                        else { if (toolSize > 1) canvas.drawPixelArea(ix, iy, toolSize, currentColor); else canvas.drawPixel(ix, iy, currentColor); }
                     }
+                    else if (currentTool == EditorTool.ERASER) { if (toolSize > 1) canvas.erasePixelArea(ix, iy, toolSize); else canvas.erasePixel(ix, iy); }
                 }
-                lastDrawX = px;
-                lastDrawY = py;
+                lastDrawX = px; lastDrawY = py;
                 return true;
             }
         }
@@ -894,132 +1172,91 @@ public abstract class AbstractEditorScreen extends Screen {
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        int kc = keyInput.key(); int sc = keyInput.scancode(); int m = keyInput.modifiers();
+        int kc = keyInput.key();
         if (hexInput != null && hexInput.isFocused()) return super.keyPressed(keyInput);
-        // Preview original texture (hold key)
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
-        if (previewKey != null && previewKey.matchesKey(keyInput)) {
-            previewingOriginal = true;
+        if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = true; return true; }
+        ModSettings s = ModSettings.getInstance();
+        if (kc == s.getKeybind("undo"))       { canvas.undo(); return true; }
+        if (kc == s.getKeybind("redo"))       { canvas.redo(); return true; }
+        if (kc == s.getKeybind("grid"))       { showGrid = !showGrid; return true; }
+        if (kc == s.getKeybind("pencil"))     { currentTool = EditorTool.PENCIL; return true; }
+        if (kc == s.getKeybind("eraser"))     { currentTool = EditorTool.ERASER; return true; }
+        if (kc == s.getKeybind("fill"))       { currentTool = EditorTool.FILL; return true; }
+        if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
+        if (kc == s.getKeybind("rectangle"))  { currentTool = EditorTool.RECTANGLE; return true; }
+        if (kc == s.getKeybind("line"))       { currentTool = EditorTool.LINE; return true; }
+        // brush key removed
+        var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
+        if (openKey != null && openKey.matchesKey(keyInput)) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
+        // Browse keybind: jump back to the previous/backing screen or open BrowseScreen
+        if (kc == s.getKeybind("browse")) {
+            Screen bs = getBackScreen();
+            MinecraftClient.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
             return true;
         }
-        ModSettings s = ModSettings.getInstance();
-        if (kc == s.getKeybind("undo")) { canvas.undo(); return true; }
-        if (kc == s.getKeybind("redo")) { canvas.redo(); return true; }
-        if (kc == s.getKeybind("grid")) { showGrid = !showGrid; return true; }
-        if (kc == s.getKeybind("pencil")) { currentTool = EditorTool.PENCIL; return true; }
-        if (kc == s.getKeybind("eraser")) { currentTool = EditorTool.ERASER; return true; }
-        if (kc == s.getKeybind("fill")) { currentTool = EditorTool.FILL; return true; }
-        if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
-        if (kc == s.getKeybind("line")) { currentTool = EditorTool.LINE; return true; }
-        if (kc == s.getKeybind("brush")) { currentTool = EditorTool.BRUSH; return true; }
-        if (kc == s.getKeybind("browse")) {
-            if (s.autoApplyLive) this.applyLive();
-            Screen bs = getBackScreen();
-            if (bs != null) MinecraftClient.getInstance().setScreen(bs);
-            else MinecraftClient.getInstance().setScreen(new BrowseScreen());
-        }
-        var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
-        if (openKey != null && openKey.matchesKey(keyInput)) {
-            if (s.autoApplyLive) this.applyLive();
-            this.close(); return true;
-        }
-        if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
-            if (s.autoApplyLive) this.applyLive();
-            this.close(); return true;
-        }
+        if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
         return super.keyPressed(keyInput);
     }
 
     @Override
     public boolean keyReleased(net.minecraft.client.input.KeyInput keyInput) {
-        int kc = keyInput.key();
-        ModSettings s = ModSettings.getInstance();
-
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
-        if (previewKey != null && previewKey.matchesKey(keyInput)) {
-            previewingOriginal = false;
-            return true;
-        }
+        if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = false; return true; }
         return super.keyReleased(keyInput);
     }
 
-    // --- Click handlers ---
+    // ─────────────────────────────────────────────────────────────────────────
+    // Click handlers
+    // ─────────────────────────────────────────────────────────────────────────
 
-    private boolean handlePickerClick(double mx, double my) {
-        int lsw = getLeftSidebarWidth();
-        int rsw = getRightSidebarWidth();
-        int canvasAreaCenter = lsw + (this.width - lsw - rsw) / 2;
-        int cpX = canvasAreaCenter - 80, cpY = this.height - 90, svW = 120, svH = 80, hueX = cpX + svW + 5, hueW = 20;
-        if (mx >= cpX && mx < cpX + svW && my >= cpY && my < cpY + svH) {
-            pickerSat = Math.max(0, Math.min(1, (float) (mx - cpX) / (svW - 1)));
-            pickerVal = Math.max(0, Math.min(1, 1f - (float) (my - cpY) / (svH - 1)));
-            setColor(hsvToRgb(pickerHue, pickerSat, pickerVal), false);
+    private boolean handleColorPickerClick(double mx, double my) {
+        int rpx = this.width - PANEL_W;
+        int innerX = rpx + 4;
+        int bh = getToolButtonHeight();
+        int py = getToolButtonHeight() + TAB_H + 4;
+        int innerW = PANEL_W - 8;
+        int avail = Math.max(0, innerW - PICKER_SV_W - 8);
+        int hueW = Math.max(HUE_W, avail / 2);
+        int alphaW = Math.max(ALPHA_W, avail - hueW);
+        int svX = innerX, svY = py;
+        int hueX = svX + PICKER_SV_W + 4;
+        int alphaX = hueX + hueW + 4;
+
+        if (mx >= svX && mx < svX + PICKER_SV_W && my >= svY && my < svY + PICKER_SV_H) {
+            pickerSat = (float) Math.max(0, Math.min(1, (mx - svX) / (PICKER_SV_W - 1)));
+            pickerVal = (float) Math.max(0, Math.min(1, 1f - (my - svY) / (PICKER_SV_H - 1)));
+            setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
             return true;
         }
-        if (mx >= hueX && mx < hueX + hueW && my >= cpY && my < cpY + svH) {
-            pickerHue = Math.max(0, Math.min(1, (float) (my - cpY) / (svH - 1)));
-            setColor(hsvToRgb(pickerHue, pickerSat, pickerVal), false);
+        if (mx >= hueX && mx < hueX + hueW && my >= svY && my < svY + PICKER_SV_H) {
+                        int rel = (int)Math.round(my - svY);
+            rel = Math.max(0, Math.min(PICKER_SV_H - 2, rel)); // cap to one before the final pixel to avoid wrap
+            pickerHue = rel / (float)(PICKER_SV_H - 1);
+            setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
+            return true;
+        }
+        if (mx >= alphaX && mx < alphaX + alphaW && my >= svY && my < svY + PICKER_SV_H) {
+            int rel = (int)Math.round(my - svY);
+            rel = Math.max(0, Math.min(PICKER_SV_H - 2, rel));
+            pickerAlpha = 1f - rel / (float)(PICKER_SV_H - 1);
+            setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
+            pickerAlphaBarBuilt = false;
             return true;
         }
         return false;
     }
 
-    private boolean handleHistoryClick(double mx, double my) {
-        if (!showColorHistory()) return false;
-        ColorHistory hist = ColorHistory.getInstance();
-        if (hist.size() == 0) return false;
-        int px0 = getPaletteX();
-        int sy = getPaletteEndY() + 50 + 12;
-        int cols = 5, cs = 18;
-        List<Integer> colors = hist.getColors();
-        for (int i = 0; i < colors.size(); i++) {
-            int c = i % cols, r = i / cols;
-            int px = px0 + c * (cs + 2), py = sy + r * (cs + 2);
-            if (mx >= px && mx < px + cs && my >= py && my < py + cs) {
-                currentColor = colors.get(i);
-                if (hexInput != null) hexInput.setText(String.format("#%06X", currentColor & 0xFFFFFF));
-                return true;
-            }
-
-        }
-        return false;
-    }
-
-    private boolean handleLayerPanelClick(double mx, double my) {
-        if (!(currentPanel == PanelType.LAYER_PANEL) || canvas == null) return false;
-        var stack = canvas.getLayerStack();
-        int panelW = 150, rowH = 20;
-        int panelH = 30 + stack.getLayerCount() * rowH + 30;
-        int panelX = this.width / 2 - panelW / 2;
-        int panelY = this.height - panelH - 30;
-        if (mx < panelX - 2 || mx > panelX + panelW + 2 || my < panelY - 2 || my > panelY + panelH + 2) return false;
-        int listY = panelY + 16;
-        for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
-            int rowY = listY + (stack.getLayerCount() - 1 - i) * rowH;
-            if (my >= rowY && my < rowY + rowH - 1 && mx >= panelX && mx < panelX + panelW) {
-                if (mx < panelX + 14) { stack.getLayers().get(i).setVisible(!stack.getLayers().get(i).isVisible()); canvas.invalidateCache(); }
-                else stack.setActiveIndex(i);
-                return true;
-            }
-        }
-        int btnY = listY + stack.getLayerCount() * rowH + 4;
-        if (my >= btnY && my < btnY + 18) {
-            if (mx >= panelX && mx < panelX + 34) { stack.addLayerAbove( Text.translatable("textureeditor.button.layer").getString() + " " + (stack.getLayerCount() - 1)); canvas.invalidateCache(); return true; }
-            if (mx >= panelX + 38 && mx < panelX + 76) { stack.removeLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true; }
-            if (mx >= panelX + 80 && mx < panelX + 110) { int idx = stack.getActiveIndex(); if (idx < stack.getLayerCount() - 1) { stack.moveLayerDown(idx); canvas.invalidateCache(); } return true; }
-            if (mx >= panelX + 114 && mx < panelX + panelW) { int idx = stack.getActiveIndex(); if (idx > 0) { stack.moveLayerUp(idx); canvas.invalidateCache(); } return true; }
-        }
-        return true;
-    }
-
-    protected boolean handlePaletteClick(double mx, double my) {
-        int cs = getPaletteCellSize();
-        int cols = getPaletteColumns();
-        int px0 = getPaletteX(), py0 = 30;
+    private boolean handlePaletteClick(double mx, double my) {
+        int rpx = this.width - PANEL_W;
+        int innerX = rpx + 4, innerW = PANEL_W - 8;
+        int bh = getToolButtonHeight();
+        int py = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + bh + 4 + bh + 8;
+        int cols = 5, cs = (innerW - (cols - 1)) / cols;
         for (int i = 0; i < PALETTE.length; i++) {
-            int c = i % cols, r = i / cols;
-            int px = px0 + c * (cs + 2), py = py0 + r * (cs + 2);
-            if (mx >= px && mx < px + cs && my >= py && my < py + cs) {
+            int col = i % cols, row = i / cols;
+            int px2 = innerX + col * (cs + 1), py2 = py + row * (cs + 1);
+            if (mx >= px2 && mx < px2 + cs && my >= py2 && my < py2 + cs) {
                 setColor(PALETTE[i], false);
                 return true;
             }
@@ -1027,46 +1264,286 @@ public abstract class AbstractEditorScreen extends Screen {
         return false;
     }
 
+    private boolean handleHistoryClick(double mx, double my) {
+        ColorHistory hist = ColorHistory.getInstance();
+        if (hist.size() == 0) return false;
+        int rpx = this.width - PANEL_W;
+        int innerX = rpx + 4, innerW = PANEL_W - 8;
+        int bh = getToolButtonHeight();
+        int cols = 5, cs = (innerW - (cols - 1)) / cols;
+        int palRows = (PALETTE.length + cols - 1) / cols;
+        int py = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + bh + 4 + bh + 8 + palRows * (cs + 1) + 4 + 10;
+        int hcs = Math.max(8, cs - 2);
+        List<Integer> colors = hist.getColors();
+        for (int i = 0; i < Math.min(colors.size(), 10); i++) {
+            int col = i % cols, row = i / cols;
+            int px2 = innerX + col * (hcs + 1), py2 = py + row * (hcs + 1);
+            if (mx >= px2 && mx < px2 + hcs && my >= py2 && my < py2 + hcs) {
+                setColor(colors.get(i), false);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean handleLayerClick(double mx, double my) {
+        if (canvas == null) return false;
+        var stack = canvas.getLayerStack();
+        int rpx = this.width - PANEL_W;
+        int innerX = rpx + 4, innerW = PANEL_W - 8;
+        int bh = getToolButtonHeight();
+        int py = getToolButtonHeight() + TAB_H + 4 + 12;
+        int rowH = 18;
+
+        // Layer rows
+        for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
+            int rowY = py + (stack.getLayerCount() - 1 - i) * (rowH + 1);
+            if (my >= rowY && my < rowY + rowH && mx >= innerX && mx < innerX + innerW) {
+                if (mx < innerX + 12) { stack.getLayers().get(i).setVisible(!stack.getLayers().get(i).isVisible()); canvas.invalidateCache(); }
+                else stack.setActiveIndex(i);
+                return true;
+            }
+        }
+
+        // Buttons
+        py += stack.getLayerCount() * (rowH + 1) + 6;
+        int btnW = (innerW - 4) / 3;
+        if (my >= py && my < py + bh) {
+            if (mx >= innerX && mx < innerX + btnW) { stack.addLayerAbove("Layer " + stack.getLayerCount()); canvas.invalidateCache(); return true; }
+            if (mx >= innerX + btnW + 2 && mx < innerX + 2 * btnW + 2) { stack.removeLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true; }
+            if (mx >= innerX + 2 * btnW + 4 && mx < innerX + innerW) { int idx = stack.getActiveIndex(); if (idx < stack.getLayerCount() - 1) { stack.moveLayerDown(idx); canvas.invalidateCache(); } return true; }
+        }
+        py += bh + 2;
+        if (my >= py && my < py + bh) {
+            if (mx >= innerX && mx < innerX + btnW) { int idx = stack.getActiveIndex(); if (idx > 0) { stack.moveLayerUp(idx); canvas.invalidateCache(); } return true; }
+            if (mx >= innerX + btnW + 2 && mx < innerX + 2 * btnW + 2) {
+                // Merge down
+                stack.mergeDown(stack.getActiveIndex()); canvas.invalidateCache(); return true;
+            }
+            if (mx >= innerX + 2 * btnW + 4 && mx < innerX + innerW) {
+                // Copy layer
+                stack.duplicateLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true;
+            }
+        }
+        return false;
+    }
+
+    // Start capturing a drag inside the color picker (SV/Hue/Alpha). Returns true if started.
+    private boolean startColorPickerDrag(double mx, double my) {
+        int rpx = this.width - PANEL_W;
+        int innerX = rpx + 4;
+        int py = getToolButtonHeight() + TAB_H + 4;
+        int innerW = PANEL_W - 8;
+        int avail = Math.max(0, innerW - PICKER_SV_W - 8);
+        int hueW = Math.max(HUE_W, avail / 2);
+        int alphaW = Math.max(ALPHA_W, avail - hueW);
+        int svX = innerX, svY = py;
+        int hueX = svX + PICKER_SV_W + 4;
+        int alphaX = hueX + hueW + 4;
+
+        if (mx >= svX && mx < svX + PICKER_SV_W && my >= svY && my < svY + PICKER_SV_H) {
+            pickingSv = true;
+            updateColorPickerFromMouse(mx, my);
+            return true;
+        }
+        if (mx >= hueX && mx < hueX + hueW && my >= svY && my < svY + PICKER_SV_H) {
+            pickingHue = true;
+            updateColorPickerFromMouse(mx, my);
+            return true;
+        }
+        if (mx >= alphaX && mx < alphaX + alphaW && my >= svY && my < svY + PICKER_SV_H) {
+            pickingAlpha = true;
+            updateColorPickerFromMouse(mx, my);
+            return true;
+        }
+        return false;
+    }
+
+    private void updateColorPickerFromMouse(double mx, double my) {
+        int rpx = this.width - PANEL_W;
+        int innerX = rpx + 4;
+        int py = getToolButtonHeight() + TAB_H + 4;
+        int innerW = PANEL_W - 8;
+        int hueW = Math.max(HUE_W, innerW - PICKER_SV_W - 8);
+        int alphaW = Math.max(ALPHA_W, innerW - PICKER_SV_W - 8);
+        int svX = innerX, svY = py;
+        int hueX = svX + PICKER_SV_W + 4;
+        int alphaX = hueX + hueW + 4;
+
+        if (pickingSv) {
+            pickerSat = (float) Math.max(0, Math.min(1, (mx - svX) / (PICKER_SV_W - 1)));
+            pickerVal = (float) Math.max(0, Math.min(1, 1f - (my - svY) / (PICKER_SV_H - 1)));
+            setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
+            return;
+        }
+        if (pickingHue) {
+            int rel = (int)Math.round(my - svY);
+            rel = Math.max(0, Math.min(PICKER_SV_H - 2, rel));
+            pickerHue = rel / (float)(PICKER_SV_H - 1);
+            setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
+            return;
+        }
+        if (pickingAlpha) {
+            int rel = (int)Math.round(my - svY);
+            rel = Math.max(0, Math.min(PICKER_SV_H - 2, rel));
+            pickerAlpha = 1f - rel / (float)(PICKER_SV_H - 1);
+            setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
+            pickerAlphaBarBuilt = false;
+            return;
+        }
+    }
+
     protected void handleCanvasClick(int px, int py, int btn) {
-        int storeColor = currentColor;
-        float variation = ModSettings.getInstance().brushVariation;
+        float variation = ModSettings.getInstance().variationPercent;
         switch (currentTool) {
-            case PENCIL -> {
-                canvas.saveSnapshot();
-                if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, btn == 1 ? 0 : storeColor);
-                else canvas.drawPixel(px, py, btn == 1 ? 0 : storeColor);
-                setColor(currentColor, true);
-            }
-            case BRUSH -> {
-                canvas.saveSnapshot();
-                if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, storeColor, variation);
-                else canvas.drawBrushPixel(px, py, storeColor, variation);
-                setColor(currentColor, true);
-            }
-            case ERASER -> {
-                canvas.saveSnapshot();
-                if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize);
-                else canvas.erasePixel(px, py);
-            }
-            case FILL -> { canvas.saveSnapshot(); canvas.floodFill(px, py, storeColor); setColor(currentColor, true); }
+            case PENCIL   -> { canvas.saveSnapshot(); if (variation > 0f) { if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation); else canvas.drawBrushPixel(px, py, currentColor, variation); } else { if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor); else canvas.drawPixel(px, py, currentColor); } setColor(currentColor, true); }
+            case ERASER   -> { canvas.saveSnapshot(); if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize); else canvas.erasePixel(px, py); }
+            case FILL     -> { canvas.saveSnapshot(); float v = ModSettings.getInstance().variationPercent; if (v > 0f) canvas.floodFill(px, py, currentColor, v); else canvas.floodFill(px, py, currentColor); setColor(currentColor, true); }
             case EYEDROPPER -> {
                 int raw = canvas.pickColorComposited(px, py);
-                if (raw == 0x00000000) {
-                    NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE, "Layer is completely empty!");
-                    return;
-                }
-                currentColor = usesTint() ? applyTint(raw) : raw;
-                setColor(currentColor, false);
-                if (hexInput != null) hexInput.setText(String.format("#%08X", currentColor));
+                if (raw == 0) { NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE, "Layer is empty!"); return; }
+                setColor(usesTint() ? applyTint(raw) : raw, false);
             }
             case LINE -> {
                 if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; }
-                else { canvas.saveSnapshot(); canvas.drawLine(lineStartX, lineStartY, px, py, storeColor); lineFirstClick = false; setColor(currentColor, true); }
+                else {
+                    canvas.saveSnapshot();
+                    if (toolSize > 1 || variation > 0f) canvas.drawLineThickness(lineStartX, lineStartY, px, py, currentColor, toolSize, variation);
+                    else canvas.drawLine(lineStartX, lineStartY, px, py, currentColor);
+                    lineFirstClick = false; setColor(currentColor, true);
+                }
+            }
+
+            case RECTANGLE -> {
+                if (!rectFirstClick) { rectStartX = px; rectStartY = py; rectFirstClick = true; }
+                else {
+                    canvas.saveSnapshot();
+                    if (toolSize > 1 || variation > 0f) canvas.drawRectOutlineThickness(rectStartX, rectStartY, px, py, currentColor, toolSize, variation);
+                    else canvas.drawRect(rectStartX, rectStartY, px, py, currentColor);
+                    rectFirstClick = false; setColor(currentColor, true);
+                }
             }
         }
     }
 
-    // --- Utilities ---
+    // ─────────────────────────────────────────────────────────────────────────
+    // Color helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    protected void setColor(int c, boolean addToHistory) {
+        currentColor = c;
+        if (addToHistory) ColorHistory.getInstance().addColor(c);
+        syncPickerFromColor(c);
+        pickerAlphaBarBuilt = false;
+        if (hexInput != null) {
+            // Update hex input without triggering its change listener to avoid recursion.
+            // Only update when the displayed text differs to avoid re-entrant setText -> onChanged -> setText loops
+            String newHex = colorToHex(c);
+            if (!newHex.equals(hexInput.getText())) {
+                suppressHexCallback = true;
+                try { hexInput.setText(newHex); } finally { suppressHexCallback = false; }
+            }
+        }
+    }
+
+    private void syncPickerFromColor(int color) {
+        int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
+        float[] hsv = rgbToHsv(r, g, b);
+        pickerHue = hsv[0]; pickerSat = hsv[1]; pickerVal = hsv[2];
+        pickerAlpha = ((color >> 24) & 0xFF) / 255f;
+    }
+
+    public void setColorPickerFromInt(int color) { syncPickerFromColor(color); }
+
+    private static float[] rgbToHsv(int r, int g, int b) {
+        float rf = r / 255f, gf = g / 255f, bf = b / 255f;
+        float max = Math.max(rf, Math.max(gf, bf)), min = Math.min(rf, Math.min(gf, bf));
+        float h, s, v = max, d = max - min;
+        s = max == 0 ? 0 : d / max;
+        if (d == 0) h = 0;
+        else if (max == rf) h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6f;
+        else if (max == gf) h = ((bf - rf) / d + 2) / 6f;
+        else h = ((rf - gf) / d + 4) / 6f;
+        return new float[]{h, s, v};
+    }
+
+    protected static int hsvToArgb(float h, float s, float v, float a) {
+        int ai = (int)(a * 255) & 0xFF;
+        int i = (int)(h * 6) % 6;
+        float f = h * 6 - (int)(h * 6);
+        int p = (int)(255 * v * (1 - s)), q = (int)(255 * v * (1 - f * s)), t = (int)(255 * v * (1 - (1 - f) * s)), vi = (int)(255 * v);
+        return (ai << 24) | switch (i) {
+            case 0 -> (vi << 16) | (t << 8) | p;
+            case 1 -> (q << 16) | (vi << 8) | p;
+            case 2 -> (p << 16) | (vi << 8) | t;
+            case 3 -> (p << 16) | (q << 8) | vi;
+            case 4 -> (t << 16) | (p << 8) | vi;
+            default -> (vi << 16) | (p << 8) | q;
+        };
+    }
+
+    // keep legacy signature for subclasses
+    protected static int hsvToRgb(float h, float s, float v) { return hsvToArgb(h, s, v, 1f); }
+
+    private static String colorToHex(int c) {
+        int a = (c >> 24) & 0xFF;
+        int rgb = c & 0xFFFFFF;
+        StringBuilder sb = new StringBuilder("#");
+        if (a != 255) {
+            // include alpha channel
+            String hex = Integer.toHexString(c);
+            while (hex.length() < 8) hex = "0" + hex;
+            sb.append(hex.toUpperCase());
+            return sb.toString();
+        } else {
+            String hex = Integer.toHexString(rgb);
+            while (hex.length() < 6) hex = "0" + hex;
+            sb.append(hex.toUpperCase());
+            return sb.toString();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Misc
+    // ─────────────────────────────────────────────────────────────────────────
+
+    protected void doResetAll() {
+        TextureManager.getInstance().clear();
+        MinecraftClient.getInstance().reloadResources();
+        if (originalPixels != null && canvas != null) {
+            canvas.saveSnapshot();
+            for (int x = 0; x < canvas.getWidth(); x++)
+                for (int y = 0; y < canvas.getHeight(); y++)
+                    canvas.setPixel(x, y, originalPixels[x][y]);
+        }
+    }
+
+    /**
+     * Confirmation screen shown before performing a destructive Reset All operation.
+     */
+    private static class ConfirmResetAllScreen extends Screen {
+        private final AbstractEditorScreen parentScreen;
+        protected ConfirmResetAllScreen(AbstractEditorScreen parent) {
+            super(Text.translatable("textureeditor.confirm.reset_all.title"));
+            this.parentScreen = parent;
+        }
+
+        @Override
+        protected void init() {
+            int w = 300, h = 80;
+            int cx = this.width / 2 - w / 2;
+            int cy = this.height / 2 - h / 2;
+            addDrawableChild(ButtonWidget.builder(Text.literal("Confirm"), btn -> { parentScreen.doResetAll(); MinecraftClient.getInstance().setScreen(parentScreen); }).position(cx + 20, cy + 40).size(100, 20).build());
+            addDrawableChild(ButtonWidget.builder(Text.literal("Cancel"), btn -> MinecraftClient.getInstance().setScreen(parentScreen)).position(cx + 140, cy + 40).size(100, 20).build());
+        }
+
+        @Override
+        public void render(DrawContext ctx, int mx, int my, float delta) {
+            ctx.fill(0, 0, this.width, this.height, 0x88000000);
+            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("Are you sure? All your changes will be lost."), this.width / 2, this.height / 2 - 10, 0xFFFFFF00);
+            super.render(ctx, mx, my, delta);
+        }
+    }
 
     protected void drawRectOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int c) {
         ctx.fill(x1, y1, x2, y1 + 1, c);
@@ -1075,34 +1552,18 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(x2 - 1, y1, x2, y2, c);
     }
 
-    /** Bresenham line algorithm — returns list of [x,y] points between (x0,y0) and (x1,y1) */
     private static java.util.List<int[]> bresenhamLine(int x0, int y0, int x1, int y1) {
-        java.util.List<int[]> points = new java.util.ArrayList<>();
+        var pts = new java.util.ArrayList<int[]>();
         int dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-        int err = dx - dy;
+        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx - dy;
         while (true) {
-            points.add(new int[]{x0, y0});
+            pts.add(new int[]{x0, y0});
             if (x0 == x1 && y0 == y1) break;
             int e2 = 2 * err;
             if (e2 > -dy) { err -= dy; x0 += sx; }
-            if (e2 < dx) { err += dx; y0 += sy; }
+            if (e2 < dx)  { err += dx; y0 += sy; }
         }
-        return points;
-    }
-
-    protected static int hsvToRgb(float h, float s, float v) {
-        int i = (int) (h * 6) % 6;
-        float f = h * 6 - (int) (h * 6);
-        int p = (int) (255 * v * (1 - s)), q = (int) (255 * v * (1 - f * s)), t = (int) (255 * v * (1 - (1 - f) * s)), vi = (int) (255 * v);
-        return switch (i) {
-            case 0 -> 0xFF000000 | (vi << 16) | (t << 8) | p;
-            case 1 -> 0xFF000000 | (q << 16) | (vi << 8) | p;
-            case 2 -> 0xFF000000 | (p << 16) | (vi << 8) | t;
-            case 3 -> 0xFF000000 | (p << 16) | (q << 8) | vi;
-            case 4 -> 0xFF000000 | (t << 16) | (p << 8) | vi;
-            default -> 0xFF000000 | (vi << 16) | (p << 8) | q;
-        };
+        return pts;
     }
 
     protected static int[][] copyPixels(int[][] src, int w, int h) {
@@ -1111,35 +1572,19 @@ public abstract class AbstractEditorScreen extends Screen {
         return copy;
     }
 
-    private int getPaletteX() {
-        return this.width - getRightSidebarWidth() + 5;
-    }
+    @Override public boolean shouldPause() { return false; }
 
-    private int getPaletteColumns() {
-        int scale = getGuiScale();
-        if (scale >= 5) return 6;
-        if (scale >= 4) return 5;
-        return 5;
-    }
+    // Legacy compat for subclasses that call these
+    protected int getLeftSidebarWidth()  { return leftW() + TOGGLE_BTN_W; }
+    protected int getRightSidebarWidth() { return rightW() + TOGGLE_BTN_W; }
+    protected int getToolButtonWidth()   { return PANEL_W - 8; }
 
-    private int getPaletteCellSize() {
-        int scale = getGuiScale();
-        if (scale >= 5) return 10;
-        if (scale >= 4) return 14;
-        return 20;
-    }
+    // Legacy compatibility hooks for older subclass implementations
+    /** Legacy method used by older subclasses to add arbitrary extra buttons (bottom/right area) */
+    protected int addExtraButtons(int toolY) { return toolY; }
 
-    public void setTint(int tint) {
-        this.blockTint = tint | 0xFF000000;
-        this.isTinted = true;
-    }
-
-    private int getPaletteEndY() {
-        int cs = getPaletteCellSize();
-        int cols = getPaletteColumns();
-        return 30 + ((PALETTE.length + cols - 1) / cols) * (cs + 2);
-    }
-
-    @Override
-    public boolean shouldPause() { return false; }
+    /** Legacy hook to allow subclasses to change the reset button label. Return a translated string. */
+    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset").getString(); }
 }
+
+

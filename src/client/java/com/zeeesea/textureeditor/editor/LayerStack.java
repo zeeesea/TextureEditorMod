@@ -143,6 +143,31 @@ public class LayerStack {
         return new Layer(width, height, "Composite", composite);
     }
 
+    public void mergeDown(int index) {
+        if (index <= 0 || index >= layers.size()) return;
+        var top = layers.get(index);
+        var bottom = layers.get(index - 1);
+        // Composite top onto bottom
+        int w = bottom.getWidth(), h = bottom.getHeight();
+        for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) {
+            int tc = top.getPixel(x, y);
+            if ((tc >> 24 & 0xFF) > 0) bottom.setPixel(x, y, tc);
+        }
+        layers.remove(index);
+        if (activeIndex >= layers.size()) activeIndex = layers.size() - 1;
+    }
+
+    public void duplicateLayer(int index) {
+        if (index < 0 || index >= layers.size()) return;
+        var orig = layers.get(index);
+        var copy = new Layer(orig.getWidth(), orig.getHeight(), orig.getName() + " Copy");
+        for (int x = 0; x < orig.getWidth(); x++)
+            for (int y = 0; y < orig.getHeight(); y++)
+                copy.setPixel(x, y, orig.getPixel(x, y));
+        layers.add(index + 1, copy);
+        activeIndex = index + 1;
+    }
+
     /**
      * Alpha-blend src over dst (both ARGB).
      */

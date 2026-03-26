@@ -24,33 +24,41 @@ public class QuickSelectWheel {
     );
 
     public enum Slice {
-        PENCIL ("Pencil"),
-        BRUSH ("Brush"),
-        ERASER ("Pencil"),
+        PENCIL ("Pencil","P"),
+        ERASER ("Eraser","E"),
+        EYEDROPPER ("Eyedropper","I"),
+        RECTANGLE ("Rectangle","R"),
         //COLOR_WHEEL ("Color Wheel"),
-        LINE ("Line"),
-        FILL ("Fill");
+        LINE ("Line","L"),
+        FILL ("Fill","F");
 
         private final String name;
+        private final String tag;
 
-        Slice(String name) {
+        Slice(String name, String tag) {
             this.name = name;
+            this.tag = tag;
         }
 
         /** Returns the corresponding EditorTool, or null if no direct mapping exists */
         public EditorTool toTool() {
             return switch (this) {
                 case PENCIL -> EditorTool.PENCIL;
-                case BRUSH -> EditorTool.BRUSH;
                 case ERASER -> EditorTool.ERASER;
-                case LINE -> EditorTool.LINE;
+                    case LINE -> EditorTool.LINE;
                 case FILL -> EditorTool.FILL;
+                    case EYEDROPPER -> EditorTool.EYEDROPPER;
+                    case RECTANGLE -> EditorTool.RECTANGLE;
                 default -> null; // COLOR_WHEEL has no direct EditorTool
             };
         }
         public String getName() {
             return name;
         }
+        public String getTag() {
+            return tag;
+        }
+
     }
 
     public QuickSelectWheel(int radius) {
@@ -87,14 +95,14 @@ public class QuickSelectWheel {
             int textX = (int)(centerX + radius * 0.6f * Math.cos(mid));
             int textY = (int)(centerY + radius * 0.6f * Math.sin(mid)) - 4;
 
-            // First letter only
-            String label = slices[i].name().substring(0, 1);
+            // Get tag
+            String label = slices[i].getTag();
             context.drawCenteredTextWithShadow(textRenderer, label, textX, textY, 0xFFFFFFFF);
         }
 
         // Show full name of hovered slice above the wheel
         if (highlightedSlice != null) {
-            context.drawCenteredTextWithShadow(textRenderer, highlightedSlice.name(), centerX, centerY - radius - 12, 0xFFFFFFFF);
+            context.drawCenteredTextWithShadow(textRenderer, highlightedSlice.getName(), centerX, centerY - radius - 12, 0xFFFFFFFF);
         }
     }
 

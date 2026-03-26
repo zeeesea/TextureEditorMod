@@ -22,6 +22,7 @@ public class KeybindSettingsScreen extends Screen {
             {"fill", "Fill Tool"},
             {"eyedropper", "Eyedropper Tool"},
             {"line", "Line Tool"},
+            {"rectangle", "Rectangle Tool"},
             {"undo", "Undo"},
             {"redo", "Redo"},
             {"grid", "Toggle Grid"},

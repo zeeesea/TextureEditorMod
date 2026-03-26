@@ -130,6 +130,32 @@ public class EditorScreen extends AbstractEditorScreen {
         return toolY;
     }
 
+    @Override
+    protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
+        int tbw = Math.min(getToolButtonWidth(), w);
+        int tbh = bh;
+        int px = x;
+        // Face cycle button — only at scale <= 4
+        if (showFaceButton()) {
+            addDrawableChild(ButtonWidget.builder(
+                    Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())),
+                    btn -> {
+                        Direction[] dirs = Direction.values();
+                        face = dirs[(face.ordinal() + 1) % dirs.length];
+                        btn.setMessage(Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())));
+                        switchFace(face);
+                    }
+            ).position(px, y).size(tbw, tbh).build());
+            y += tbh + 4;
+        }
+
+        // Reset Block button — always shown in General tab
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.reset_block"), btn -> resetBlock())
+                .position(px, y).size(tbw, tbh).build());
+        y += tbh + 4;
+        return y;
+    }
+
     private void switchFace(Direction newFace) {
         applyLive();
         this.face = newFace;

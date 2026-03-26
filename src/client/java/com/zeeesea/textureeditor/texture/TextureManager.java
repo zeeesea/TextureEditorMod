@@ -47,8 +47,103 @@ public class TextureManager {
     public static TextureManager getInstance() { return INSTANCE; }
 
     public void putTexture(Identifier textureId, int[][] pixels, int width, int height) {
-        modifiedTextures.put(textureId, pixels);
-        textureDimensions.put(textureId, new int[]{width, height});
+        // Try to ensure we have the original pixels to compare against
+        ensureOriginalStored(textureId);
+        int[][] orig = originalTextures.get(textureId);
+
+        // If we don't have original pixels available, assume modified (can't compare)
+        if (orig == null) {
+            modifiedTextures.put(textureId, pixels);
+            textureDimensions.put(textureId, new int[]{width, height});
+            return;
+        }
+
+        // Quick size check
+        boolean isDifferent = true;
+        if (orig.length == width && (width == 0 || orig[0].length == height)) {
+            // Compare pixels; bail out early on first difference
+            isDifferent = false;
+            outer:
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    if (orig[x][y] != pixels[x][y]) {
+                        isDifferent = true;
+                        break outer;
+                    }
+                }
+            }
+        }
+
+        if (isDifferent) {
+            modifiedTextures.put(textureId, pixels);
+            textureDimensions.put(textureId, new int[]{width, height});
+            // If this is an armor/equipment texture alias, also mark common model/alias ids so UI picks it up
+            try {
+                addArmorAliasMarks(textureId, pixels, width, height);
+            } catch (Exception ignored) {}
+        } else {
+            // Pixels match original -> ensure we don't mark this texture as modified
+            modifiedTextures.remove(textureId);
+            textureDimensions.remove(textureId);
+        }
+    }
+
+    // When a texture is modified, also mark any known armor/equipment aliases so BrowseScreen can detect them
+    private void addArmorAliasMarks(Identifier textureId, int[][] pixels, int width, int height) {
+        String path = textureId.getPath();
+        String ns = textureId.getNamespace();
+
+        // equipment -> models/armor
+        if (path.startsWith("textures/entity/equipment/humanoid/")) {
+            String name = path.substring("textures/entity/equipment/humanoid/".length());
+            if (name.endsWith(".png")) name = name.substring(0, name.length() - 4);
+            Identifier modelId = Identifier.of(ns, "textures/models/armor/" + name + "_layer_1.png");
+            modifiedTextures.putIfAbsent(modelId, pixels);
+            textureDimensions.putIfAbsent(modelId, new int[]{width, height});
+        }
+        if (path.startsWith("textures/entity/equipment/humanoid_leggings/")) {
+            String name = path.substring("textures/entity/equipment/humanoid_leggings/".length());
+            if (name.endsWith(".png")) name = name.substring(0, name.length() - 4);
+            Identifier modelId = Identifier.of(ns, "textures/models/armor/" + name + "_layer_2.png");
+            modifiedTextures.putIfAbsent(modelId, pixels);
+            textureDimensions.putIfAbsent(modelId, new int[]{width, height});
+        }
+        if (path.startsWith("textures/entity/equipment/piglin_head/")) {
+            String name = path.substring("textures/entity/equipment/piglin_head/".length());
+            if (name.endsWith(".png")) name = name.substring(0, name.length() - 4);
+            Identifier modelId = Identifier.of(ns, "textures/models/armor/" + name + "_piglin_helmet.png");
+            modifiedTextures.putIfAbsent(modelId, pixels);
+            textureDimensions.putIfAbsent(modelId, new int[]{width, height});
+        }
+
+        // models/armor -> equipment aliases
+        if (path.startsWith("textures/models/armor/") && path.endsWith(".png")) {
+            String name = path.substring("textures/models/armor/".length());
+            if (name.endsWith(".png")) name = name.substring(0, name.length() - 4);
+            String raw = name;
+            String suffix = "";
+            if (raw.endsWith("_overlay")) { suffix = "_overlay"; raw = raw.substring(0, raw.length() - "_overlay".length()); }
+
+            if (raw.endsWith("_layer_1")) {
+                String material = raw.substring(0, raw.length() - "_layer_1".length());
+                Identifier eq = Identifier.of(ns, "textures/entity/equipment/humanoid/" + material + suffix + ".png");
+                modifiedTextures.putIfAbsent(eq, pixels);
+                textureDimensions.putIfAbsent(eq, new int[]{width, height});
+            } else if (raw.endsWith("_layer_2")) {
+                String material = raw.substring(0, raw.length() - "_layer_2".length());
+                Identifier eq = Identifier.of(ns, "textures/entity/equipment/humanoid_leggings/" + material + suffix + ".png");
+                modifiedTextures.putIfAbsent(eq, pixels);
+                textureDimensions.putIfAbsent(eq, new int[]{width, height});
+            } else if (raw.contains("_piglin_helmet")) {
+                String material = raw.replace("_piglin_helmet", "");
+                Identifier eq1 = Identifier.of(ns, "textures/entity/equipment/piglin_head/" + material + suffix + ".png");
+                Identifier eq2 = Identifier.of(ns, "textures/entity/equipment/humanoid/" + material + suffix + ".png");
+                modifiedTextures.putIfAbsent(eq1, pixels);
+                textureDimensions.putIfAbsent(eq1, new int[]{width, height});
+                modifiedTextures.putIfAbsent(eq2, pixels);
+                textureDimensions.putIfAbsent(eq2, new int[]{width, height});
+            }
+        }
     }
 
     public void storeOriginal(Identifier textureId, int[][] pixels, int width, int height) {
@@ -344,6 +439,7 @@ public class TextureManager {
         putTexture(textureId, pixels, width, height);
         writeSpritePixels(spriteId, pixels, width, height);
         markItemGuiAtlasDirty(spriteId);
+
 
         try {
             ItemModelRebaker.rebake(spriteId);
