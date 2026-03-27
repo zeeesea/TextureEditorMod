@@ -1193,6 +1193,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (openKey != null && openKey.matchesKey(keyInput)) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
         // Browse keybind: jump back to the previous/backing screen or open BrowseScreen
         if (kc == s.getKeybind("browse")) {
+            if (ModSettings.getInstance().autoApplyLive) applyLive();
             Screen bs = getBackScreen();
             MinecraftClient.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
             return true;

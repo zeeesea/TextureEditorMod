@@ -3,7 +3,6 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
-import com.zeeesea.textureeditor.client.TextureIconManager;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
@@ -19,6 +18,10 @@ import net.minecraft.util.math.Direction;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.*;
+import java.io.InputStream;
+import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.client.texture.NativeImage;
+import net.minecraft.client.texture.NativeImageBackedTexture;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +49,10 @@ public class BrowseScreen extends Screen {
     private int visibleRows;
     private int scrollOffset = 0;
     private int maxScroll = 0;
+
+    // Preview cache for entries without an ItemStack (GUI, ENTITY, etc.)
+    private final Map<Identifier, PreviewCache> previewCache = new ConcurrentHashMap<>();
+    private final Map<Identifier, Identifier> previewTextureIds = new ConcurrentHashMap<>();
 
     // Tab buttons
     private ButtonWidget tabAll, tabBlocks, tabItems, tabMobs, tabEntity, tabGui, tabSky;
@@ -647,6 +654,8 @@ public class BrowseScreen extends Screen {
         // GAMEMODE SWITCHER
         addGUIEntry(entries, "gui/sprites/gamemode_switcher/selection", "Gamemode Selection");
         addGUIEntry(entries, "gui/sprites/gamemode_switcher/slot", "Gamemode Slot");
+        
+
 
         return entries;
     }
@@ -705,6 +714,22 @@ public class BrowseScreen extends Screen {
                 null
         ));
 
+        // Block breaking (destroy stages) - single browse entry that opens a frame-based editor
+        entries.add(new BrowseEntry(
+                Identifier.of("minecraft", "textures/block/destroy_stage_0.png"),
+                "Block Breaking",
+                EntryType.GUI,
+                null
+        ));
+
+        /*
+        // Empty Armor Slots
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_boots.png"), "Empty Armor Slot Boots", EntryType.GUI, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_chestplate.png"), "Empty Armor Slot Chestplate", EntryType.GUI, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_helmet.png"), "Empty Armor Slot Helmet", EntryType.GUI, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_leggings.png"), "Empty Armor Slot Leggings", EntryType.GUI, null));
+        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_shield.png"), "Empty Armor Slot Shield", EntryType.GUI, null));
+        */
 
         // Boats
         entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/oak.png"), "Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.item.Items.OAK_BOAT)));
@@ -1024,30 +1049,26 @@ public class BrowseScreen extends Screen {
                 int iconY = y + (CELL_SIZE - 16) / 2;
                 context.drawItem(entry.stack, iconX, iconY);
             } else {
-                // Try to get a generated icon from the texture ID
-                var future = TextureIconManager.getOrCreateIconForTexture(entry.id);
-                var iconData = future != null ? future.getNow(null) : null;
-                if (iconData != null) {
-                    // draw the dynamic texture centered and scaled to 16x16 (or smaller preserving aspect)
-                    int targetSize = 16;
-                    int iw = iconData.width;
-                    int ih = iconData.height;
-                    float scale = Math.min((float)targetSize / iw, (float)targetSize / ih);
-                    int drawW = Math.max(1, (int)(iw * scale));
-                    int drawH = Math.max(1, (int)(ih * scale));
-                    int iconX = x + (CELL_SIZE - drawW) / 2;
-                    int iconY = y + (CELL_SIZE - drawH) / 2;
-                    try {
-                        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, iconData.id, iconX, iconY, 0, 0, drawW, drawH, drawW, drawH);
-                    } catch (Exception e) {
-                        // fallback to label
-                        String label = entry.name.length() > 5 ? entry.name.substring(0, 5) : entry.name;
-                        int lx = x + (CELL_SIZE - textRenderer.getWidth(label)) / 2;
-                        int ly = y + (CELL_SIZE - 8) / 2;
-                        context.drawText(textRenderer, label, lx, ly, pal.ENTRY_TEXT, false);
-                    }
+                // Try to render a cropped/scaled preview texture for GUI / ENTITY / other non-item entries
+                PreviewCache cache = getOrBuildPreview(entry);
+                if (cache != null && cache.dynamicId != null) {
+                    // Fit preview into the icon cell with padding; preserve aspect ratio.
+                    // Do NOT upscale previews here (preserve original look). Only downscale if larger than maxSize.
+                    int pad = 4;
+                    int maxSize = CELL_SIZE - pad * 2;
+                    int srcW = cache.width;
+                    int srcH = cache.height;
+                    float fit = Math.min((float)maxSize / srcW, (float)maxSize / srcH);
+                    if (fit > 1f) fit = 1f; // prevent upscaling
+                    int drawW = Math.max(1, Math.round(srcW * fit));
+                    int drawH = Math.max(1, Math.round(srcH * fit));
+                    int drawX = x + (CELL_SIZE - drawW) / 2;
+                    int drawY = y + (CELL_SIZE - drawH) / 2;
+                    // Use same form as ExportScreen to render a dynamic NativeImageBackedTexture
+                    context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
+                            cache.dynamicId, drawX, drawY, 0, 0, drawW, drawH, cache.width, cache.height, cache.width, cache.height);
                 } else {
-                    // GUI entries: draw abbreviated name while icon is loading or if generation failed
+                    // GUI entries: draw abbreviated name as fallback
                     String label = entry.name.length() > 5 ? entry.name.substring(0, 5) : entry.name;
                     int lx = x + (CELL_SIZE - textRenderer.getWidth(label)) / 2;
                     int ly = y + (CELL_SIZE - 8) / 2;
@@ -1229,6 +1250,202 @@ public class BrowseScreen extends Screen {
         ctx.fill(x2 - 1, y1, x2, y2, c);
     }
 
+    // --- Preview generation helpers ---
+
+    private static class PreviewCache {
+        Identifier sourceId;
+        Identifier dynamicId;
+        int width;
+        int height;
+        int cropX, cropY, cropW, cropH;
+        int checksum;
+    }
+
+    private PreviewCache getOrBuildPreview(BrowseEntry entry) {
+        try {
+            Identifier fullId = asFullTextureId(entry.id);
+            PreviewCache existing = previewCache.get(fullId);
+
+            // Try to obtain pixel data from TextureManager (modified textures) first
+            int[][] pixels = TextureManager.getInstance().getPixels(fullId);
+            int w = 0, h = 0;
+            if (pixels != null) {
+                w = pixels.length > 0 ? pixels.length : 0;
+                h = w > 0 ? pixels[0].length : 0;
+            } else {
+                // Try to load from resources. Use candidate searching to resolve moved/aliased textures (armor/entity)
+                try {
+                    Identifier resolved = findBestResource(fullId);
+                    if (resolved != null) {
+                        InputStream stream = client.getResourceManager().getResource(resolved).get().getInputStream();
+                        NativeImage img = NativeImage.read(stream);
+                        w = img.getWidth(); h = img.getHeight();
+                        pixels = new int[w][h];
+                        for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) pixels[x][y] = img.getColorArgb(x, y);
+                        img.close();
+                        stream.close();
+                        // if we found an alias, update fullId so previewCache keys align
+                        fullId = resolved;
+                    }
+                } catch (Exception e) {
+                    // ignore: resource not available
+                }
+            }
+
+            if (pixels == null || w == 0 || h == 0) return null;
+
+            int checksum = computePixelsChecksum(pixels, w, h);
+            if (existing != null && existing.checksum == checksum && existing.dynamicId != null) return existing;
+
+            // Decide whether to crop transparent border.
+            int[] crop;
+            if (entry.type == EntryType.ENTITY || entry.type == EntryType.MOB) {
+                // For entity/armor textures show full texture exactly as in editor (no crop)
+                crop = new int[]{0, 0, w, h};
+            } else {
+                crop = cropTransparentBounds(pixels, w, h, 8);
+                if (crop == null) return null; // fully transparent
+            }
+
+            int cropW = crop[2], cropH = crop[3];
+            int[][] cropped = new int[cropW][cropH];
+            for (int cx = 0; cx < cropW; cx++) for (int cy = 0; cy < cropH; cy++) cropped[cx][cy] = pixels[crop[0] + cx][crop[1] + cy];
+
+            // Register preview texture at the original cropped pixel size (no resampling)
+            NativeImage out = nativeImageFromPixels(cropped, cropW, cropH);
+            Identifier dynId = registerOrUpdatePreviewTexture(fullId, out);
+
+            PreviewCache cache = new PreviewCache();
+            cache.sourceId = fullId;
+            cache.dynamicId = dynId;
+            cache.width = cropW; cache.height = cropH;
+            cache.cropX = crop[0]; cache.cropY = crop[1]; cache.cropW = cropW; cache.cropH = cropH;
+            cache.checksum = checksum;
+
+            previewCache.put(fullId, cache);
+            return cache;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Identifier findBestResource(Identifier requestId) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        Identifier full = requestId.getPath().startsWith("textures/") ? requestId : Identifier.of(requestId.getNamespace(), "textures/" + requestId.getPath() + ".png");
+        try {
+            var opt = client.getResourceManager().getResource(full);
+            if (opt.isPresent()) return full;
+        } catch (Exception ignored) {}
+
+        // Armor aliases
+        try {
+            if (full.getPath().startsWith("textures/models/armor/") && full.getPath().endsWith(".png")) {
+                for (Identifier alt : generateArmorAliasCandidates(full)) {
+                    try { if (client.getResourceManager().getResource(alt).isPresent()) return alt; } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Entity alternatives for textures/entity/<name>.png -> textures/entity/<name>/<name>.png etc.
+        try {
+            if (full.getPath().startsWith("textures/entity/") && full.getPath().endsWith(".png")) {
+                String filename = full.getPath().replace("textures/entity/", "").replace(".png", "");
+                if (!filename.contains("/")) {
+                    Identifier a1 = Identifier.of(full.getNamespace(), "textures/entity/" + filename + "/" + filename + ".png");
+                    if (client.getResourceManager().getResource(a1).isPresent()) return a1;
+                    Identifier a2 = Identifier.of(full.getNamespace(), "textures/entity/equipment/wings/" + filename + ".png");
+                    if (client.getResourceManager().getResource(a2).isPresent()) return a2;
+                    Identifier a3 = Identifier.of(full.getNamespace(), "textures/entity/equipment/" + filename + ".png");
+                    if (client.getResourceManager().getResource(a3).isPresent()) return a3;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    private int computePixelsChecksum(int[][] pixels, int w, int h) {
+        int hash = 1;
+        for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) hash = 31 * hash + pixels[x][y];
+        return hash;
+    }
+
+    private int[] cropTransparentBounds(int[][] pixels, int w, int h, int alphaThreshold) {
+        int minX = w, minY = h, maxX = -1, maxY = -1;
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                int argb = pixels[x][y];
+                int a = (argb >> 24) & 0xFF;
+                if (a > alphaThreshold) {
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (maxX < 0 || maxY < 0) return null;
+        return new int[]{minX, minY, maxX - minX + 1, maxY - minY + 1};
+    }
+
+    private int[][] scalePixelsPreserveAlpha(int[][] src, int srcW, int srcH, int dstW, int dstH) {
+        // Nearest-neighbor down/up-scaling using floor mapping to avoid introducing blended pixels.
+        int[][] out = new int[dstW][dstH];
+        for (int x = 0; x < dstW; x++) {
+            int sx = Math.min(srcW - 1, (int)((long)x * srcW / dstW));
+            for (int y = 0; y < dstH; y++) {
+                int sy = Math.min(srcH - 1, (int)((long)y * srcH / dstH));
+                out[x][y] = src[sx][sy];
+            }
+        }
+        return out;
+    }
+
+    private NativeImage nativeImageFromPixels(int[][] pixels, int w, int h) {
+        NativeImage img = new NativeImage(w, h, false);
+        for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) img.setColorArgb(x, y, pixels[x][y]);
+        return img;
+    }
+
+    private Identifier registerOrUpdatePreviewTexture(Identifier sourceId, NativeImage img) {
+        try {
+            String safe = sourceId.toString().replaceAll("[^a-zA-Z0-9._-]", "_");
+            Identifier dyn = Identifier.of("textureeditor", "preview/" + safe);
+            NativeImageBackedTexture tex = new NativeImageBackedTexture(() -> "textureeditor_preview", img);
+            MinecraftClient.getInstance().getTextureManager().registerTexture(dyn, tex);
+            try { tex.upload(); } catch (Exception ignored) {}
+            previewTextureIds.put(sourceId, dyn);
+            // Try to disable linear filtering to preserve pixel-perfect look (best-effort via reflection)
+            try {
+                Object reg = MinecraftClient.getInstance().getTextureManager().getTexture(dyn);
+                if (reg != null) {
+                    try {
+                        java.lang.reflect.Method mf = reg.getClass().getMethod("setFilter", boolean.class);
+                        mf.invoke(reg, false);
+                    } catch (NoSuchMethodException ignored) {
+                        // Some MC versions may not have setFilter; ignore
+                    }
+                }
+            } catch (Exception ignored) {}
+            return dyn;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void invalidatePreviewForSource(Identifier source) {
+        PreviewCache c = previewCache.remove(source);
+        Identifier dyn = previewTextureIds.remove(source);
+        if (dyn != null) {
+            try {
+                MinecraftClient.getInstance().getTextureManager().destroyTexture(dyn);
+            } catch (Exception ignored) {}
+        }
+        if (c != null) {
+            // nothing else to free — NativeImage owned by texture manager
+        }
+    }
+
     @Override
     public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
         if (super.mouseClicked(click, bl)) return true;
@@ -1328,10 +1545,19 @@ public class BrowseScreen extends Screen {
         } else if (entry.type == EntryType.GUI) {
             if (useExternal) {
                 if (!openExternalForDirectTexture(entry.id, entry.name)) {
-                    client.setScreen(createGuiEditorWithTint(entry));
+                    // Special-case: block breaking frames (destroy_stage_0..9) should open the BreakingEditorScreen
+                    if (entry.id.getPath().contains("destroy_stage_0.png") || "Block Breaking".equals(entry.name)) {
+                        client.setScreen(new BreakingEditorScreen(this));
+                    } else {
+                        client.setScreen(createGuiEditorWithTint(entry));
+                    }
                 }
             } else {
-                client.setScreen(createGuiEditorWithTint(entry));
+                if (entry.id.getPath().contains("destroy_stage_0.png") || "Block Breaking".equals(entry.name)) {
+                    client.setScreen(new BreakingEditorScreen(this));
+                } else {
+                    client.setScreen(createGuiEditorWithTint(entry));
+                }
             }
         } else if (entry.type == EntryType.PARTICLE) {
             if (useExternal) {
