@@ -42,6 +42,9 @@ public class ModSettings {
     public boolean useExternalEditor = false;
     public String selectedEditorName = ""; // name from auto-detected list
     public String externalEditorCustomPath = ""; // custom path overrides auto-detect
+    
+    // UI color preset (name of ColorPalette.Preset)
+    public String colorPreset = "DEFAULT";
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -124,6 +127,11 @@ public class ModSettings {
                     for (var entry : defaults.keybinds.entrySet()) {
                         settings.keybinds.putIfAbsent(entry.getKey(), entry.getValue());
                     }
+                    // Apply stored color preset (if present)
+                    try {
+                        com.zeeesea.textureeditor.util.ColorPalette.Preset p = com.zeeesea.textureeditor.util.ColorPalette.Preset.valueOf(settings.colorPreset);
+                        com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.setPreset(p);
+                    } catch (Exception ignored) {}
                     return settings;
                 }
             } catch (Exception e) {
@@ -132,6 +140,21 @@ public class ModSettings {
         }
         ModSettings settings = new ModSettings();
         settings.save();
+        // Ensure default palette applied on fresh config
+        try {
+            com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.setPreset(com.zeeesea.textureeditor.util.ColorPalette.Preset.valueOf(settings.colorPreset));
+        } catch (Exception ignored) {}
         return settings;
+    }
+
+    /** Change and persist the color preset. */
+    public void setColorPreset(String presetName) {
+        if (presetName == null) return;
+        this.colorPreset = presetName;
+        try {
+            com.zeeesea.textureeditor.util.ColorPalette.Preset p = com.zeeesea.textureeditor.util.ColorPalette.Preset.valueOf(presetName);
+            com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.setPreset(p);
+        } catch (Exception ignored) {}
+        save();
     }
 }

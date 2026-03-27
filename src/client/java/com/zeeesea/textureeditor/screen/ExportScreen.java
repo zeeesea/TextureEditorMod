@@ -28,7 +28,7 @@ public class ExportScreen extends Screen {
     private TextFieldWidget authorInput;
     private PixelCanvas iconCanvas;
     private String statusMessage = "";
-    private int statusColor = 0xFF00FF00;
+    private int statusColor = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.STATUS_OK;
 
     // Icon canvas settings
     private static final int ICON_SIZE = 64;
@@ -116,24 +116,25 @@ public class ExportScreen extends Screen {
 
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
+        context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("textureeditor.screen.export.title"), this.width / 2, 10, 0xFFFFFFFF);
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_name"), this.width / 2 - 100, 30, 0xFFCCCCCC, false);
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.description"), this.width / 2 - 100, 65, 0xFFCCCCCC, false);
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.author"), this.width / 2 - 100, 100, 0xFFCCCCCC, false);
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("textureeditor.screen.export.title"), this.width / 2, 10, pal.TEXT_NORMAL);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_name"), this.width / 2 - 100, 30, pal.TEXT_LIGHT, false);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.description"), this.width / 2 - 100, 65, pal.TEXT_LIGHT, false);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.author"), this.width / 2 - 100, 100, pal.TEXT_LIGHT, false);
 
         System.out.println(this.height);
 
 
 
         // Draw "Pack Icon (optional):" label
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_icon"), iconScreenX, 135, 0xFFCCCCCC, false);
+        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_icon"), iconScreenX, 135, pal.TEXT_LIGHT, false);
 
         // Draw icon canvas
         drawIconCanvas(context, mouseX, mouseY);
@@ -146,10 +147,10 @@ public class ExportScreen extends Screen {
             int py = palY + i * 18;
             context.fill(px, py, px + 16, py + 16, PALETTE[i]);
             if (PALETTE[i] == currentColor) {
-                context.fill(px - 1, py - 1, px + 17, py, 0xFFFFFF00);
-                context.fill(px - 1, py + 16, px + 17, py + 17, 0xFFFFFF00);
-                context.fill(px - 1, py, px, py + 16, 0xFFFFFF00);
-                context.fill(px + 16, py, px + 17, py + 16, 0xFFFFFF00);
+                context.fill(px - 1, py - 1, px + 17, py, pal.HEADER_UNDERLINE);
+                context.fill(px - 1, py + 16, px + 17, py + 17, pal.HEADER_UNDERLINE);
+                context.fill(px - 1, py, px, py + 16, pal.HEADER_UNDERLINE);
+                context.fill(px + 16, py, px + 17, py + 16, pal.HEADER_UNDERLINE);
             }
         }
 
@@ -170,9 +171,10 @@ public class ExportScreen extends Screen {
                 for (int y = 0; y < ICON_SIZE; y++) {
                     int c = iconCanvas.getPixel(x, y);
                     int alpha = (c >> 24) & 0xFF;
-                    if (alpha == 0) {
-                        c = ((x / 4 + y / 4) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0;
-                    }
+                            if (alpha == 0) {
+                                var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+                                c = ((x / 4 + y / 4) % 2 == 0) ? pal.CHECKER_DARK : pal.CHECKER_LIGHT;
+                            }
                     img.setColorArgb(x, y, c);
                 }
             }
@@ -193,20 +195,21 @@ public class ExportScreen extends Screen {
         if (showGrid) {
             for (int x = 0; x <= ICON_SIZE; x += 8) {
                 int sx = iconScreenX + x * iconZoom;
-                context.fill(sx, iconScreenY, sx + 1, iconScreenY + drawH, 0x40FFFFFF);
+                context.fill(sx, iconScreenY, sx + 1, iconScreenY + drawH, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.OVERLAY_HALF_WHITE);
             }
             for (int y = 0; y <= ICON_SIZE; y += 8) {
                 int sy = iconScreenY + y * iconZoom;
-                context.fill(iconScreenX, sy, iconScreenX + drawW, sy + 1, 0x40FFFFFF);
+                context.fill(iconScreenX, sy, iconScreenX + drawW, sy + 1, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.OVERLAY_HALF_WHITE);
             }
         }
 
         int endX = iconScreenX + drawW;
         int endY = iconScreenY + drawH;
-        context.fill(iconScreenX - 1, iconScreenY - 1, endX + 1, iconScreenY, 0xFFFFFFFF);
-        context.fill(iconScreenX - 1, endY, endX + 1, endY + 1, 0xFFFFFFFF);
-        context.fill(iconScreenX - 1, iconScreenY, iconScreenX, endY, 0xFFFFFFFF);
-        context.fill(endX, iconScreenY, endX + 1, endY, 0xFFFFFFFF);
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        context.fill(iconScreenX - 1, iconScreenY - 1, endX + 1, iconScreenY, pal.TEXT_NORMAL);
+        context.fill(iconScreenX - 1, endY, endX + 1, endY + 1, pal.TEXT_NORMAL);
+        context.fill(iconScreenX - 1, iconScreenY, iconScreenX, endY, pal.TEXT_NORMAL);
+        context.fill(endX, iconScreenY, endX + 1, endY, pal.TEXT_NORMAL);
     }
 
     @Override

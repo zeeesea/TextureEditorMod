@@ -144,6 +144,22 @@ public class SettingsScreen extends Screen {
                 .position(centerX - 100, y).size(200, 20).build());
         y += 40;
 
+        // Color Preset / Profile switcher
+        String currentPreset = ModSettings.getInstance().colorPreset;
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.color_preset", currentPreset), btn -> {
+            // Cycle through presets
+            com.zeeesea.textureeditor.util.ColorPalette.Preset[] vals = com.zeeesea.textureeditor.util.ColorPalette.Preset.values();
+            int idx = 0;
+            for (int i = 0; i < vals.length; i++) if (vals[i].name().equalsIgnoreCase(currentPreset)) { idx = i; break; }
+            int next = (idx + 1) % vals.length;
+            String nextName = vals[next].name();
+            ModSettings.getInstance().setColorPreset(nextName);
+            // Rebuild screen to update displayed name
+            this.clearChildren();
+            this.init();
+        }).position(centerX - 100, y).size(200, 20).build());
+        y += 40;
+
         // Done
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.done"), btn -> this.close())
                 .position(centerX - 50, y).size(100, 20).build());
@@ -151,9 +167,21 @@ public class SettingsScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
+        context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
 
-        context.drawCenteredTextWithShadow(textRenderer, this.title, this.width / 2, 15, 0xFFFFFF);
+        // Draw centered title with custom shadow color when the text is very light (white)
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        String titleStr = this.title.getString();
+        int titleW = textRenderer.getWidth(titleStr);
+        int titleX = this.width / 2 - titleW / 2;
+        int titleY = 15;
+        int textColor = pal.TEXT_NORMAL;
+        // If the text color is pure white, use the palette's TITLE_TEXT_SHADOW_ON_WHITE (user asked white-on-white),
+        // otherwise use the standard TITLE_TEXT_SHADOW
+        int shadowColor = (textColor == 0xFFFFFFFF) ? pal.TITLE_TEXT_SHADOW_ON_WHITE : pal.TITLE_TEXT_SHADOW;
+        // draw shadow offset by (1,1)
+        context.drawText(textRenderer, titleStr, titleX + 1, titleY + 1, shadowColor, false);
+        context.drawText(textRenderer, titleStr, titleX, titleY, textColor, false);
 
         super.render(context, mouseX, mouseY, delta);
     }

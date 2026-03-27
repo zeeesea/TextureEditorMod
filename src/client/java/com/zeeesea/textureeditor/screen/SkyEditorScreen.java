@@ -67,7 +67,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
 
 
     @Override
-    protected int getBackgroundColor() { return 0xFF0A0A1E; }
+    protected int getBackgroundColor() { return com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.SKY_BACKGROUND; }
 
     @Override
     protected int getMaxZoom() { return 1024; }
@@ -165,14 +165,10 @@ public class SkyEditorScreen extends AbstractEditorScreen {
             int idx = (currentSkyTexture.ordinal() - 1 + textures.length) % textures.length;
             switchTexture(textures[idx]);
         }).position(px, y).size(btnW, bh).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.sky." + currentSkyTexture.key), btn -> {
-            int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
-            switchTexture(textures[idx]);
-        }).position(px + btnW + 4, y).size(Math.min(80, w - btnW - 4), bh).build());
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
             int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
             switchTexture(textures[idx]);
-        }).position(px + btnW + 8 + Math.min(80, w - btnW - 4), y).size(btnW, bh).build());
+        }).position(px + btnW + 4, y).size(btnW, bh).build());
         return y + bh + 4;
     }
 
@@ -180,7 +176,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
     protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
         // Active texture indicator
         int skyBtnX = this.width / 2 - 120;
-        context.fill(skyBtnX + 64, 25, skyBtnX + 174, 27, 0xFFFFFF00);
+        context.fill(skyBtnX + 64, 25, skyBtnX + 174, 27, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.HEADER_UNDERLINE);
     }
 
     private void switchTexture(SkyTexture tex) {

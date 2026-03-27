@@ -118,6 +118,8 @@
   "textureeditor.label.editor_keybinds": "Editor Keybinds...",
   "textureeditor.label.done": "Done",
 
+  "textureeditor.label.color_preset": "Color Preset: %s",
+
 
   "//": "--- EXPORT & FIELDS ---",
   "textureeditor.field.search": "Search",

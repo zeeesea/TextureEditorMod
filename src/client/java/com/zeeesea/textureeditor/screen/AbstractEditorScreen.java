@@ -6,6 +6,7 @@ import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.util.ColorPalette;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -182,7 +183,7 @@ public abstract class AbstractEditorScreen extends Screen {
     protected boolean handleExtraDrag(double mx, double my, int btn, double dx, double dy) { return false; }
     protected boolean handleExtraScroll(double mx, double my, double ha, double va) { return false; }
 
-    protected int  getBackgroundColor() { return 0xFF0F0F1A; }
+    protected int  getBackgroundColor() { return ColorPalette.INSTANCE.EDITOR_BACKGROUND; }
     // Increased default max zoom to allow deep zooming into very small textures
     protected int  getMaxZoom()         { return 4096; }
     protected int  getMinZoom()         { return 1; }
@@ -365,19 +366,19 @@ public abstract class AbstractEditorScreen extends Screen {
 
     private int buildGeneralTab(int py, int px, int w, int bh, ModSettings s) {
         addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.apply_live").styled(st -> st.withColor(0xFF44FF44)),
+                        Text.translatable("textureeditor.button.apply_live").styled(st -> st.withColor(ColorPalette.INSTANCE.STATUS_OK)),
                         btn -> applyLive())
                 .position(px, py).size(w, bh).build());
         py += bh + 2;
 
         addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.export_pack").styled(st -> st.withColor(0xFFFFCC44)),
+                        Text.translatable("textureeditor.button.export_pack").styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
                         btn -> MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
                 .position(px, py).size(w, bh).build());
         py += bh + 2;
 
         addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.browse").styled(st -> st.withColor(0xFFFF66CC)),
+                        Text.translatable("textureeditor.button.browse").styled(st -> st.withColor(ColorPalette.INSTANCE.WHEEL_HIGHLIGHT)),
                         btn -> {
                             if (s.autoApplyLive) applyLive();
                             Screen bs = getBackScreen();
@@ -389,13 +390,13 @@ public abstract class AbstractEditorScreen extends Screen {
         // Separator
         py += 2;
         addDrawableChild(ButtonWidget.builder(
-                                Text.literal(getResetCurrentLabel()).styled(st -> st.withColor(0xFFFF9944)),
+                                Text.literal(getResetCurrentLabel()).styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
                         btn -> resetCurrent())
                 .position(px, py).size(w, bh).build());
         py += bh + 2;
 
         addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.reset_all").styled(st -> st.withColor(0xFFFF4444)),
+                        Text.translatable("textureeditor.button.reset_all").styled(st -> st.withColor(ColorPalette.INSTANCE.TEXT_ALERT)),
                         btn -> MinecraftClient.getInstance().setScreen(new ConfirmResetAllScreen(this)))
                 .position(px, py).size(w, bh).build());
         py += bh + 8;
@@ -560,36 +561,37 @@ public abstract class AbstractEditorScreen extends Screen {
         drawCanvas(ctx, mx, my);
 
         // Panel backgrounds
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         if (leftOpen) {
-            ctx.fill(0, 0, PANEL_W + TOGGLE_BTN_W, this.height, 0xFF141420);
-            ctx.fill(PANEL_W + TOGGLE_BTN_W, 0, PANEL_W + TOGGLE_BTN_W + 1, this.height, 0xFF2A2A44);
+            ctx.fill(0, 0, PANEL_W + TOGGLE_BTN_W, this.height, pal.PANEL_DARK);
+            ctx.fill(PANEL_W + TOGGLE_BTN_W, 0, PANEL_W + TOGGLE_BTN_W + 1, this.height, pal.PANEL_SEPARATOR);
             // Tab underline
             int tabLineX = leftTab == LeftTab.GENERAL ? 0 : PANEL_W / 2;
-            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + PANEL_W / 2, getToolButtonHeight() + TAB_H, 0xFFFFAA00);
+            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + PANEL_W / 2, getToolButtonHeight() + TAB_H, pal.TAB_UNDERLINE);
         } else {
-            ctx.fill(0, 0, TOGGLE_BTN_W, this.height, 0xFF141420);
+            ctx.fill(0, 0, TOGGLE_BTN_W, this.height, pal.PANEL_DARK);
         }
 
         if (rightOpen) {
             int rpx = this.width - PANEL_W - TOGGLE_BTN_W;
-            ctx.fill(rpx, 0, this.width, this.height, 0xFF141420);
-            ctx.fill(rpx - 1, 0, rpx, this.height, 0xFF2A2A44);
+            ctx.fill(rpx, 0, this.width, this.height, pal.PANEL_DARK);
+            ctx.fill(rpx - 1, 0, rpx, this.height, pal.PANEL_SEPARATOR);
             int tabLineX = this.width - PANEL_W + (rightTab == RightTab.COLOR ? 0 : PANEL_W / 2);
-            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + PANEL_W / 2, getToolButtonHeight() + TAB_H, 0xFFFFAA00);
+            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + PANEL_W / 2, getToolButtonHeight() + TAB_H, pal.TAB_UNDERLINE);
             // Draw color/layer tab content
             if (rightTab == RightTab.COLOR) drawColorTabContent(ctx, mx, my, this.width - getPanelWidth(), getToolButtonHeight() + TAB_H + 4, getPanelWidth());
             else drawLayerTabContent(ctx, mx, my, this.width - getPanelWidth(), getToolButtonHeight() + TAB_H + 4, getPanelWidth());
         } else {
-            ctx.fill(this.width - TOGGLE_BTN_W, 0, this.width, this.height, 0xFF141420);
+            ctx.fill(this.width - TOGGLE_BTN_W, 0, this.width, this.height, pal.PANEL_DARK);
         }
 
         // Title bar
-        ctx.fill(leftW() + TOGGLE_BTN_W, 0, this.width - rightW() - TOGGLE_BTN_W, getToolButtonHeight(), 0xFF1A1A30);
-        ctx.drawText(textRenderer, getEditorTitle(), leftW() + TOGGLE_BTN_W + 4, 5, 0xFFDDDDFF, true);
+        ctx.fill(leftW() + TOGGLE_BTN_W, 0, this.width - rightW() - TOGGLE_BTN_W, getToolButtonHeight(), pal.TITLE_BAR_BG);
+        ctx.drawText(textRenderer, getEditorTitle(), leftW() + TOGGLE_BTN_W + 4, 5, pal.TITLE_TEXT, true);
 
         // Status bar
         int statusY = this.height - 14;
-        ctx.fill(leftW() + TOGGLE_BTN_W, statusY, this.width - rightW() - TOGGLE_BTN_W, this.height, 0xFF111122);
+        ctx.fill(leftW() + TOGGLE_BTN_W, statusY, this.width - rightW() - TOGGLE_BTN_W, this.height, pal.STATUS_BAR_BG);
         String status = "Tool: " + currentTool.getDisplayName() + " | Size: " + toolSize + "px"
                 + (canvas != null ? " | " + canvas.getWidth() + "×" + canvas.getHeight() : "");
         if (canvas != null) {
@@ -599,9 +601,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 status += " | x:" + hx + ", y:" + hy;
             }
         }
-        ctx.drawText(textRenderer, status, leftW() + TOGGLE_BTN_W + 4, statusY + 3, 0xFF888899, false);
-
-        // live preview replaces static "waiting for click" messages
+        ctx.drawText(textRenderer, status, leftW() + TOGGLE_BTN_W + 4, statusY + 3, pal.STATUS_TEXT, false);
 
         super.render(ctx, mx, my, delta);
 
@@ -615,6 +615,7 @@ public abstract class AbstractEditorScreen extends Screen {
     // ─────────────────────────────────────────────────────────────────────────
 
     private void drawColorTabContent(DrawContext ctx, int mx, int my, int rpx, int py, int pw) {
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         int bh = getToolButtonHeight();
         int innerX = rpx + 4;
         int innerW = pw - 8;
@@ -640,13 +641,13 @@ public abstract class AbstractEditorScreen extends Screen {
             }
         }
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
-        drawRectOutline(ctx, svX - 1, svY - 1, svX + PICKER_SV_W + 1, svY + PICKER_SV_H + 1, 0xFF444466);
+        drawRectOutline(ctx, svX - 1, svY - 1, svX + PICKER_SV_W + 1, svY + PICKER_SV_H + 1, pal.PICKER_BORDER);
 
         // Cursor on SV
         int scx = svX + (int)(pickerSat * (PICKER_SV_W - 1));
         int scy = svY + (int)((1f - pickerVal) * (PICKER_SV_H - 1));
-        ctx.fill(scx - 2, scy, scx + 3, scy + 1, 0xFFFFFFFF);
-        ctx.fill(scx, scy - 2, scx + 1, scy + 3, 0xFFFFFFFF);
+        ctx.fill(scx - 2, scy, scx + 3, scy + 1, pal.TEXT_NORMAL);
+        ctx.fill(scx, scy - 2, scx + 1, scy + 3, pal.TEXT_NORMAL);
 
         // Compute dynamic widths: split the available extra space between hue & alpha
         int avail = Math.max(0, innerW - PICKER_SV_W - 8);
@@ -670,7 +671,7 @@ public abstract class AbstractEditorScreen extends Screen {
             pickerHueBarBuilt = true;
         }
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_HUE_ID, hueX, hueY, 0, 0, hueW, PICKER_SV_H, hueW, PICKER_SV_H, hueW, PICKER_SV_H);
-        drawRectOutline(ctx, hueX - 1, hueY - 1, hueX + hueW + 1, hueY + PICKER_SV_H + 1, 0xFF444466);
+        drawRectOutline(ctx, hueX - 1, hueY - 1, hueX + hueW + 1, hueY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int hcy = hueY + (int)(pickerHue * (PICKER_SV_H - 1));
         ctx.fill(hueX - 1, hcy, hueX + hueW + 1, hcy + 1, 0xFFFFFFFF);
 
@@ -679,20 +680,20 @@ public abstract class AbstractEditorScreen extends Screen {
         int alphaY = svY;
         // checker background
         for (int y = 0; y < PICKER_SV_H; y += 4) for (int x2 = 0; x2 < alphaW; x2 += 4)
-            ctx.fill(alphaX + x2, alphaY + y, alphaX + x2 + 4, alphaY + y + 4, ((x2 / 4 + y / 4) % 2 == 0) ? 0xFF808080 : 0xFFA0A0A0);
+            ctx.fill(alphaX + x2, alphaY + y, alphaX + x2 + 4, alphaY + y + 4, ((x2 / 4 + y / 4) % 2 == 0) ? pal.CHECKER_DARK : pal.CHECKER_LIGHT);
 
         if (!pickerAlphaBarBuilt || pickerAlphaTexture == null || pickerAlphaTexture.getGlTexture().getWidth(0) != alphaW) rebuildAlphaBar(alphaW);
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
-        drawRectOutline(ctx, alphaX - 1, alphaY - 1, alphaX + alphaW + 1, alphaY + PICKER_SV_H + 1, 0xFF444466);
+        drawRectOutline(ctx, alphaX - 1, alphaY - 1, alphaX + alphaW + 1, alphaY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int acy = alphaY + (int)((1f - pickerAlpha) * (PICKER_SV_H - 1));
-        ctx.fill(alphaX - 1, acy, alphaX + alphaW + 1, acy + 1, 0xFFFFFFFF);
+        ctx.fill(alphaX - 1, acy, alphaX + alphaW + 1, acy + 1, pal.TEXT_NORMAL);
 
         py = svY + PICKER_SV_H + 6;
 
         // ── Current color swatch ───────────────────────────────────────────────
         int swatchW = 28;
         ctx.fill(innerX, py, innerX + swatchW, py + bh, currentColor);
-        drawRectOutline(ctx, innerX, py, innerX + swatchW, py + bh, 0xFF555577);
+        drawRectOutline(ctx, innerX, py, innerX + swatchW, py + bh, pal.SWATCH_BORDER);
 
         // Hex input widget is positioned next to the swatch in buildColorTab();
         // do not draw the hex text manually to avoid duplication.
@@ -708,7 +709,7 @@ public abstract class AbstractEditorScreen extends Screen {
             int px2 = innerX + col * (cs + 1);
             int py2 = py + row * (cs + 1);
             ctx.fill(px2, py2, px2 + cs, py2 + cs, PALETTE[i]);
-            if (PALETTE[i] == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + cs + 1, py2 + cs + 1, 0xFFFFFF00);
+            if (PALETTE[i] == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + cs + 1, py2 + cs + 1, pal.HEADER_UNDERLINE);
         }
 
         py += ((PALETTE.length + cols - 1) / cols) * (cs + 1) + 4;
@@ -716,7 +717,7 @@ public abstract class AbstractEditorScreen extends Screen {
         // ── Color history ──────────────────────────────────────────────────────
         ColorHistory hist = ColorHistory.getInstance();
         if (hist.size() > 0) {
-            ctx.drawText(textRenderer, "History", innerX, py, 0xFF888899, false);
+            ctx.drawText(textRenderer, "History", innerX, py, pal.STATUS_TEXT, false);
             py += 10;
             List<Integer> colors = hist.getColors();
             int hcs = Math.max(8, cs - 2);
@@ -725,7 +726,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 int px2 = innerX + col * (hcs + 1);
                 int py2 = py + row * (hcs + 1);
                 ctx.fill(px2, py2, px2 + hcs, py2 + hcs, colors.get(i));
-                if (colors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + hcs + 1, py2 + hcs + 1, 0xFFFFFF00);
+                        if (colors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + hcs + 1, py2 + hcs + 1, pal.HEADER_UNDERLINE);
             }
         }
     }
@@ -751,6 +752,7 @@ public abstract class AbstractEditorScreen extends Screen {
     // ─────────────────────────────────────────────────────────────────────────
 
     private void drawLayerTabContent(DrawContext ctx, int mx, int my, int rpx, int py, int pw) {
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         if (canvas == null) return;
         var stack = canvas.getLayerStack();
         int innerX = rpx + 4;
@@ -758,19 +760,19 @@ public abstract class AbstractEditorScreen extends Screen {
         int rowH = 18;
         int bh = getToolButtonHeight();
 
-        ctx.drawText(textRenderer, "Layers", innerX, py, 0xFFDDDDFF, true);
+        ctx.drawText(textRenderer, "Layers", innerX, py, pal.TITLE_TEXT, true);
         py += 12;
 
         for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
             var layer = stack.getLayers().get(i);
             int rowY = py + (stack.getLayerCount() - 1 - i) * (rowH + 1);
             boolean active = i == stack.getActiveIndex();
-            ctx.fill(innerX, rowY, innerX + innerW, rowY + rowH, active ? 0xFF2A2A55 : 0xFF1A1A33);
+            ctx.fill(innerX, rowY, innerX + innerW, rowY + rowH, active ? pal.CELL_BG_HOVER : pal.CELL_BG);
             if (active) drawRectOutline(ctx, innerX, rowY, innerX + innerW, rowY + rowH, 0xFF6666AA);
             String eye = layer.isVisible() ? "●" : "○";
-            ctx.drawText(textRenderer, eye, innerX + 2, rowY + 5, layer.isVisible() ? 0xFF55FF55 : 0xFF555555, false);
+            ctx.drawText(textRenderer, eye, innerX + 2, rowY + 5, layer.isVisible() ? pal.STATUS_OK : pal.TEXT_SUBTLE, false);
             String name = layer.getName().length() > 10 ? layer.getName().substring(0, 10) + ".." : layer.getName();
-            ctx.drawText(textRenderer, name, innerX + 14, rowY + 5, 0xFFDDDDDD, false);
+            ctx.drawText(textRenderer, name, innerX + 14, rowY + 5, pal.TEXT_NORMAL, false);
         }
 
         py += stack.getLayerCount() * (rowH + 1) + 6;
@@ -778,14 +780,14 @@ public abstract class AbstractEditorScreen extends Screen {
         // Action buttons 3 per row
         int btnW = (innerW - 4) / 3;
         // Row 1: Add, Del, Up
-        ctx.fill(innerX, py, innerX + btnW, py + bh, 0xFF1E3322); ctx.drawText(textRenderer, "+ Add", innerX + 2, py + 4, 0xFF88FF88, false);
-        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, 0xFF331A1A); ctx.drawText(textRenderer, "- Del", innerX + btnW + 4, py + 4, 0xFFFF8888, false);
-        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, 0xFF1A1A33); ctx.drawText(textRenderer, "▲ Up", innerX + 2 * btnW + 6, py + 4, 0xFF8888FF, false);
+        ctx.fill(innerX, py, innerX + btnW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "+ Add", innerX + 2, py + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "- Del", innerX + btnW + 4, py + 4, pal.TEXT_SUBTLE, false);
+        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▲ Up", innerX + 2 * btnW + 6, py + 4, pal.TEXT_NORMAL, false);
         py += bh + 2;
         // Row 2: Down, Merge, Copy
-        ctx.fill(innerX, py, innerX + btnW, py + bh, 0xFF1A1A33); ctx.drawText(textRenderer, "▼ Dn", innerX + 2, py + 4, 0xFF8888FF, false);
-        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, 0xFF1A2233); ctx.drawText(textRenderer, "Merge", innerX + btnW + 4, py + 4, 0xFF88AAFF, false);
-        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, 0xFF221A33); ctx.drawText(textRenderer, "Copy", innerX + 2 * btnW + 6, py + 4, 0xFFAA88FF, false);
+        ctx.fill(innerX, py, innerX + btnW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▼ Dn", innerX + 2, py + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Merge", innerX + btnW + 4, py + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Copy", innerX + 2 * btnW + 6, py + 4, pal.TEXT_NORMAL, false);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
+import com.zeeesea.textureeditor.client.TextureIconManager;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
@@ -701,7 +702,7 @@ public class BrowseScreen extends Screen {
                 Identifier.of("minecraft", "textures/block/grass_block_side_overlay.png"),
                 "Grass Overhang",
                 EntryType.GUI,
-                new ItemStack(net.minecraft.item.Items.GRASS_BLOCK)
+                null
         ));
 
 
@@ -947,11 +948,13 @@ public class BrowseScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+
         // Background
-        context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
+        context.fill(0, 0, this.width, this.height, pal.BROWSE_BACKGROUND);
 
         // Header bar
-        context.fill(0, 0, this.width, 28, 0xFF16213E);
+        context.fill(0, 0, this.width, 28, pal.HEADER_BAR);
 
         // Tab underline indicator
         if (tabAll != null) {
@@ -965,7 +968,7 @@ public class BrowseScreen extends Screen {
                 case SKY -> tabSky;
             };
             if (activeTab != null)
-                context.fill(activeTab.getX(), activeTab.getY() + 20, activeTab.getX() + activeTab.getWidth(), activeTab.getY() + 22, 0xFFFFFF00);
+                context.fill(activeTab.getX(), activeTab.getY() + 20, activeTab.getX() + activeTab.getWidth(), activeTab.getY() + 22, pal.TAB_UNDERLINE);
         }
 
         // Render widgets
@@ -973,18 +976,20 @@ public class BrowseScreen extends Screen {
 
         // Title info
         String entriesText = filteredEntries.size() + " entries";
-        context.drawText(textRenderer, entriesText, this.width - textRenderer.getWidth(entriesText) - 5, 36, 0xFF999999, false);
+        context.drawText(textRenderer, entriesText, this.width - textRenderer.getWidth(entriesText) - 5, 36, pal.TEXT_MUTED, false);
 
         // Render grid
         renderGrid(context, mouseX, mouseY);
     }
 
     private void renderGrid(DrawContext context, int mouseX, int mouseY) {
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         int startIdx = scrollOffset * columns;
         int gridX = GRID_SIDE_MARGIN;
         int gridY = GRID_TOP;
 
-        String tooltipText = null;
+        java.util.List<String> tooltipParts = null;
+        java.util.List<Integer> tooltipColors = null;
 
         for (int i = startIdx; i < filteredEntries.size(); i++) {
             int localIdx = i - startIdx;
@@ -1001,16 +1006,16 @@ public class BrowseScreen extends Screen {
 
             // Cell background
             boolean hovered = mouseX >= x && mouseX < x + CELL_SIZE && mouseY >= y && mouseY < y + CELL_SIZE;
-            int bgColor = hovered ? 0xFF3A3A5E : 0xFF2A2A4E;
+            int bgColor = hovered ? pal.CELL_BG_HOVER : pal.CELL_BG;
             context.fill(x, y, x + CELL_SIZE, y + CELL_SIZE, bgColor);
 
             // Check if this entry has been modified (show indicator)
             boolean modified = isModified(entry);
             if (modified) {
                 // Green border for modified textures
-                drawRectOutline(context, x, y, x + CELL_SIZE, y + CELL_SIZE, 0xFF00FF00);
+                drawRectOutline(context, x, y, x + CELL_SIZE, y + CELL_SIZE, pal.MODIFIED_BORDER);
             } else {
-                drawRectOutline(context, x, y, x + CELL_SIZE, y + CELL_SIZE, 0xFF333355);
+                drawRectOutline(context, x, y, x + CELL_SIZE, y + CELL_SIZE, pal.CELL_BORDER);
             }
 
             // Render item icon or label
@@ -1019,32 +1024,69 @@ public class BrowseScreen extends Screen {
                 int iconY = y + (CELL_SIZE - 16) / 2;
                 context.drawItem(entry.stack, iconX, iconY);
             } else {
-                // GUI entries: draw abbreviated name
-                String label = entry.name.length() > 5 ? entry.name.substring(0, 5) : entry.name;
-                int lx = x + (CELL_SIZE - textRenderer.getWidth(label)) / 2;
-                int ly = y + (CELL_SIZE - 8) / 2;
-                context.drawText(textRenderer, label, lx, ly, 0xFFCCCCCC, false);
+                // Try to get a generated icon from the texture ID
+                var future = TextureIconManager.getOrCreateIconForTexture(entry.id);
+                var iconData = future != null ? future.getNow(null) : null;
+                if (iconData != null) {
+                    // draw the dynamic texture centered and scaled to 16x16 (or smaller preserving aspect)
+                    int targetSize = 16;
+                    int iw = iconData.width;
+                    int ih = iconData.height;
+                    float scale = Math.min((float)targetSize / iw, (float)targetSize / ih);
+                    int drawW = Math.max(1, (int)(iw * scale));
+                    int drawH = Math.max(1, (int)(ih * scale));
+                    int iconX = x + (CELL_SIZE - drawW) / 2;
+                    int iconY = y + (CELL_SIZE - drawH) / 2;
+                    try {
+                        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, iconData.id, iconX, iconY, 0, 0, drawW, drawH, drawW, drawH);
+                    } catch (Exception e) {
+                        // fallback to label
+                        String label = entry.name.length() > 5 ? entry.name.substring(0, 5) : entry.name;
+                        int lx = x + (CELL_SIZE - textRenderer.getWidth(label)) / 2;
+                        int ly = y + (CELL_SIZE - 8) / 2;
+                        context.drawText(textRenderer, label, lx, ly, pal.ENTRY_TEXT, false);
+                    }
+                } else {
+                    // GUI entries: draw abbreviated name while icon is loading or if generation failed
+                    String label = entry.name.length() > 5 ? entry.name.substring(0, 5) : entry.name;
+                    int lx = x + (CELL_SIZE - textRenderer.getWidth(label)) / 2;
+                    int ly = y + (CELL_SIZE - 8) / 2;
+                    context.drawText(textRenderer, label, lx, ly, pal.ENTRY_TEXT, false);
+                }
             }
 
             // Tooltip on hover
             if (hovered) {
-                tooltipText = entry.name + " (" + entry.type.displayName + ")";
+                tooltipParts = new java.util.ArrayList<>();
+                tooltipColors = new java.util.ArrayList<>();
+                tooltipParts.add(entry.name + " (" + entry.type.displayName + ")");
+                tooltipColors.add(pal.TEXT_NORMAL);
                 if (modified) {
-                    tooltipText += " \u00a7a[Modified] \u00a77- Right-click to reset";
+                    tooltipParts.add(" [Modified] ");
+                    tooltipColors.add(pal.STATUS_OK);
+                    tooltipParts.add("- Right-click to reset");
+                    tooltipColors.add(pal.TEXT_SUBTLE);
                 }
             }
         }
-
         // Draw tooltip — use createNewRootLayer to render above item icons
-        if (tooltipText != null) {
+        if (tooltipParts != null && !tooltipParts.isEmpty()) {
             context.createNewRootLayer();
-            int tw = textRenderer.getWidth(tooltipText) + 8;
+            int tw = 8; // padding
+            for (String s : tooltipParts) tw += textRenderer.getWidth(s);
             int tx = Math.min(mouseX + 10, this.width - tw - 5);
             int ty = mouseY - 18;
             if (ty < 0) ty = mouseY + 15;
-            context.fill(tx - 2, ty - 2, tx + tw, ty + 12, 0xEE222244);
-            drawRectOutline(context, tx - 2, ty - 2, tx + tw, ty + 12, 0xFFAAAAAA);
-            context.drawText(textRenderer, tooltipText, tx + 2, ty, 0xFFFFFFFF, true);
+            context.fill(tx - 2, ty - 2, tx + tw, ty + 12, pal.PANEL_BG);
+            drawRectOutline(context, tx - 2, ty - 2, tx + tw, ty + 12, pal.TEXT_SUBTLE);
+
+            int cursorX = tx + 2;
+            for (int pi = 0; pi < tooltipParts.size(); pi++) {
+                String part = tooltipParts.get(pi);
+                int color = tooltipColors.get(pi);
+                context.drawText(textRenderer, part, cursorX, ty, color, true);
+                cursorX += textRenderer.getWidth(part);
+            }
         }
 
         // Scrollbar
@@ -1052,10 +1094,12 @@ public class BrowseScreen extends Screen {
             int sbX = this.width - 8;
             int sbY = GRID_TOP;
             int sbH = this.height - GRID_TOP - 10;
-            context.fill(sbX, sbY, sbX + 6, sbY + sbH, 0xFF333355);
+            // track/background
+            context.fill(sbX, sbY, sbX + 6, sbY + sbH, pal.SCROLLBAR_BG);
             int thumbH = Math.max(20, sbH * visibleRows / ((filteredEntries.size() + columns - 1) / columns));
             int thumbY = sbY + (int)((float)scrollOffset / maxScroll * (sbH - thumbH));
-            context.fill(sbX, thumbY, sbX + 6, thumbY + thumbH, 0xFF8888CC);
+            // thumb
+            context.fill(sbX, thumbY, sbX + 6, thumbY + thumbH, pal.SCROLL_THUMB);
         }
     }
 

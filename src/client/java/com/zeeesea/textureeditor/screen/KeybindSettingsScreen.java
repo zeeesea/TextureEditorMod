@@ -71,9 +71,10 @@ public class KeybindSettingsScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
-        context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a7eEditor Keybinds", this.width / 2, 15, 0xFFFFFFFF);
-        context.drawCenteredTextWithShadow(textRenderer, "\u00a77Click a keybind to change it, then press the new key", this.width / 2, 30, 0xFFAAAAAA);
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        context.fill(0, 0, this.width, this.height, pal.BROWSE_BACKGROUND);
+        context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a7eEditor Keybinds", this.width / 2, 15, pal.TEXT_NORMAL);
+        context.drawCenteredTextWithShadow(textRenderer, "\u00a77Click a keybind to change it, then press the new key", this.width / 2, 30, pal.TEXT_SUBTLE);
         super.render(context, mouseX, mouseY, delta);
     }
 

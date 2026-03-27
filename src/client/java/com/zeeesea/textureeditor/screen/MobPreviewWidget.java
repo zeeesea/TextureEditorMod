@@ -44,16 +44,17 @@ public class MobPreviewWidget {
         if (!visible || entity == null) return;
 
         // Panel background
-        context.fill(x - 2, y - 16, x + width + 2, y + height + 2, 0xEE222244);
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        context.fill(x - 2, y - 16, x + width + 2, y + height + 2, pal.PANEL_BG);
         // Border
-        context.fill(x - 2, y - 16, x + width + 2, y - 15, 0xFFFFFFFF);
-        context.fill(x - 2, y + height + 1, x + width + 2, y + height + 2, 0xFFFFFFFF);
-        context.fill(x - 2, y - 16, x - 1, y + height + 2, 0xFFFFFFFF);
-        context.fill(x + width + 1, y - 16, x + width + 2, y + height + 2, 0xFFFFFFFF);
+        context.fill(x - 2, y - 16, x + width + 2, y - 15, pal.TEXT_NORMAL);
+        context.fill(x - 2, y + height + 1, x + width + 2, y + height + 2, pal.TEXT_NORMAL);
+        context.fill(x - 2, y - 16, x - 1, y + height + 2, pal.TEXT_NORMAL);
+        context.fill(x + width + 1, y - 16, x + width + 2, y + height + 2, pal.TEXT_NORMAL);
 
         // Title
         MinecraftClient client = MinecraftClient.getInstance();
-        context.drawText(client.textRenderer, Text.translatable("textureeditor.button.preview_3d"), x + 2, y - 13, 0xFFFFFFFF, false);
+        context.drawText(client.textRenderer, Text.translatable("textureeditor.button.preview_3d"), x + 2, y - 13, pal.TEXT_NORMAL, false);
 
         // Render entity
         if (entity instanceof LivingEntity livingEntity) {
@@ -84,13 +85,13 @@ public class MobPreviewWidget {
                         mouseX, mouseY,
                         livingEntity
                 );
-            } catch (Exception e) {
+                } catch (Exception e) {
                 // If rendering fails, show error text
-                context.drawText(client.textRenderer, "Preview N/A", x + 10, y + height / 2, 0xFFFF5555, false);
+                context.drawText(client.textRenderer, "Preview N/A", x + 10, y + height / 2, pal.TEXT_ALERT, false);
             }
         } else {
             MinecraftClient client2 = MinecraftClient.getInstance();
-            context.drawText(client2.textRenderer, "Non-living entity", x + 5, y + height / 2, 0xFFAAAAAA, false);
+            context.drawText(client2.textRenderer, "Non-living entity", x + 5, y + height / 2, pal.TEXT_SUBTLE, false);
         }
 
         // Instructions

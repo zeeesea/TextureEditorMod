@@ -129,7 +129,7 @@ public class ExternalEditorSettingsScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, this.width, this.height, 0xFF1A1A2E);
+        context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
         context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a76External Editor Settings", this.width / 2, 10, 0xFFFFFF);
 
         int centerX = this.width / 2;

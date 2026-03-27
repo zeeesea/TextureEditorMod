@@ -13,8 +13,8 @@ public class QuickSelectWheel {
     private int centerX;
     private int centerY;
 
-    int defaultColor = 0xFF17172e;
-    int highlightColor = 0xFF222245;
+    int defaultColor = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.WHEEL_DEFAULT;
+    int highlightColor = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.WHEEL_HIGHLIGHT;
 
     Slice highlightedSlice;
 
@@ -97,12 +97,12 @@ public class QuickSelectWheel {
 
             // Get tag
             String label = slices[i].getTag();
-            context.drawCenteredTextWithShadow(textRenderer, label, textX, textY, 0xFFFFFFFF);
+            context.drawCenteredTextWithShadow(textRenderer, label, textX, textY, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.TEXT_NORMAL);
         }
 
         // Show full name of hovered slice above the wheel
         if (highlightedSlice != null) {
-            context.drawCenteredTextWithShadow(textRenderer, highlightedSlice.getName(), centerX, centerY - radius - 12, 0xFFFFFFFF);
+            context.drawCenteredTextWithShadow(textRenderer, highlightedSlice.getName(), centerX, centerY - radius - 12, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.TEXT_NORMAL);
         }
     }
 
