@@ -378,7 +378,7 @@ public abstract class AbstractEditorScreen extends Screen {
         py += bh + 2;
 
         addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.browse").styled(st -> st.withColor(ColorPalette.INSTANCE.WHEEL_HIGHLIGHT)),
+                        Text.translatable("textureeditor.button.browse").styled(st -> st.withColor(ColorPalette.INSTANCE.TEXT_NORMAL)),
                         btn -> {
                             if (s.autoApplyLive) applyLive();
                             Screen bs = getBackScreen();

@@ -127,6 +127,8 @@ public class ModSettings {
                     for (var entry : defaults.keybinds.entrySet()) {
                         settings.keybinds.putIfAbsent(entry.getKey(), entry.getValue());
                     }
+                    // Set the singleton instance early so callers (e.g. ColorPalette) can safely access settings
+                    instance = settings;
                     // Apply stored color preset (if present)
                     try {
                         com.zeeesea.textureeditor.util.ColorPalette.Preset p = com.zeeesea.textureeditor.util.ColorPalette.Preset.valueOf(settings.colorPreset);
@@ -139,6 +141,8 @@ public class ModSettings {
             }
         }
         ModSettings settings = new ModSettings();
+        // Set singleton before applying palette so ColorPalette persistence won't re-enter load
+        instance = settings;
         settings.save();
         // Ensure default palette applied on fresh config
         try {

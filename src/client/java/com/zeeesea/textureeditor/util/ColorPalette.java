@@ -110,170 +110,6 @@ public class ColorPalette {
 
     private void applyPreset(Preset p) {
         switch (p) {
-            case ALL_WHITE:
-                // Everything white / high-contrast light
-                BROWSE_BACKGROUND = 0xFFFFFFFF;
-                EDITOR_BACKGROUND = 0xFFFFFFFF;
-                SKY_BACKGROUND = 0xFFFFFFFF;
-
-                HEADER_BAR = 0xFFFFFFFF;
-                HEADER_UNDERLINE = 0xFFFFFFFF;
-
-                CELL_BG = 0xFFFFFFFF;
-                CELL_BG_HOVER = 0xFFFFFFFF;
-                CELL_BORDER = 0xFFDDDDDD;
-                MODIFIED_BORDER = 0xFF000000;
-
-                PANEL_BG = 0xFFFFFFFF;
-                TOOLTIP_BORDER = 0xFFAAAAAA;
-
-                TEXT_NORMAL = 0xFF000000;
-                TEXT_LIGHT = 0xFF222222;
-                TEXT_MUTED = 0xFF555555;
-                TEXT_SUBTLE = 0xFF666666;
-                TEXT_ALERT = 0xFFAA0000;
-
-                WHEEL_DEFAULT = 0xFFFFFFFF;
-                WHEEL_HIGHLIGHT = 0xFFEEEEEE;
-
-                STATUS_OK = 0xFF00AA00;
-
-                PANEL_DARK = 0xFFFAFAFA;
-                PANEL_SEPARATOR = 0xFFEEEEEE;
-                TAB_UNDERLINE = 0xFF000000;
-
-                TITLE_BAR_BG = 0xFFFFFFFF;
-                TITLE_TEXT = 0xFF000000;
-                STATUS_BAR_BG = 0xFFFFFFFF;
-                STATUS_TEXT = 0xFF333333;
-                TITLE_TEXT_SHADOW = 0xFF000000;
-                TITLE_TEXT_SHADOW_ON_WHITE = 0xFFFFFFFF;
-
-                PICKER_BORDER = 0xFFCCCCCC;
-                SWATCH_BORDER = 0xFFBBBBBB;
-
-                SCROLL_THUMB = 0xFFCCCCCC;
-
-                OVERLAY_HALF_WHITE = 0x40FFFFFF;
-
-                CHECKER_DARK = 0xFFB0B0B0;
-                CHECKER_LIGHT = 0xFFD0D0D0;
-
-                ACTIVE_LAYER_BORDER = 0xFF000000;
-
-
-                break;
-
-            case ALL_BLACK:
-                // Everything black (OLED-like dark)
-                BROWSE_BACKGROUND = 0xFF000000;
-                EDITOR_BACKGROUND = 0xFF000000;
-                SKY_BACKGROUND = 0xFF000000;
-
-                HEADER_BAR = 0xFF000000;
-                HEADER_UNDERLINE = 0xFF000000;
-
-                CELL_BG = 0xFF000000;
-                CELL_BG_HOVER = 0xFF101010;
-                CELL_BORDER = 0xFF111111;
-                MODIFIED_BORDER = 0xFFFFFFFF; // white highlight for modified
-
-                PANEL_BG = 0xEE000000;
-                TOOLTIP_BORDER = 0xFF444444;
-
-                TEXT_NORMAL = 0xFFFFFFFF;
-                TEXT_LIGHT = 0xFFCCCCCC;
-                TEXT_MUTED = 0xFF888888;
-                TEXT_SUBTLE = 0xFF666666;
-                TEXT_ALERT = 0xFFFF4444;
-
-                WHEEL_DEFAULT = 0xFF000000;
-                WHEEL_HIGHLIGHT = 0xFF101010;
-
-                STATUS_OK = 0xFF00FF00;
-
-                PANEL_DARK = 0xFF000000;
-                PANEL_SEPARATOR = 0xFF111111;
-                TAB_UNDERLINE = 0xFFFFFFFF;
-
-                TITLE_BAR_BG = 0xFF000000;
-                TITLE_TEXT = 0xFFFFFFFF;
-                STATUS_BAR_BG = 0xFF000000;
-                STATUS_TEXT = 0xFFAAAAAA;
-                TITLE_TEXT_SHADOW = 0xFF000000;
-                TITLE_TEXT_SHADOW_ON_WHITE = 0xFFFFFFFF;
-
-                PICKER_BORDER = 0xFF222222;
-                SWATCH_BORDER = 0xFF333333;
-
-                SCROLL_THUMB = 0xFF444444;
-
-                SCROLLBAR_BG = 0xFF000000;
-                ENTRY_TEXT = 0xFFFFFFFF;
-
-                OVERLAY_HALF_WHITE = 0x40000000;
-
-                CHECKER_DARK = 0xFF101010;
-                CHECKER_LIGHT = 0xFF202020;
-
-                ACTIVE_LAYER_BORDER = 0xFFFFFFFF;
-                break;
-
-            case DARK_BLUE:
-                // Dark blue / dark mode, similar to existing colors but shifted to blue tones
-                BROWSE_BACKGROUND = 0xFF0E1426; // deep blue-black
-                EDITOR_BACKGROUND = 0xFF0B0F1A;
-                SKY_BACKGROUND = 0xFF071021;
-
-                HEADER_BAR = 0xFF09122B;
-                HEADER_UNDERLINE = 0xFF2E6BA0;
-
-                CELL_BG = 0xFF1A2740;
-                CELL_BG_HOVER = 0xFF263452;
-                CELL_BORDER = 0xFF23314F;
-                MODIFIED_BORDER = 0xFF66FFCC;
-
-                PANEL_BG = 0xEE0B1630;
-                TOOLTIP_BORDER = 0xFF9FB6D9;
-
-                TEXT_NORMAL = 0xFFECEFF6;
-                TEXT_LIGHT = 0xFFD6DCE6;
-                TEXT_MUTED = 0xFF9FB0C8;
-                TEXT_SUBTLE = 0xFF99A7C0;
-                TEXT_ALERT = 0xFFFF7F7F;
-
-                WHEEL_DEFAULT = 0xFF0D1230;
-                WHEEL_HIGHLIGHT = 0xFF122040;
-
-                STATUS_OK = 0xFF4CEB9E;
-
-                PANEL_DARK = 0xFF081026;
-                PANEL_SEPARATOR = 0xFF11223A;
-                TAB_UNDERLINE = 0xFF4DA3E6;
-
-                TITLE_BAR_BG = 0xFF0F1A2D;
-                TITLE_TEXT = 0xFFE8EEFF;
-                STATUS_BAR_BG = 0xFF07121B;
-                STATUS_TEXT = 0xFF9FB6D9;
-                TITLE_TEXT_SHADOW = 0xFF000000;
-                TITLE_TEXT_SHADOW_ON_WHITE = 0xFFFFFFFF;
-
-                PICKER_BORDER = 0xFF2A3A56;
-                SWATCH_BORDER = 0xFF334468;
-
-                SCROLL_THUMB = 0xFF47628F;
-
-                SCROLLBAR_BG = 0xFF07121B;
-                ENTRY_TEXT = 0xFFECEFF6;
-
-                OVERLAY_HALF_WHITE = 0x40FFFFFF;
-
-                CHECKER_DARK = 0xFF596376;
-                CHECKER_LIGHT = 0xFF6F7E91;
-
-                ACTIVE_LAYER_BORDER = 0xFF6BE8C3;
-                break;
-
             case LIGHT:
                 // Light theme: soft grays and off-whites
                 BROWSE_BACKGROUND = 0xFFF2F4F8;
@@ -395,11 +231,11 @@ public class ColorPalette {
 
                 CELL_BG = 0xFF000000;
                 CELL_BG_HOVER = 0xFF040404;
-                CELL_BORDER = 0xFFFFFFFF;
-                MODIFIED_BORDER = 0xFF00FF00;
+                CELL_BORDER = 0xFF121212;
+                MODIFIED_BORDER = 0xFFFFFFFF;
 
                 PANEL_BG = 0xEE000000;
-                TOOLTIP_BORDER = 0xFF00AA88;
+                TOOLTIP_BORDER = 0xFF1c1c1c;
 
                 TEXT_NORMAL = 0xFFFFFFFF;
                 TEXT_LIGHT = 0xFFCCCCCC;
