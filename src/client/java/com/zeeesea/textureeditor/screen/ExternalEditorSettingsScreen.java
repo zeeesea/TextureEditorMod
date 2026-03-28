@@ -26,6 +26,11 @@ public class ExternalEditorSettingsScreen extends Screen {
     private final Screen parent;
     private TextFieldWidget customPathField;
     private int detectedEditorsEndY;
+    // scrolling state for tall external editor settings
+    private int scrollY = 0;
+    private int contentTop = 35;
+    private int contentHeight = 0;
+    private final java.util.List<Integer> baseYs = new java.util.ArrayList<>();
 
     public ExternalEditorSettingsScreen(Screen parent) {
         super(Text.literal("External Editor Settings"));
@@ -36,7 +41,8 @@ public class ExternalEditorSettingsScreen extends Screen {
     protected void init() {
         ModSettings s = ModSettings.getInstance();
         int centerX = this.width / 2;
-        int y = 35;
+        int startY = 35;
+        int y = startY;
 
         // Toggle: Use External Editor
         addDrawableChild(ButtonWidget.builder(
@@ -76,7 +82,7 @@ public class ExternalEditorSettingsScreen extends Screen {
 
         y += 8;
 
-        // Custom path label drawn in render()
+        // Custom path label will be drawn in render(); position field below detected editors
         y += 12;
         customPathField = new TextFieldWidget(this.textRenderer, centerX - 120, y, 240, 18, Text.literal("Custom Path"));
         customPathField.setMaxLength(500);
@@ -125,6 +131,23 @@ public class ExternalEditorSettingsScreen extends Screen {
         // Done
         addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> this.close())
                 .position(centerX - 50, y).size(100, 20).build());
+
+        // record content height and clamp scroll
+        contentTop = startY;
+        contentHeight = y;
+
+        // capture base Y positions for all child widgets so we can offset them at render time
+        baseYs.clear();
+        var ch = this.children();
+        for (var d : ch) {
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) baseYs.add(w.getY());
+            else baseYs.add(-1);
+        }
+
+        int avail = Math.max(0, this.height - contentTop - 40);
+        int maxScroll = Math.max(0, contentHeight - avail);
+        if (scrollY > maxScroll) scrollY = maxScroll;
+        if (scrollY < 0) scrollY = 0;
     }
 
     @Override
@@ -133,21 +156,51 @@ public class ExternalEditorSettingsScreen extends Screen {
         context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a76External Editor Settings", this.width / 2, 10, 0xFFFFFF);
 
         int centerX = this.width / 2;
+        // Render the variable content inside a scissored region so title stays fixed.
+        int left = 0;
+        int top = contentTop;
+        int availH = Math.max(0, this.height - top - 40);
 
-        // "Detected Editors:" label
-        List<ExternalEditorDetector.DetectedEditor> detected = ExternalEditorDetector.detectEditors();
-        int labelY = 35 + 30;
-        if (!detected.isEmpty()) {
-            context.drawText(textRenderer, "\u00a7eDetected Editors:", centerX - 118, labelY, 0xFFFFFF, false);
-        } else {
-            context.drawText(textRenderer, "\u00a7cNo editors auto-detected", centerX - 118, labelY + 4, 0xFF5555, false);
+        context.enableScissor(left, top, this.width, top + availH);
+        try {
+            // offset widget Y positions according to scrollY
+            var ch2 = this.children();
+            for (int i = 0; i < ch2.size(); i++) {
+                var d = ch2.get(i);
+                if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                    int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                    if (by >= 0) w.setY(by - scrollY);
+                }
+            }
+
+            // "Detected Editors:" label (scrolled)
+            List<ExternalEditorDetector.DetectedEditor> detected = ExternalEditorDetector.detectEditors();
+            int labelY = contentTop + 30 - scrollY;
+            if (!detected.isEmpty()) {
+                context.drawText(textRenderer, "\u00a7eDetected Editors:", centerX - 118, labelY, 0xFFFFFF, false);
+            } else {
+                context.drawText(textRenderer, "\u00a7cNo editors auto-detected", centerX - 118, labelY + 4, 0xFF5555, false);
+            }
+
+            // "Custom Editor Path" label (descriptive, scrolled)
+            int customLabelY = detectedEditorsEndY + 8 - scrollY;
+            context.drawText(textRenderer, "Custom Editor Path (overrides auto-detection):", centerX - 118, customLabelY, 0xAAAAAA, false);
+
+            super.render(context, mouseX, mouseY, delta);
+        } finally {
+            // restore widget positions
+            var ch3 = this.children();
+            for (int i = 0; i < ch3.size(); i++) {
+                var d = ch3.get(i);
+                if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                    int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                    if (by >= 0) w.setY(by);
+                }
+            }
+            context.disableScissor();
         }
 
-        // "Custom Editor Path" label
-        int customLabelY = detectedEditorsEndY + 8;
-        context.drawText(textRenderer, "Custom Editor Path (overrides auto):", centerX - 118, customLabelY, 0xAAAAAA, false);
-
-        // Status at bottom
+        // Status at bottom (fixed)
         ModSettings s = ModSettings.getInstance();
         String editorPath = getResolvedPath(s);
         int statusY = this.height - 20;
@@ -158,8 +211,6 @@ public class ExternalEditorSettingsScreen extends Screen {
         } else {
             context.drawCenteredTextWithShadow(textRenderer, "\u00a77No editor configured", centerX, statusY, 0xFFFFFF);
         }
-
-        super.render(context, mouseX, mouseY, delta);
     }
 
     private String getResolvedPath(ModSettings s) {
@@ -194,6 +245,40 @@ public class ExternalEditorSettingsScreen extends Screen {
     public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
         if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
         return super.keyPressed(keyInput);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mx, double my, double ha, double va) {
+        int top = contentTop;
+        int availH = Math.max(0, this.height - top - 40);
+        if (contentHeight <= availH) return false;
+        if (my < top || my > top + availH) return false;
+
+        int maxScroll = Math.max(0, contentHeight - availH);
+        int step = 12;
+        if (va > 0) scrollY = Math.max(0, scrollY - step);
+        else if (va < 0) scrollY = Math.min(maxScroll, scrollY + step);
+        return true;
+    }
+
+    @Override
+    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+        return super.mouseClicked(click, doubled);
+    }
+
+    @Override
+    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+        return super.mouseReleased(click);
+    }
+
+    @Override
+    public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+        return super.mouseDragged(click, offsetX, offsetY);
+    }
+
+    @Override
+    public void mouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX, mouseY);
     }
 
     @Override

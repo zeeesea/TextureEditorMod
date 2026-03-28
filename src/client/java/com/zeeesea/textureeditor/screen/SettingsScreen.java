@@ -13,6 +13,11 @@ import org.lwjgl.glfw.GLFW;
 public class SettingsScreen extends Screen {
 
     private final Screen parent;
+    // scrolling state for tall settings screens
+    private int scrollY = 0;
+    private int contentTop = 40; // y where settings widgets start
+    private int contentHeight = 0; // computed after init
+    private final java.util.List<Integer> baseYs = new java.util.ArrayList<>();
 
     public SettingsScreen(Screen parent) {
         // Nutzt jetzt den Key aus deiner JSON für den Fenstertitel
@@ -25,7 +30,8 @@ public class SettingsScreen extends Screen {
         ModSettings s = ModSettings.getInstance();
 
         int centerX = this.width / 2;
-        int y = 40;
+        int startY = 40;
+        int y = startY;
 
         // Hilfs-Texte für ON/OFF
         Text textOn = Text.translatable("textureeditor.label.on");
@@ -163,6 +169,24 @@ public class SettingsScreen extends Screen {
         // Done
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.done"), btn -> this.close())
                 .position(centerX - 50, y).size(100, 20).build());
+
+        // record total content height for scrolling calculations
+        contentTop = startY;
+        contentHeight = y;
+
+        // capture base Y positions for all child widgets so we can offset them at render time
+        baseYs.clear();
+        var ch = this.children();
+        for (var d : ch) {
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) baseYs.add(w.getY());
+            else baseYs.add(-1);
+        }
+
+        // clamp scrollY to valid range in case window size changed
+        int avail = Math.max(0, this.height - contentTop - 40);
+        int maxScroll = Math.max(0, contentHeight - avail);
+        if (scrollY > maxScroll) scrollY = maxScroll;
+        if (scrollY < 0) scrollY = 0;
     }
 
     @Override
@@ -183,12 +207,74 @@ public class SettingsScreen extends Screen {
         context.drawText(textRenderer, titleStr, titleX + 1, titleY + 1, shadowColor, false);
         context.drawText(textRenderer, titleStr, titleX, titleY, textColor, false);
 
-        super.render(context, mouseX, mouseY, delta);
+        // Render children (buttons) inside a scissored, translated region so the title stays fixed
+        int left = 0;
+        int top = contentTop;
+        int availH = Math.max(0, this.height - top - 40); // leave some bottom padding for done button visibility
+
+        // Offset widgets' Y positions according to scroll, render within scissor, then restore positions.
+        context.enableScissor(left, top, this.width, top + availH);
+        try {
+            var ch2 = this.children();
+            for (int i = 0; i < ch2.size(); i++) {
+                var d = ch2.get(i);
+                if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                    int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                    if (by >= 0) w.setY(by - scrollY);
+                }
+            }
+            super.render(context, mouseX, mouseY, delta);
+        } finally {
+            var ch3 = this.children();
+            for (int i = 0; i < ch3.size(); i++) {
+                var d = ch3.get(i);
+                if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                    int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                    if (by >= 0) w.setY(by);
+                }
+            }
+            context.disableScissor();
+        }
     }
 
     @Override
     public void renderBackground(DrawContext ctx, int mx, int my, float d) {
 
+    }
+
+    @Override
+    public boolean mouseScrolled(double mx, double my, double ha, double va) {
+        // Only scroll when content is taller than available area and mouse is over the content region
+        int top = contentTop;
+        int availH = Math.max(0, this.height - top - 40);
+        if (contentHeight <= availH) return false;
+        if (my < top || my > top + availH) return false;
+
+        int maxScroll = Math.max(0, contentHeight - availH);
+        int step = 12; // pixels per scroll
+        if (va > 0) scrollY = Math.max(0, scrollY - step);
+        else if (va < 0) scrollY = Math.min(maxScroll, scrollY + step);
+        return true;
+    }
+
+    @Override
+    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+        return super.mouseClicked(click, doubled);
+    }
+
+    @Override
+    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+        return super.mouseReleased(click);
+    }
+
+    @Override
+    public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+        return super.mouseDragged(click, offsetX, offsetY);
+    }
+
+    @Override
+    public void mouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX, mouseY);
     }
 
     @Override
