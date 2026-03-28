@@ -118,6 +118,13 @@ public abstract class AbstractEditorScreen extends Screen {
     private net.minecraft.client.texture.NativeImageBackedTexture pickerAlphaTexture = null;
     private boolean pickerHueBarBuilt = false;
     private boolean pickerAlphaBarBuilt = false;
+    // Scrolling state for right-panel content (palette/history and layers)
+    private int paletteScrollY = 0;
+    private int layerScrollY = 0;
+    private static final int SCROLL_STEP = 18;
+    // Left panel scroll state (for General / Tools long content)
+    private int leftPanelScrollY = 0;
+    private int leftPanelContentHeight = 0;
     private static final Identifier PICKER_SV_ID   = Identifier.of("textureeditor", "picker_sv");
     private static final Identifier PICKER_HUE_ID  = Identifier.of("textureeditor", "picker_hue");
     private static final Identifier PICKER_ALPHA_ID = Identifier.of("textureeditor", "picker_alpha");
@@ -199,8 +206,22 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     protected int getToolButtonHeight() {
-        return getGuiScale() >= 4 ? 18 : 20;
+        int base = getGuiScale() >= 4 ? 18 : 20;
+        // scale down further on very small screens
+        int scaled = Math.max(12, Math.min(24, base - Math.max(0, (4 - getGuiScale()))));
+        return scaled;
     }
+
+    /** Compute a responsive tool/button width so UI adapts to resolution */
+    protected int getToolButtonWidth(int panelInnerWidth) {
+        // default wide button is panelInnerWidth; small buttons (half/third) computed by caller
+        int min = Math.max(36, panelInnerWidth / 6);
+        int max = Math.max(80, panelInnerWidth);
+        return Math.max(min, Math.min(panelInnerWidth, max));
+    }
+
+    /** Utility to return the inner X of a right panel (4px padding) for given panel left x. */
+    protected int getPanelInnerX(int panelLeftX) { return panelLeftX + 4; }
 
     private String getVarLabel() {
         int pct = (int)(ModSettings.getInstance().variationPercent * 100);
@@ -304,6 +325,8 @@ public abstract class AbstractEditorScreen extends Screen {
     private void buildWidgets() {
         ModSettings s = ModSettings.getInstance();
         int bh = getToolButtonHeight();
+        // reset computed left-panel content height before constructing
+        leftPanelContentHeight = 0;
 
         // ── LEFT panel toggle button ──────────────────────────────────────────
         addDrawableChild(ButtonWidget.builder(
@@ -325,9 +348,12 @@ public abstract class AbstractEditorScreen extends Screen {
             if (leftTab == LeftTab.GENERAL) {
                 // General tab
                 py = buildGeneralTab(py, 4, getPanelWidth() - 8, bh, s);
+                // record content height for scrolling
+                leftPanelContentHeight = Math.max(leftPanelContentHeight, py - (bh + TAB_H + 4));
             } else {
                 // Tools tab
                 py = buildToolsTab(py, 4, getPanelWidth() - 8, bh, s);
+                leftPanelContentHeight = Math.max(leftPanelContentHeight, py - (bh + TAB_H + 4));
             }
         }
 
@@ -368,13 +394,13 @@ public abstract class AbstractEditorScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(
                         Text.translatable("textureeditor.button.apply_live").styled(st -> st.withColor(ColorPalette.INSTANCE.STATUS_OK)),
                         btn -> applyLive())
-                .position(px, py).size(w, bh).build());
+                .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
         addDrawableChild(ButtonWidget.builder(
                         Text.translatable("textureeditor.button.export_pack").styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
                         btn -> MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
-                .position(px, py).size(w, bh).build());
+                .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
         addDrawableChild(ButtonWidget.builder(
@@ -384,7 +410,7 @@ public abstract class AbstractEditorScreen extends Screen {
                             Screen bs = getBackScreen();
                             MinecraftClient.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
                         })
-                .position(px, py).size(w, bh).build());
+                .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 8;
 
         // Separator
@@ -392,13 +418,13 @@ public abstract class AbstractEditorScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(
                                 Text.literal(getResetCurrentLabel()).styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
                         btn -> resetCurrent())
-                .position(px, py).size(w, bh).build());
+                .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
         addDrawableChild(ButtonWidget.builder(
                         Text.translatable("textureeditor.button.reset_all").styled(st -> st.withColor(ColorPalette.INSTANCE.TEXT_ALERT)),
                         btn -> MinecraftClient.getInstance().setScreen(new ConfirmResetAllScreen(this)))
-                .position(px, py).size(w, bh).build());
+                .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 8;
 
         // Extra buttons from subclass (face selector etc.)
@@ -420,13 +446,13 @@ public abstract class AbstractEditorScreen extends Screen {
             String h1 = s.showToolHints ? s.getKeyName(t1.name().toLowerCase()) : "";
             String l1 = t1.getDisplayName() + (h1.isEmpty() ? "" : " (" + h1 + ")");
             addDrawableChild(ButtonWidget.builder(Text.literal(l1), btn -> currentTool = t1)
-                    .position(px, py).size(hw, bh).build());
+                    .position(px, py - leftPanelScrollY).size(hw, bh).build());
             if (i + 1 < tools.length) {
                 final EditorTool t2 = tools[i + 1];
                 String h2 = s.showToolHints ? s.getKeyName(t2.name().toLowerCase()) : "";
                 String l2 = t2.getDisplayName() + (h2.isEmpty() ? "" : " (" + h2 + ")");
                 addDrawableChild(ButtonWidget.builder(Text.literal(l2), btn -> currentTool = t2)
-                        .position(px + hw + 2, py).size(hw, bh).build());
+                        .position(px + hw + 2, py - leftPanelScrollY).size(hw, bh).build());
             }
             py += bh + 2;
         }
@@ -434,15 +460,15 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Undo / Redo
         int hw = (w - 2) / 2;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.undo"), btn -> canvas.undo())
-                .position(px, py).size(hw, bh).build());
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.undo"), btn -> canvas.undo())
+                .position(px, py - leftPanelScrollY).size(hw, bh).build());
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.redo"), btn -> canvas.redo())
-                .position(px + hw + 2, py).size(hw, bh).build());
+                .position(px + hw + 2, py - leftPanelScrollY).size(hw, bh).build());
         py += bh + 4;
 
         // Grid toggle
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.grid"), btn -> showGrid = !showGrid)
-                .position(px, py).size(w, bh).build());
+                .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
 
@@ -455,7 +481,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 toolSize = (int)(value * 9) + 1;
             }
         };
-        addDrawableChild(sizeSlider);
+        sizeSlider.setX(px); sizeSlider.setY(py - leftPanelScrollY); addDrawableChild(sizeSlider);
         py += bh + 4;
 
         // Variation percent slider (0..100). When value == 0 show "OFF" instead of "0%".
@@ -463,7 +489,7 @@ public abstract class AbstractEditorScreen extends Screen {
             @Override protected void updateMessage() { setMessage(Text.literal(getVarLabel())); }
             @Override protected void applyValue() { ModSettings.getInstance().variationPercent = (float)this.value; ModSettings.getInstance().save(); }
         };
-        addDrawableChild(varSlider);
+        varSlider.setX(px); varSlider.setY(py - leftPanelScrollY); addDrawableChild(varSlider);
         py += bh + 4;
 
         // Helper to display label for variation slider
@@ -573,14 +599,15 @@ public abstract class AbstractEditorScreen extends Screen {
         }
 
         if (rightOpen) {
-            int rpx = this.width - PANEL_W - TOGGLE_BTN_W;
+            int panelW = getPanelWidth();
+            int rpx = this.width - panelW - TOGGLE_BTN_W;
             ctx.fill(rpx, 0, this.width, this.height, pal.PANEL_DARK);
             ctx.fill(rpx - 1, 0, rpx, this.height, pal.PANEL_SEPARATOR);
-            int tabLineX = this.width - PANEL_W + (rightTab == RightTab.COLOR ? 0 : PANEL_W / 2);
-            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + PANEL_W / 2, getToolButtonHeight() + TAB_H, pal.TAB_UNDERLINE);
+            int tabLineX = this.width - panelW + (rightTab == RightTab.COLOR ? 0 : panelW / 2);
+            ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + panelW / 2, getToolButtonHeight() + TAB_H, pal.TAB_UNDERLINE);
             // Draw color/layer tab content
-            if (rightTab == RightTab.COLOR) drawColorTabContent(ctx, mx, my, this.width - getPanelWidth(), getToolButtonHeight() + TAB_H + 4, getPanelWidth());
-            else drawLayerTabContent(ctx, mx, my, this.width - getPanelWidth(), getToolButtonHeight() + TAB_H + 4, getPanelWidth());
+            if (rightTab == RightTab.COLOR) drawColorTabContent(ctx, mx, my, this.width - panelW, getToolButtonHeight() + TAB_H + 4, panelW);
+            else drawLayerTabContent(ctx, mx, my, this.width - panelW, getToolButtonHeight() + TAB_H + 4, panelW);
         } else {
             ctx.fill(this.width - TOGGLE_BTN_W, 0, this.width, this.height, pal.PANEL_DARK);
         }
@@ -617,13 +644,24 @@ public abstract class AbstractEditorScreen extends Screen {
     private void drawColorTabContent(DrawContext ctx, int mx, int my, int rpx, int py, int pw) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         int bh = getToolButtonHeight();
-        int innerX = rpx + 4;
+        int innerX = getPanelInnerX(rpx);
         int innerW = pw - 8;
 
-        // ── SV square ─────────────────────────────────────────────────────────
+        // ── SV square
         int svX = innerX;
         int svY = py;
 
+        // Compute dynamic widths: split the available extra space between hue & alpha
+        int avail = Math.max(0, innerW - PICKER_SV_W - 8);
+        int hueW = Math.max(HUE_W, avail / 2);
+        int alphaW = Math.max(ALPHA_W, avail - hueW);
+
+        int hueX = svX + PICKER_SV_W + 4;
+        int hueY = svY;
+        int alphaX = hueX + hueW + 4;
+        int alphaY = svY;
+
+        // Prepare textures (build/update)
         if (cachedPickerHue != pickerHue || pickerSvTexture == null) {
             cachedPickerHue = pickerHue;
             var img = new net.minecraft.client.texture.NativeImage(PICKER_SV_W, PICKER_SV_H, false);
@@ -640,95 +678,114 @@ public abstract class AbstractEditorScreen extends Screen {
                 MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_SV_ID, pickerSvTexture);
             }
         }
+        if (!pickerHueBarBuilt || pickerHueTexture == null || pickerHueTexture.getGlTexture().getWidth(0) != hueW) {
+            var himg = new net.minecraft.client.texture.NativeImage(hueW, PICKER_SV_H, false);
+            for (int y = 0; y < PICKER_SV_H; y++) {
+                int c = hsvToArgb(y / (float)(PICKER_SV_H - 1), 1f, 1f, 1f);
+                for (int x = 0; x < hueW; x++) himg.setColorArgb(x, y, c);
+            }
+            if (pickerHueTexture != null) { pickerHueTexture.setImage(himg); pickerHueTexture.upload(); }
+            else {
+                pickerHueTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_hue", himg);
+                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_HUE_ID, pickerHueTexture);
+            }
+            pickerHueBarBuilt = true;
+        }
+        if (!pickerAlphaBarBuilt || pickerAlphaTexture == null || pickerAlphaTexture.getGlTexture().getWidth(0) != alphaW) rebuildAlphaBar(alphaW);
+
+        // Current swatch + hex are positioned under the picker: compute their Y now so we can
+        // use it to mask the palette/history that scroll under this area.
+        int swatchW = 28;
+        int swatchY = svY + PICKER_SV_H + 6;
+        // Build the y used by original code for palette start
+        int paletteStartY = swatchY + bh + 4 + bh + 8;
+
+        // ── Palette (centered)
+        int cols = 5;
+        int cs = (innerW - (cols - 1) * 1) / cols;
+        int totalPaletteRows = (PALETTE.length + cols - 1) / cols;
+        int paletteHeight = totalPaletteRows * (cs + 1);
+        // allow scrolling only for palette + history combined; apply paletteScrollY as vertical offset
+        int startY = paletteStartY - paletteScrollY;
+        // picker clipping area so palette/history draw behind the picker
+        int pickerLeft = svX - 1;
+        int pickerRight = alphaX + alphaW + 1;
+        int pickerTop = svY - 1;
+        int pickerBottom = svY + PICKER_SV_H + 1;
+
+        // Compute mask bounds: cover the entire upper area from the top of the
+        // tab/content region down to just below the current swatch/hex input so
+        // scrolled palette/history items disappear beneath the foreground UI.
+        int maskTop = py - 2; // reach up to the top of the color tab content (near the tabs)
+        int maskBottom = swatchY + bh + 1; // hide everything above the bottom of swatch/hex area
+
+        // Calculate starting row index so we don't draw any partial rows that intersect the masked area
+        int rowHeight = cs + 1;
+        int firstRow = Math.max(0, (int) Math.ceil((maskBottom - startY) / (double) rowHeight));
+        int startIndex = firstRow * cols;
+        startIndex = Math.max(0, Math.min(startIndex, PALETTE.length));
+
+        for (int i = startIndex; i < PALETTE.length; i++) {
+            int col = i % cols, row = i / cols;
+            int px2 = innerX + col * (cs + 1) + (innerW - (cols * cs + (cols - 1))) / 2; // center horizontally
+            int py2 = startY + row * (cs + 1);
+            // Skip any swatches that would overlap the picker's horizontal area
+            if (!(px2 + cs > pickerLeft && px2 < pickerRight && py2 + cs > pickerTop && py2 < pickerBottom)) {
+                ctx.fill(px2, py2, px2 + cs, py2 + cs, PALETTE[i]);
+            }
+            if (PALETTE[i] == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + cs + 1, py2 + cs + 1, pal.HEADER_UNDERLINE);
+        }
+
+        int afterPaletteY = paletteStartY + paletteHeight + 4 - paletteScrollY;
+
+        // ── Color history (centered)
+        ColorHistory hist = ColorHistory.getInstance();
+        if (hist.size() > 0) {
+            ctx.drawText(textRenderer, "History", innerX + (innerW - textRenderer.getWidth("History")) / 2, afterPaletteY, pal.STATUS_TEXT, false);
+            int hy = afterPaletteY + 10;
+            List<Integer> colors = hist.getColors();
+            int hcs = Math.max(8, cs - 2);
+            for (int i = 0; i < Math.min(colors.size(), 10); i++) {
+                int col = i % cols, row = i / cols;
+                int px2 = innerX + col * (hcs + 1) + (innerW - (cols * hcs + (cols - 1))) / 2;
+                int py2 = hy + row * (hcs + 1);
+                if (py2 >= maskBottom && !(px2 + hcs > pickerLeft && px2 < pickerRight && py2 + hcs > pickerTop && py2 < pickerBottom)) {
+                    ctx.fill(px2, py2, px2 + hcs, py2 + hcs, colors.get(i));
+                }
+                if (colors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + hcs + 1, py2 + hcs + 1, pal.HEADER_UNDERLINE);
+            }
+        }
+
+        // Mask the whole upper area (picker + swatch/hex region) so scrolled
+        // palette/history content is fully hidden beneath the foreground UI.
+        ctx.fill(innerX, maskTop, innerX + innerW, maskBottom, pal.PANEL_DARK);
+
+        // Draw the picker and controls on top
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
         drawRectOutline(ctx, svX - 1, svY - 1, svX + PICKER_SV_W + 1, svY + PICKER_SV_H + 1, pal.PICKER_BORDER);
-
         // Cursor on SV
         int scx = svX + (int)(pickerSat * (PICKER_SV_W - 1));
         int scy = svY + (int)((1f - pickerVal) * (PICKER_SV_H - 1));
         ctx.fill(scx - 2, scy, scx + 3, scy + 1, pal.TEXT_NORMAL);
         ctx.fill(scx, scy - 2, scx + 1, scy + 3, pal.TEXT_NORMAL);
 
-        // Compute dynamic widths: split the available extra space between hue & alpha
-        int avail = Math.max(0, innerW - PICKER_SV_W - 8);
-        int hueW = Math.max(HUE_W, avail / 2);
-        int alphaW = Math.max(ALPHA_W, avail - hueW);
-
-        // ── Hue bar (vertical) ─────────────────────────────────────────────────
-        int hueX = svX + PICKER_SV_W + 4;
-        int hueY = svY;
-        if (!pickerHueBarBuilt || pickerHueTexture == null || pickerHueTexture.getGlTexture().getWidth(0) != hueW) {
-            var img = new net.minecraft.client.texture.NativeImage(hueW, PICKER_SV_H, false);
-            for (int y = 0; y < PICKER_SV_H; y++) {
-                int c = hsvToArgb(y / (float)(PICKER_SV_H - 1), 1f, 1f, 1f);
-                for (int x = 0; x < hueW; x++) img.setColorArgb(x, y, c);
-            }
-            if (pickerHueTexture != null) { pickerHueTexture.setImage(img); pickerHueTexture.upload(); }
-            else {
-                pickerHueTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_hue", img);
-                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_HUE_ID, pickerHueTexture);
-            }
-            pickerHueBarBuilt = true;
-        }
+        // Draw hue and alpha bars on top as well
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_HUE_ID, hueX, hueY, 0, 0, hueW, PICKER_SV_H, hueW, PICKER_SV_H, hueW, PICKER_SV_H);
         drawRectOutline(ctx, hueX - 1, hueY - 1, hueX + hueW + 1, hueY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int hcy = hueY + (int)(pickerHue * (PICKER_SV_H - 1));
         ctx.fill(hueX - 1, hcy, hueX + hueW + 1, hcy + 1, 0xFFFFFFFF);
 
-        // ── Alpha bar (vertical) ───────────────────────────────────────────────
-        int alphaX = hueX + hueW + 4;
-        int alphaY = svY;
-        // checker background
+        // Alpha bar (checker background already written earlier via rebuildAlphaBar)
         for (int y = 0; y < PICKER_SV_H; y += 4) for (int x2 = 0; x2 < alphaW; x2 += 4)
             ctx.fill(alphaX + x2, alphaY + y, alphaX + x2 + 4, alphaY + y + 4, ((x2 / 4 + y / 4) % 2 == 0) ? pal.CHECKER_DARK : pal.CHECKER_LIGHT);
-
-        if (!pickerAlphaBarBuilt || pickerAlphaTexture == null || pickerAlphaTexture.getGlTexture().getWidth(0) != alphaW) rebuildAlphaBar(alphaW);
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
         drawRectOutline(ctx, alphaX - 1, alphaY - 1, alphaX + alphaW + 1, alphaY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int acy = alphaY + (int)((1f - pickerAlpha) * (PICKER_SV_H - 1));
         ctx.fill(alphaX - 1, acy, alphaX + alphaW + 1, acy + 1, pal.TEXT_NORMAL);
 
-        py = svY + PICKER_SV_H + 6;
-
-        // ── Current color swatch ───────────────────────────────────────────────
-        int swatchW = 28;
-        ctx.fill(innerX, py, innerX + swatchW, py + bh, currentColor);
-        drawRectOutline(ctx, innerX, py, innerX + swatchW, py + bh, pal.SWATCH_BORDER);
-
-        // Hex input widget is positioned next to the swatch in buildColorTab();
-        // do not draw the hex text manually to avoid duplication.
-
-        py += bh + 4;
-
-        py += bh + 8;
-
-        // ── Palette ────────────────────────────────────────────────────────────
-        int cols = 5, cs = (innerW - (cols - 1) * 1) / cols;
-        for (int i = 0; i < PALETTE.length; i++) {
-            int col = i % cols, row = i / cols;
-            int px2 = innerX + col * (cs + 1);
-            int py2 = py + row * (cs + 1);
-            ctx.fill(px2, py2, px2 + cs, py2 + cs, PALETTE[i]);
-            if (PALETTE[i] == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + cs + 1, py2 + cs + 1, pal.HEADER_UNDERLINE);
-        }
-
-        py += ((PALETTE.length + cols - 1) / cols) * (cs + 1) + 4;
-
-        // ── Color history ──────────────────────────────────────────────────────
-        ColorHistory hist = ColorHistory.getInstance();
-        if (hist.size() > 0) {
-            ctx.drawText(textRenderer, "History", innerX, py, pal.STATUS_TEXT, false);
-            py += 10;
-            List<Integer> colors = hist.getColors();
-            int hcs = Math.max(8, cs - 2);
-            for (int i = 0; i < Math.min(colors.size(), 10); i++) {
-                int col = i % cols, row = i / cols;
-                int px2 = innerX + col * (hcs + 1);
-                int py2 = py + row * (hcs + 1);
-                ctx.fill(px2, py2, px2 + hcs, py2 + hcs, colors.get(i));
-                        if (colors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + hcs + 1, py2 + hcs + 1, pal.HEADER_UNDERLINE);
-            }
-        }
+        // Draw the current color swatch on top of the mask so it remains visible
+        ctx.fill(innerX, swatchY, innerX + swatchW, swatchY + bh, currentColor);
+        drawRectOutline(ctx, innerX, swatchY, innerX + swatchW, swatchY + bh, pal.SWATCH_BORDER);
     }
 
     private void rebuildAlphaBar(int width) {
@@ -755,39 +812,54 @@ public abstract class AbstractEditorScreen extends Screen {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         if (canvas == null) return;
         var stack = canvas.getLayerStack();
-        int innerX = rpx + 4;
+        int innerX = getPanelInnerX(rpx);
         int innerW = pw - 8;
         int rowH = 18;
         int bh = getToolButtonHeight();
-
         ctx.drawText(textRenderer, "Layers", innerX, py, pal.TITLE_TEXT, true);
         py += 12;
+        // Compute action button geometry (two rows) so we can reserve space for the scrollable list
+        int btnW = (innerW - 4) / 3;
+        int actionY = py;
+        int secondActionY = actionY + bh + 2;
+        int listStartY = secondActionY + bh + 4;
+        int contentY = listStartY - layerScrollY;
+        // Compute mask bounds so top action area fully occludes the scrolling list
+        // Extend mask to the absolute top so scrolled layers remain hidden all
+        // the way up (prevents any layer from being visible above the action area).
+        int maskTop = 0;
+        int maskBottom = secondActionY + bh + 1; // bottom of the fixed action area
 
+        // Draw the layer list first (so it scrolls underneath the fixed actions).
+        // Skip any rows that would intersect the fixed action region so nothing
+        // bleeds through the action buttons.
         for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
             var layer = stack.getLayers().get(i);
-            int rowY = py + (stack.getLayerCount() - 1 - i) * (rowH + 1);
+            int rowY = contentY + (stack.getLayerCount() - 1 - i) * (rowH + 1);
+            // If this row intersects the masked area, don't draw it (it will be
+            // hidden by the opaque panel and fixed buttons above).
+            if (rowY + rowH > maskTop && rowY < maskBottom) continue;
             boolean active = i == stack.getActiveIndex();
             ctx.fill(innerX, rowY, innerX + innerW, rowY + rowH, active ? pal.CELL_BG_HOVER : pal.CELL_BG);
-            if (active) drawRectOutline(ctx, innerX, rowY, innerX + innerW, rowY + rowH, 0xFF6666AA);
+            if (active) drawRectOutline(ctx, innerX, rowY, innerX + innerW, rowY + rowH, pal.ACTIVE_LAYER_BORDER);
             String eye = layer.isVisible() ? "●" : "○";
             ctx.drawText(textRenderer, eye, innerX + 2, rowY + 5, layer.isVisible() ? pal.STATUS_OK : pal.TEXT_SUBTLE, false);
             String name = layer.getName().length() > 10 ? layer.getName().substring(0, 10) + ".." : layer.getName();
             ctx.drawText(textRenderer, name, innerX + 14, rowY + 5, pal.TEXT_NORMAL, false);
         }
-
-        py += stack.getLayerCount() * (rowH + 1) + 6;
-
-        // Action buttons 3 per row
-        int btnW = (innerW - 4) / 3;
+        // Draw an opaque panel area behind the fixed action buttons so the scrolling
+        // layer list is fully hidden when it scrolls beneath the buttons.
+        ctx.fill(innerX, actionY, innerX + innerW, secondActionY + bh, pal.PANEL_DARK);
+        // Now draw the fixed action buttons on top so they occlude the scrolling list beneath
         // Row 1: Add, Del, Up
-        ctx.fill(innerX, py, innerX + btnW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "+ Add", innerX + 2, py + 4, pal.TEXT_NORMAL, false);
-        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "- Del", innerX + btnW + 4, py + 4, pal.TEXT_SUBTLE, false);
-        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▲ Up", innerX + 2 * btnW + 6, py + 4, pal.TEXT_NORMAL, false);
-        py += bh + 2;
+        ctx.fill(innerX, actionY, innerX + btnW, actionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "+ Add", innerX + 2, actionY + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX + btnW + 2, actionY, innerX + 2 * btnW + 2, actionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "- Del", innerX + btnW + 4, actionY + 4, pal.TEXT_SUBTLE, false);
+        ctx.fill(innerX + 2 * btnW + 4, actionY, innerX + innerW, actionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▲ Up", innerX + 2 * btnW + 6, actionY + 4, pal.TEXT_NORMAL, false);
         // Row 2: Down, Merge, Copy
-        ctx.fill(innerX, py, innerX + btnW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▼ Dn", innerX + 2, py + 4, pal.TEXT_NORMAL, false);
-        ctx.fill(innerX + btnW + 2, py, innerX + 2 * btnW + 2, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Merge", innerX + btnW + 4, py + 4, pal.TEXT_NORMAL, false);
-        ctx.fill(innerX + 2 * btnW + 4, py, innerX + innerW, py + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Copy", innerX + 2 * btnW + 6, py + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX, secondActionY, innerX + btnW, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▼ Dn", innerX + 2, secondActionY + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX + btnW + 2, secondActionY, innerX + 2 * btnW + 2, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Merge", innerX + btnW + 4, secondActionY + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX + 2 * btnW + 4, secondActionY, innerX + innerW, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Copy", innerX + 2 * btnW + 6, secondActionY + 4, pal.TEXT_NORMAL, false);
+        // No fixed bottom buttons anymore; actions are at top and the layer list scrolls underneath
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1013,6 +1085,85 @@ public abstract class AbstractEditorScreen extends Screen {
         } catch (Exception ignored) {}
 
         if (handleExtraScroll(mx, my, ha, va)) return true;
+
+        // Left panel scrolling
+        if (leftOpen) {
+            int leftPanelLeft = 0;
+            int leftPanelInnerX = 4;
+            int leftTop = getToolButtonHeight() + TAB_H + 4;
+            int visibleH = this.height - leftTop - 20;
+            if (mx >= leftPanelLeft && mx < leftPanelLeft + getPanelWidth() && my >= leftTop && my < leftTop + visibleH) {
+                if (va > 0) leftPanelScrollY = Math.max(0, leftPanelScrollY - SCROLL_STEP);
+                else if (va < 0) leftPanelScrollY = Math.min(Math.max(0, leftPanelContentHeight - visibleH), leftPanelScrollY + SCROLL_STEP);
+                return true;
+            }
+        }
+
+        // Right-panel scrolling: palette/history or layer list
+        if (rightOpen) {
+            int panelW = getPanelWidth();
+            int rpx = this.width - panelW;
+            // compute picker geometry for hover detection
+            int pickerInnerX = rpx + 4;
+            int pickerPy = getToolButtonHeight() + TAB_H + 4;
+            int pickerInnerW = panelW - 8;
+            int pickerAvail = Math.max(0, pickerInnerW - PICKER_SV_W - 8);
+            int pickerHueW = Math.max(HUE_W, pickerAvail / 2);
+            int pickerAlphaW = Math.max(ALPHA_W, pickerAvail - pickerHueW);
+            int pickerSvX = pickerInnerX, pickerSvY = pickerPy;
+            int pickerHueX = pickerSvX + PICKER_SV_W + 4;
+            int pickerAlphaX = pickerHueX + pickerHueW + 4;
+            // color tab region
+            if (rightTab == RightTab.COLOR) {
+                int innerX = getPanelInnerX(rpx), innerW = panelW - 8;
+                int palTop = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + getToolButtonHeight() + 4 + getToolButtonHeight() + 8;
+                int cols = 5;
+                int cs = (innerW - (cols - 1)) / cols;
+                int totalPaletteRows = (PALETTE.length + cols - 1) / cols;
+                int paletteHeight = totalPaletteRows * (cs + 1) + 4;
+                int histSize = ColorHistory.getInstance().size();
+                int histRows = (Math.min(histSize, 10) + cols - 1) / cols;
+                int historyHeight = histRows * (Math.max(8, cs - 2) + 1) + 14;
+                int contentHeight = paletteHeight + historyHeight;
+                int visibleH = this.height - palTop - 20;
+                if (mx >= rpx && mx < rpx + panelW && my >= palTop && my < palTop + visibleH) {
+                    if (va > 0) paletteScrollY = Math.max(0, paletteScrollY - SCROLL_STEP);
+                    else if (va < 0) paletteScrollY = Math.min(Math.max(0, contentHeight - visibleH), paletteScrollY + SCROLL_STEP);
+                    return true;
+                }
+            }
+            // If hovering over hue or alpha bars, use scroll to adjust them instead of zooming
+            if (rightTab == RightTab.COLOR) {
+                if (mx >= pickerHueX && mx < pickerHueX + pickerHueW && my >= pickerSvY && my < pickerSvY + PICKER_SV_H) {
+                    // adjust hue
+                    if (va > 0) pickerHue = Math.max(0f, pickerHue - 1f / (PICKER_SV_H - 1));
+                    else if (va < 0) pickerHue = Math.min(1f, pickerHue + 1f / (PICKER_SV_H - 1));
+                    setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
+                    return true;
+                }
+                if (mx >= pickerAlphaX && mx < pickerAlphaX + pickerAlphaW && my >= pickerSvY && my < pickerSvY + PICKER_SV_H) {
+                    // adjust alpha
+                    if (va > 0) pickerAlpha = Math.min(1f, pickerAlpha + 1f / (PICKER_SV_H - 1));
+                    else if (va < 0) pickerAlpha = Math.max(0f, pickerAlpha - 1f / (PICKER_SV_H - 1));
+                    setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
+                    pickerAlphaBarBuilt = false;
+                    return true;
+                }
+            }
+            // layers tab region
+            if (rightTab == RightTab.LAYERS) {
+                int listTop = getToolButtonHeight() + TAB_H + 4 + 12;
+                int innerW = panelW - 8;
+                int rowH = 18;
+                int listHeight = canvas != null ? canvas.getLayerStack().getLayerCount() * (rowH + 1) : 0;
+                int visibleH = this.height - listTop - 60;
+                if (mx >= rpx && mx < rpx + panelW && my >= listTop && my < listTop + visibleH) {
+                    if (va > 0) layerScrollY = Math.max(0, layerScrollY - SCROLL_STEP);
+                    else if (va < 0) layerScrollY = Math.min(Math.max(0, listHeight - visibleH), layerScrollY + SCROLL_STEP);
+                    return true;
+                }
+            }
+        }
 
         int oldZoom = zoom;
         if (va > 0 && zoom < getAllowedMaxZoom()) {
@@ -1251,14 +1402,18 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     private boolean handlePaletteClick(double mx, double my) {
-        int rpx = this.width - PANEL_W;
-        int innerX = rpx + 4, innerW = PANEL_W - 8;
+        int panelW = getPanelWidth();
+        int rpx = this.width - panelW;
+        int innerX = getPanelInnerX(rpx), innerW = panelW - 8;
         int bh = getToolButtonHeight();
         int py = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + bh + 4 + bh + 8;
         int cols = 5, cs = (innerW - (cols - 1)) / cols;
+        int startY = py - paletteScrollY;
+        int centerOffsetX = (innerW - (cols * cs + (cols - 1))) / 2;
         for (int i = 0; i < PALETTE.length; i++) {
             int col = i % cols, row = i / cols;
-            int px2 = innerX + col * (cs + 1), py2 = py + row * (cs + 1);
+            int px2 = innerX + col * (cs + 1) + centerOffsetX;
+            int py2 = startY + row * (cs + 1);
             if (mx >= px2 && mx < px2 + cs && my >= py2 && my < py2 + cs) {
                 setColor(PALETTE[i], false);
                 return true;
@@ -1270,17 +1425,20 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean handleHistoryClick(double mx, double my) {
         ColorHistory hist = ColorHistory.getInstance();
         if (hist.size() == 0) return false;
-        int rpx = this.width - PANEL_W;
-        int innerX = rpx + 4, innerW = PANEL_W - 8;
+        int panelW = getPanelWidth();
+        int rpx = this.width - panelW;
+        int innerX = getPanelInnerX(rpx), innerW = panelW - 8;
         int bh = getToolButtonHeight();
         int cols = 5, cs = (innerW - (cols - 1)) / cols;
         int palRows = (PALETTE.length + cols - 1) / cols;
         int py = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + bh + 4 + bh + 8 + palRows * (cs + 1) + 4 + 10;
         int hcs = Math.max(8, cs - 2);
+        int startY = py - paletteScrollY;
+        int centerOffsetX = (innerW - (cols * hcs + (cols - 1))) / 2;
         List<Integer> colors = hist.getColors();
         for (int i = 0; i < Math.min(colors.size(), 10); i++) {
             int col = i % cols, row = i / cols;
-            int px2 = innerX + col * (hcs + 1), py2 = py + row * (hcs + 1);
+            int px2 = innerX + col * (hcs + 1) + centerOffsetX, py2 = startY + row * (hcs + 1);
             if (mx >= px2 && mx < px2 + hcs && my >= py2 && my < py2 + hcs) {
                 setColor(colors.get(i), false);
                 return true;
@@ -1292,40 +1450,38 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean handleLayerClick(double mx, double my) {
         if (canvas == null) return false;
         var stack = canvas.getLayerStack();
-        int rpx = this.width - PANEL_W;
-        int innerX = rpx + 4, innerW = PANEL_W - 8;
+        int panelW = getPanelWidth();
+        int rpx = this.width - panelW;
+        int innerX = getPanelInnerX(rpx), innerW = panelW - 8;
         int bh = getToolButtonHeight();
-        int py = getToolButtonHeight() + TAB_H + 4 + 12;
-        int rowH = 18;
 
-        // Layer rows
+        // Action buttons are fixed at the top under the "Layers" title. Check them first.
+        int actionTop = getToolButtonHeight() + TAB_H + 4 + 12;
+        int btnW = (innerW - 4) / 3;
+        // First action row
+        if (my >= actionTop && my < actionTop + bh && mx >= innerX && mx < innerX + innerW) {
+            if (mx < innerX + btnW) { stack.addLayerAbove("Layer " + stack.getLayerCount()); canvas.invalidateCache(); return true; }
+            if (mx < innerX + btnW + 2 + btnW) { stack.removeLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true; }
+            if (mx <= innerX + innerW) { int idx = stack.getActiveIndex(); if (idx < stack.getLayerCount() - 1) { stack.moveLayerDown(idx); canvas.invalidateCache(); } return true; }
+        }
+        // Second action row
+        int secondActionTop = actionTop + bh + 2;
+        if (my >= secondActionTop && my < secondActionTop + bh && mx >= innerX && mx < innerX + innerW) {
+            if (mx < innerX + btnW) { int idx = stack.getActiveIndex(); if (idx > 0) { stack.moveLayerUp(idx); canvas.invalidateCache(); } return true; }
+            if (mx < innerX + btnW + 2 + btnW) { stack.mergeDown(stack.getActiveIndex()); canvas.invalidateCache(); return true; }
+            if (mx <= innerX + innerW) { stack.duplicateLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true; }
+        }
+
+        // Layer rows (account for scroll) - these are drawn below the actions and scroll under them
+        int listStartY = secondActionTop + bh + 4;
+        int rowH = 18;
+        int contentY = listStartY - layerScrollY;
         for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
-            int rowY = py + (stack.getLayerCount() - 1 - i) * (rowH + 1);
+            int rowY = contentY + (stack.getLayerCount() - 1 - i) * (rowH + 1);
             if (my >= rowY && my < rowY + rowH && mx >= innerX && mx < innerX + innerW) {
                 if (mx < innerX + 12) { stack.getLayers().get(i).setVisible(!stack.getLayers().get(i).isVisible()); canvas.invalidateCache(); }
                 else stack.setActiveIndex(i);
                 return true;
-            }
-        }
-
-        // Buttons
-        py += stack.getLayerCount() * (rowH + 1) + 6;
-        int btnW = (innerW - 4) / 3;
-        if (my >= py && my < py + bh) {
-            if (mx >= innerX && mx < innerX + btnW) { stack.addLayerAbove("Layer " + stack.getLayerCount()); canvas.invalidateCache(); return true; }
-            if (mx >= innerX + btnW + 2 && mx < innerX + 2 * btnW + 2) { stack.removeLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true; }
-            if (mx >= innerX + 2 * btnW + 4 && mx < innerX + innerW) { int idx = stack.getActiveIndex(); if (idx < stack.getLayerCount() - 1) { stack.moveLayerDown(idx); canvas.invalidateCache(); } return true; }
-        }
-        py += bh + 2;
-        if (my >= py && my < py + bh) {
-            if (mx >= innerX && mx < innerX + btnW) { int idx = stack.getActiveIndex(); if (idx > 0) { stack.moveLayerUp(idx); canvas.invalidateCache(); } return true; }
-            if (mx >= innerX + btnW + 2 && mx < innerX + 2 * btnW + 2) {
-                // Merge down
-                stack.mergeDown(stack.getActiveIndex()); canvas.invalidateCache(); return true;
-            }
-            if (mx >= innerX + 2 * btnW + 4 && mx < innerX + innerW) {
-                // Copy layer
-                stack.duplicateLayer(stack.getActiveIndex()); canvas.invalidateCache(); return true;
             }
         }
         return false;
@@ -1367,8 +1523,9 @@ public abstract class AbstractEditorScreen extends Screen {
         int innerX = rpx + 4;
         int py = getToolButtonHeight() + TAB_H + 4;
         int innerW = PANEL_W - 8;
-        int hueW = Math.max(HUE_W, innerW - PICKER_SV_W - 8);
-        int alphaW = Math.max(ALPHA_W, innerW - PICKER_SV_W - 8);
+        int avail = Math.max(0, innerW - PICKER_SV_W - 8);
+        int hueW = Math.max(HUE_W, avail / 2);
+        int alphaW = Math.max(ALPHA_W, avail - hueW);
         int svX = innerX, svY = py;
         int hueX = svX + PICKER_SV_W + 4;
         int alphaX = hueX + hueW + 4;
@@ -1395,6 +1552,7 @@ public abstract class AbstractEditorScreen extends Screen {
             return;
         }
     }
+
 
     protected void handleCanvasClick(int px, int py, int btn) {
         float variation = ModSettings.getInstance().variationPercent;

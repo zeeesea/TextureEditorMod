@@ -33,7 +33,7 @@ public class ModSettings {
     public int colorHistorySize = 20;
     public float brushVariation = 0.15f; // legacy, kept for compatibility
     // Global variation percent applied to tools; 0.0 means OFF
-    public float variationPercent = 0.15f; // fraction (0.0-1.0)
+    public float variationPercent = 0.0f;
 
     public boolean multiplayerSync = false;
 

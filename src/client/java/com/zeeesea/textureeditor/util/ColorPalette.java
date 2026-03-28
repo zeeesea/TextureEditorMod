@@ -13,9 +13,6 @@ public class ColorPalette {
 
     public enum Preset {
         DEFAULT,
-        ALL_WHITE,
-        ALL_BLACK,
-        DARK_BLUE,
         LIGHT,
         VINTAGE,
         OLED
