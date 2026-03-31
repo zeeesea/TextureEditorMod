@@ -1,6 +1,8 @@
 package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
+import com.zeeesea.textureeditor.helper.NotificationHelper;
+import net.minecraft.client.toast.SystemToast;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -110,22 +112,22 @@ public class SettingsScreen extends Screen {
         }).position(centerX - 100, y).size(200, 20).build());
         y += 28;
 
-        // Brush Variation
-        int variationPercent = Math.round(s.brushVariation * 100);
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.brush_variation", variationPercent + "%"), btn -> {
-            s.brushVariation = switch (variationPercent) {
-                case 5 -> 0.10f;
-                case 10 -> 0.15f;
-                case 15 -> 0.20f;
-                case 20 -> 0.30f;
-                case 30 -> 0.50f;
-                default -> 0.05f;
-            };
-            s.save();
-            this.clearChildren();
-            this.init();
-        }).position(centerX - 100, y).size(200, 20).build());
-        y += 40;
+        // Default layers preference: One layer (only Base) vs Two layers (Base + Layer 0)
+        addDrawableChild(ButtonWidget.builder(
+                Text.translatable("textureeditor.label.default_layers", s.oneLayerByDefault ? Text.translatable("textureeditor.label.one_layer") : Text.translatable("textureeditor.label.two_layers")),
+                btn -> {
+                    s.oneLayerByDefault = !s.oneLayerByDefault;
+                    s.save();
+                    // Immediately update this button's visible message so the user gets instant feedback
+                    btn.setMessage(Text.translatable("textureeditor.label.default_layers",
+                            s.oneLayerByDefault ? Text.translatable("textureeditor.label.one_layer") : Text.translatable("textureeditor.label.two_layers")
+                    ));
+                    // Debug output for log-based verification
+                    System.out.println("[TextureEditor] oneLayerByDefault toggled -> " + s.oneLayerByDefault);
+                }
+        ).position(centerX - 100, y).size(200, 20).build());
+        y += 28;
+
 
         /* DEFAULT: OFF, feature alr implemented, but too unstable to publish
         // Multiplayer Sync
@@ -203,8 +205,7 @@ public class SettingsScreen extends Screen {
         // If the text color is pure white, use the palette's TITLE_TEXT_SHADOW_ON_WHITE (user asked white-on-white),
         // otherwise use the standard TITLE_TEXT_SHADOW
         int shadowColor = (textColor == 0xFFFFFFFF) ? pal.TITLE_TEXT_SHADOW_ON_WHITE : pal.TITLE_TEXT_SHADOW;
-        // draw shadow offset by (1,1)
-        context.drawText(textRenderer, titleStr, titleX + 1, titleY + 1, shadowColor, false);
+        shadowColor = pal.TITLE_TEXT_SHADOW;
         context.drawText(textRenderer, titleStr, titleX, titleY, textColor, false);
 
         // Render children (buttons) inside a scissored, translated region so the title stays fixed
@@ -259,22 +260,90 @@ public class SettingsScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
-        return super.mouseClicked(click, doubled);
+        // Apply widget Y offset used for rendering so hitboxes match visual positions
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
+        boolean res = super.mouseClicked(click, doubled);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
+        return res;
     }
 
     @Override
     public boolean mouseReleased(net.minecraft.client.gui.Click click) {
-        return super.mouseReleased(click);
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
+        boolean res = super.mouseReleased(click);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
+        return res;
     }
 
     @Override
     public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
-        return super.mouseDragged(click, offsetX, offsetY);
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
+        boolean res = super.mouseDragged(click, offsetX, offsetY);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
+        return res;
     }
 
     @Override
     public void mouseMoved(double mouseX, double mouseY) {
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
         super.mouseMoved(mouseX, mouseY);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
     }
 
     @Override

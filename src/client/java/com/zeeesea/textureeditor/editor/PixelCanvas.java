@@ -42,14 +42,14 @@ public class PixelCanvas {
     public PixelCanvas(int width, int height) {
         this.width = width;
         this.height = height;
-        this.layerStack = new LayerStack(width, height);
+        this.layerStack = new LayerStack(width, height, ModSettings.getInstance().oneLayerByDefault);
         MAX_UNDO = ModSettings.getInstance().maxUndoSteps;
     }
 
     public PixelCanvas(int width, int height, int[][] initialPixels) {
         this.width = width;
         this.height = height;
-        this.layerStack = new LayerStack(width, height, initialPixels);
+        this.layerStack = new LayerStack(width, height, initialPixels, ModSettings.getInstance().oneLayerByDefault);
     }
 
     public int getWidth() { return width; }

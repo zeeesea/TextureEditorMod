@@ -61,6 +61,16 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean rectFirstClick = false;
     // Preview coordinates for live previewing of line/rectangle tools
     private int previewEndX = -1, previewEndY = -1;
+    // Track mouse-down state to distinguish click vs drag
+    private boolean leftDown = false;
+    private int downPx = -1, downPy = -1; // pixel coords where mouse was pressed
+    private boolean movedSinceDown = false;
+    // Has the user started dragging to adjust the preview shape after setting start point
+    private boolean draggingShape = false;
+    // If the shape start was created via a confirmed click (press+release without movement)
+    private boolean shapeStartConfirmed = false;
+    // Whether the current shape start was created on press (so drag should behave immediately)
+    private boolean startCreatedOnPress = false;
 
     // Color picker drag-capture flags (keep interaction captured while dragging inside picker)
     private boolean pickingSv = false, pickingHue = false, pickingAlpha = false;
@@ -614,7 +624,8 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Title bar
         ctx.fill(leftW() + TOGGLE_BTN_W, 0, this.width - rightW() - TOGGLE_BTN_W, getToolButtonHeight(), pal.TITLE_BAR_BG);
-        ctx.drawText(textRenderer, getEditorTitle(), leftW() + TOGGLE_BTN_W + 4, 5, pal.TITLE_TEXT, true);
+        boolean shadow = pal.TITLE_TEXT == 0xFF000000;
+        ctx.drawText(textRenderer, getEditorTitle(), leftW() + TOGGLE_BTN_W + 4, 5, pal.TITLE_TEXT, shadow);
 
         // Status bar
         int statusY = this.height - 14;
@@ -776,8 +787,13 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(hueX - 1, hcy, hueX + hueW + 1, hcy + 1, 0xFFFFFFFF);
 
         // Alpha bar (checker background already written earlier via rebuildAlphaBar)
-        for (int y = 0; y < PICKER_SV_H; y += 4) for (int x2 = 0; x2 < alphaW; x2 += 4)
-            ctx.fill(alphaX + x2, alphaY + y, alphaX + x2 + 4, alphaY + y + 4, ((x2 / 4 + y / 4) % 2 == 0) ? pal.CHECKER_DARK : pal.CHECKER_LIGHT);
+        // Align checker parity with absolute screen coords so the pattern doesn't shift when alphaW changes
+        for (int y = 0; y < PICKER_SV_H; y += 4) for (int x2 = 0; x2 < alphaW; x2 += 4) {
+            int absX = alphaX + x2;
+            int absY = alphaY + y;
+            int parity = ((absX / 4) + (absY / 4)) & 1;
+            ctx.fill(absX, absY, absX + 4, absY + 4, (parity == 0) ? pal.CHECKER_DARK : pal.CHECKER_LIGHT);
+        }
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
         drawRectOutline(ctx, alphaX - 1, alphaY - 1, alphaX + alphaW + 1, alphaY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int acy = alphaY + (int)((1f - pickerAlpha) * (PICKER_SV_H - 1));
@@ -1042,6 +1058,12 @@ public abstract class AbstractEditorScreen extends Screen {
 
         if (previewingOriginal)
             ctx.drawCenteredTextWithShadow(textRenderer, "§e§lPREVIEW", canvasScreenX + (w * zoom) / 2, canvasScreenY - 12, 0xFFFFFF00);
+
+        // If a line/rectangle start is active and it was confirmed via click, show helpful overlay above the canvas
+        if ((lineFirstClick || rectFirstClick) && shapeStartConfirmed && !draggingShape) {
+            String msg = "Click another point to finish";
+            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(msg), canvasScreenX + (w * zoom) / 2, canvasScreenY - 26, 0xFFFFFF00);
+        }
     }
 
     private int renderPixel(int c, int x, int y) {
@@ -1196,6 +1218,16 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
         double mx = click.x(), my = click.y(); int btn = click.button();
+        // On press record down state so we can tell click vs drag on release
+        if (btn == 0) {
+            leftDown = true;
+            if (canvas != null) {
+                int dpx = (int)((mx - canvasScreenX) / zoom), dpy = (int)((my - canvasScreenY) / zoom);
+                downPx = dpx; downPy = dpy; movedSinceDown = false;
+            } else {
+                downPx = downPy = -1; movedSinceDown = false;
+            }
+        }
         if (super.mouseClicked(click, bl)) return true;
         if (handleExtraClick(mx, my, btn)) return true;
 
@@ -1217,19 +1249,18 @@ public abstract class AbstractEditorScreen extends Screen {
 
         if (isInUIRegion(mx, my)) return false;
 
-        // Canvas click
+        // Canvas press: we only record the press here; action happens on release
         if (btn == 0 && canvas != null) {
             int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
                 lastDrawX = px; lastDrawY = py;
-                // For LINE/RECTANGLE: start a preview instead of immediate draw
+                // For LINE/RECTANGLE: start immediately on press (preserve original drag behavior)
                 if (currentTool == EditorTool.LINE) {
-                    lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = px; previewEndY = py; return true;
+                    if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = false; startCreatedOnPress = true; return true; }
                 }
                 if (currentTool == EditorTool.RECTANGLE) {
-                    rectStartX = px; rectStartY = py; rectFirstClick = true; previewEndX = px; previewEndY = py; return true;
+                    if (!rectFirstClick) { rectStartX = px; rectStartY = py; rectFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = false; startCreatedOnPress = true; return true; }
                 }
-                handleCanvasClick(px, py, btn);
                 return true;
             }
         }
@@ -1239,33 +1270,86 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public boolean mouseReleased(net.minecraft.client.gui.Click click) {
         double mx = click.x(), my = click.y(); int btn = click.button();
+        if (btn == 0) {
+            leftDown = false;
+        }
         if (handleExtraRelease(mx, my, btn)) return true;
         if (btn == 1) { isPanning = false; return true; }
         // If a color picker drag was active, stop it
         if (btn == 0 && (pickingSv || pickingHue || pickingAlpha)) { pickingSv = pickingHue = pickingAlpha = false; return true; }
 
-        // Commit previewed shapes on left release
+        // Commit previewed shapes on left release. Distinguish click (no move) vs drag.
         if (btn == 0) {
-            if (lineFirstClick && previewEndX >= 0) {
-                if (canvas != null) {
-                    canvas.saveSnapshot();
-                    float variation = ModSettings.getInstance().variationPercent;
-                    if (toolSize > 1 || variation > 0f) canvas.drawLineThickness(lineStartX, lineStartY, previewEndX, previewEndY, currentColor, toolSize, variation);
-                    else canvas.drawLine(lineStartX, lineStartY, previewEndX, previewEndY, currentColor);
-                    canvas.invalidateCache(); canvasTextureDirty = true;
+            // compute release pixel coords
+            int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
+            boolean insideCanvas = canvas != null && px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight();
+
+            if (!movedSinceDown) {
+                // This was a click (press+release without movement)
+                if (insideCanvas) {
+                    // If the start was created by press, this click confirms it and shows the overlay
+                    if (startCreatedOnPress) {
+                        shapeStartConfirmed = true;
+                        startCreatedOnPress = false;
+                        return true;
+                    }
+                    // If no start yet (rare), set start now and mark confirmed
+                    if (currentTool == EditorTool.LINE && !lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = true; return true; }
+                    if (currentTool == EditorTool.RECTANGLE && !rectFirstClick) { rectStartX = px; rectStartY = py; rectFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = true; return true; }
+
+                    // If a start exists and was confirmed, a second click commits
+                    if (currentTool == EditorTool.LINE && lineFirstClick && shapeStartConfirmed) {
+                        if (canvas != null) {
+                            canvas.saveSnapshot();
+                            float variation = ModSettings.getInstance().variationPercent;
+                            if (toolSize > 1 || variation > 0f) canvas.drawLineThickness(lineStartX, lineStartY, px, py, currentColor, toolSize, variation);
+                            else canvas.drawLine(lineStartX, lineStartY, px, py, currentColor);
+                            canvas.invalidateCache(); canvasTextureDirty = true;
+                        }
+                        lineFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; setColor(currentColor, true); return true;
+                    }
+                    if (currentTool == EditorTool.RECTANGLE && rectFirstClick && shapeStartConfirmed) {
+                        if (canvas != null) {
+                            canvas.saveSnapshot();
+                            float variation = ModSettings.getInstance().variationPercent;
+                            if (toolSize > 1 || variation > 0f) canvas.drawRectOutlineThickness(rectStartX, rectStartY, px, py, currentColor, toolSize, variation);
+                            else canvas.drawRect(rectStartX, rectStartY, px, py, currentColor);
+                            canvas.invalidateCache(); canvasTextureDirty = true;
+                        }
+                        rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; setColor(currentColor, true); return true;
+                    }
+
+                    // Not a shape tool click: delegate to click handler
+                    handleCanvasClick(px, py, btn);
+                    return true;
                 }
-                lineFirstClick = false; previewEndX = previewEndY = -1; setColor(currentColor, true); return true;
-            }
-            if (rectFirstClick && previewEndX >= 0) {
-                if (canvas != null) {
-                    canvas.saveSnapshot();
-                    float variation = ModSettings.getInstance().variationPercent;
-                    if (toolSize > 1 || variation > 0f) canvas.drawRectOutlineThickness(rectStartX, rectStartY, previewEndX, previewEndY, currentColor, toolSize, variation);
-                    else canvas.drawRectOutlineThickness(rectStartX, rectStartY, previewEndX, previewEndY, currentColor, 1, variation);
-                    canvas.invalidateCache(); canvasTextureDirty = true;
+            } else {
+                // This was a drag (movement occurred while holding). If preview exists, commit it.
+                if (lineFirstClick && previewEndX >= 0) {
+                    if (canvas != null) {
+                        canvas.saveSnapshot();
+                        float variation = ModSettings.getInstance().variationPercent;
+                        if (toolSize > 1 || variation > 0f) canvas.drawLineThickness(lineStartX, lineStartY, previewEndX, previewEndY, currentColor, toolSize, variation);
+                        else canvas.drawLine(lineStartX, lineStartY, previewEndX, previewEndY, currentColor);
+                        canvas.invalidateCache(); canvasTextureDirty = true;
+                    }
+                    lineFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; startCreatedOnPress = false; setColor(currentColor, true); return true;
                 }
-                rectFirstClick = false; previewEndX = previewEndY = -1; setColor(currentColor, true); return true;
+                if (rectFirstClick && previewEndX >= 0) {
+                    if (canvas != null) {
+                        canvas.saveSnapshot();
+                        float variation = ModSettings.getInstance().variationPercent;
+                        if (toolSize > 1 || variation > 0f) canvas.drawRectOutlineThickness(rectStartX, rectStartY, previewEndX, previewEndY, currentColor, toolSize, variation);
+                        else canvas.drawRectOutlineThickness(rectStartX, rectStartY, previewEndX, previewEndY, currentColor, 1, variation);
+                        canvas.invalidateCache(); canvasTextureDirty = true;
+                    }
+                    rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; startCreatedOnPress = false; setColor(currentColor, true); return true;
+                }
             }
+            // reset movement tracking
+            movedSinceDown = false;
+            leftDown = false;
+            shapeStartConfirmed = shapeStartConfirmed && (lineFirstClick || rectFirstClick);
         }
 
         if (btn == 2) {
@@ -1302,9 +1386,20 @@ public abstract class AbstractEditorScreen extends Screen {
         if (canvas != null && btn == 0) {
             int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
-                // If previewing a shape, update preview end coordinate and do not draw to canvas
-                if (lineFirstClick || rectFirstClick) { previewEndX = px; previewEndY = py; return true; }
+                // Update movement tracking (click vs drag)
+                if (leftDown && downPx >= 0 && downPy >= 0) {
+                    if (px != downPx || py != downPy) movedSinceDown = true;
+                }
 
+                // If previewing a shape, update preview end and show live preview (immediate)
+                if (lineFirstClick || rectFirstClick) {
+                    previewEndX = px; previewEndY = py;
+                    draggingShape = true;
+                    movedSinceDown = true; // mark as drag so release will commit as drag
+                    return true;
+                }
+
+                // Normal brush/eraser drawing while dragging
                 float variation = ModSettings.getInstance().variationPercent;
                 int sx = lastDrawX >= 0 ? lastDrawX : px, sy = lastDrawY >= 0 ? lastDrawY : py;
                 for (int[] pt : bresenhamLine(sx, sy, px, py)) {
@@ -1337,8 +1432,8 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("eraser"))     { currentTool = EditorTool.ERASER; return true; }
         if (kc == s.getKeybind("fill"))       { currentTool = EditorTool.FILL; return true; }
         if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
-        if (kc == s.getKeybind("rectangle"))  { currentTool = EditorTool.RECTANGLE; return true; }
-        if (kc == s.getKeybind("line"))       { currentTool = EditorTool.LINE; return true; }
+        if (kc == s.getKeybind("rectangle"))  { currentTool = EditorTool.RECTANGLE; lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
+        if (kc == s.getKeybind("line"))       { currentTool = EditorTool.LINE; lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
         // brush key removed
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
         if (openKey != null && openKey.matchesKey(keyInput)) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
@@ -1566,7 +1661,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 setColor(usesTint() ? applyTint(raw) : raw, false);
             }
             case LINE -> {
-                if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; }
+                if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = -1; previewEndY = -1; }
                 else {
                     canvas.saveSnapshot();
                     if (toolSize > 1 || variation > 0f) canvas.drawLineThickness(lineStartX, lineStartY, px, py, currentColor, toolSize, variation);
@@ -1576,7 +1671,7 @@ public abstract class AbstractEditorScreen extends Screen {
             }
 
             case RECTANGLE -> {
-                if (!rectFirstClick) { rectStartX = px; rectStartY = py; rectFirstClick = true; }
+                if (!rectFirstClick) { rectStartX = px; rectStartY = py; rectFirstClick = true; previewEndX = -1; previewEndY = -1; }
                 else {
                     canvas.saveSnapshot();
                     if (toolSize > 1 || variation > 0f) canvas.drawRectOutlineThickness(rectStartX, rectStartY, px, py, currentColor, toolSize, variation);

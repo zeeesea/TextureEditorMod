@@ -23,6 +23,23 @@ public class LayerStack {
     }
 
     /**
+     * Create a layer stack, optionally creating only a single Base layer when
+     * singleBaseOnly is true. This preserves backward compatibility while allowing
+     * a preference for a single-layer default.
+     */
+    public LayerStack(int width, int height, boolean singleBaseOnly) {
+        this.width = width;
+        this.height = height;
+        layers.add(new Layer(width, height, "Base"));
+        if (!singleBaseOnly) {
+            layers.add(new Layer(width, height, "Layer 0"));
+            activeIndex = 1;
+        } else {
+            activeIndex = 0;
+        }
+    }
+
+    /**
      * Create a layer stack with a base layer initialized from existing pixels.
      */
     public LayerStack(int width, int height, int[][] basePixels) {
@@ -30,6 +47,21 @@ public class LayerStack {
         this.height = height;
         layers.add(new Layer(width, height, "Base", basePixels));
         layers.add(new Layer(width, height, Text.translatable("textureeditor.button.layer").getString() + "0"));
+    }
+
+    /**
+     * Create from existing pixels and optionally only keep a single Base layer.
+     */
+    public LayerStack(int width, int height, int[][] basePixels, boolean singleBaseOnly) {
+        this.width = width;
+        this.height = height;
+        layers.add(new Layer(width, height, "Base", basePixels));
+        if (!singleBaseOnly) {
+            layers.add(new Layer(width, height, Text.translatable("textureeditor.button.layer").getString() + "0"));
+            activeIndex = 1;
+        } else {
+            activeIndex = 0;
+        }
     }
 
     public int getWidth() { return width; }

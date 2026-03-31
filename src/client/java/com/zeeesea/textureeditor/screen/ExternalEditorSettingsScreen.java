@@ -263,22 +263,89 @@ public class ExternalEditorSettingsScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
-        return super.mouseClicked(click, doubled);
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
+        boolean res = super.mouseClicked(click, doubled);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
+        return res;
     }
 
     @Override
     public boolean mouseReleased(net.minecraft.client.gui.Click click) {
-        return super.mouseReleased(click);
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
+        boolean res = super.mouseReleased(click);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
+        return res;
     }
 
     @Override
     public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
-        return super.mouseDragged(click, offsetX, offsetY);
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
+        boolean res = super.mouseDragged(click, offsetX, offsetY);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
+        return res;
     }
 
     @Override
     public void mouseMoved(double mouseX, double mouseY) {
+        var ch2 = this.children();
+        for (int i = 0; i < ch2.size(); i++) {
+            var d = ch2.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by - scrollY);
+            }
+        }
         super.mouseMoved(mouseX, mouseY);
+        var ch3 = this.children();
+        for (int i = 0; i < ch3.size(); i++) {
+            var d = ch3.get(i);
+            if (d instanceof net.minecraft.client.gui.widget.Widget w) {
+                int by = baseYs.size() > i ? baseYs.get(i) : w.getY();
+                if (by >= 0) w.setY(by);
+            }
+        }
     }
 
     @Override

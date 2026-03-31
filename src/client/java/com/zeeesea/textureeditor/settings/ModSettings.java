@@ -22,6 +22,10 @@ public class ModSettings {
     public boolean modEnabled = true;
     public String defaultTool = "PENCIL"; // EditorTool enum name
 
+    // Layers preference: when true, new textures open with only a single "Base" layer;
+    // when false (default) they open with Base + Layer 0 as before.
+    public boolean oneLayerByDefault = false;
+
     // Editor keybinds (GLFW key codes)
     public Map<String, Integer> keybinds = new HashMap<>();
 
@@ -72,7 +76,6 @@ public class ModSettings {
         keybinds.put("redo", GLFW.GLFW_KEY_Y);
         keybinds.put("grid", GLFW.GLFW_KEY_G);
         keybinds.put("browse", GLFW.GLFW_KEY_LEFT_SHIFT);
-        save();
     }
 
     public int getKeybind(String action) {

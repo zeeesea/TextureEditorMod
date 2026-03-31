@@ -255,7 +255,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
 
         // Reset canvas: delete all layers, create fresh base layer
         canvas.saveSnapshot();
-        canvas.setLayerStack(new LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels));
+        canvas.setLayerStack(new LayerStack(canvas.getWidth(), canvas.getHeight(), originalPixels, com.zeeesea.textureeditor.settings.ModSettings.getInstance().oneLayerByDefault));
         canvas.invalidateCache();
 
         // Remove stored modifications

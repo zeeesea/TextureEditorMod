@@ -1105,7 +1105,8 @@ public class BrowseScreen extends Screen {
             for (int pi = 0; pi < tooltipParts.size(); pi++) {
                 String part = tooltipParts.get(pi);
                 int color = tooltipColors.get(pi);
-                context.drawText(textRenderer, part, cursorX, ty, color, true);
+                // Draw tooltip text without shadow so it doesn't render an outline
+                context.drawText(textRenderer, part, cursorX, ty, color, false);
                 cursorX += textRenderer.getWidth(part);
             }
         }
