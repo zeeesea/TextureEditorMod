@@ -72,6 +72,7 @@ public class ModSettings {
         keybinds.put("line", GLFW.GLFW_KEY_L);
         // brush key removed; variation is now a global toggle
         keybinds.put("rectangle", GLFW.GLFW_KEY_T);
+        keybinds.put("select", GLFW.GLFW_KEY_Q);
         keybinds.put("undo", GLFW.GLFW_KEY_Z);
         keybinds.put("redo", GLFW.GLFW_KEY_Y);
         keybinds.put("grid", GLFW.GLFW_KEY_G);

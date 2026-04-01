@@ -72,6 +72,34 @@ public abstract class AbstractEditorScreen extends Screen {
     // Whether the current shape start was created on press (so drag should behave immediately)
     private boolean startCreatedOnPress = false;
 
+    // ── Selection tool ────────────────────────────────────────────────────────
+    private enum SelectionMode { RECT, LASSO }
+    private SelectionMode selectionMode = SelectionMode.RECT;
+    private int selMinX = -1, selMinY = -1, selMaxX = -1, selMaxY = -1;
+    private boolean[][] selectionMask = null;
+    private boolean selectionDraggingCreate = false;
+    private boolean selectionDraggingMove = false;
+    private int selectionAnchorX = -1, selectionAnchorY = -1;
+    private int selectionMoveDx = 0, selectionMoveDy = 0;
+    private int[][] selectionMovePixels = null;
+    private int selectionMoveW = 0, selectionMoveH = 0;
+    private boolean[][] selectionMoveMask = null;
+    private java.util.List<int[]> selectionLassoPoints = new java.util.ArrayList<>();
+    private int[][] selectionClipboard = null;
+    private int selectionClipboardW = 0, selectionClipboardH = 0;
+
+    private boolean selectionMenuOpen = false;
+    private int selectionMenuX = 0, selectionMenuY = 0;
+    private static final String[] SELECTION_MENU_ITEMS = {
+            "Copy", "Cut", "Paste", "Duplicate", "Delete", "Invert",
+            "Flip H", "Flip V", "Rotate 90",
+            "Mode: Rect", "Mode: Lasso",
+            "Deselect"
+    };
+
+    // Save one snapshot per draw stroke so undo/redo stays reliable for drag drawing.
+    private boolean strokeSnapshotTaken = false;
+
     // Color picker drag-capture flags (keep interaction captured while dragging inside picker)
     private boolean pickingSv = false, pickingHue = false, pickingAlpha = false;
 
@@ -261,6 +289,418 @@ public abstract class AbstractEditorScreen extends Screen {
         return v;
     }
 
+    private int screenToCanvasX(double mx) {
+        return (int) Math.floor((mx - canvasScreenX) / (double)Math.max(1, zoom));
+    }
+
+    private int screenToCanvasY(double my) {
+        return (int) Math.floor((my - canvasScreenY) / (double)Math.max(1, zoom));
+    }
+
+    private boolean isCanvasPixelInside(int px, int py) {
+        return canvas != null && px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight();
+    }
+
+    private boolean hasSelection() {
+        return selectionMask != null && selMinX >= 0 && selMinY >= 0 && selMaxX >= selMinX && selMaxY >= selMinY;
+    }
+
+    private boolean isSelectedMask(int x, int y) {
+        return selectionMask != null
+                && x >= 0 && y >= 0
+                && x < selectionMask.length
+                && y < selectionMask[0].length
+                && selectionMask[x][y];
+    }
+
+    private boolean isSelectedMoveMask(int x, int y) {
+        return selectionMoveMask != null
+                && x >= 0 && y >= 0
+                && x < selectionMoveMask.length
+                && y < selectionMoveMask[0].length
+                && selectionMoveMask[x][y];
+    }
+
+    private void clearSelection() {
+        selMinX = selMinY = selMaxX = selMaxY = -1;
+        selectionMask = null;
+        selectionDraggingCreate = false;
+        selectionDraggingMove = false;
+        selectionMoveDx = selectionMoveDy = 0;
+        selectionMovePixels = null;
+        selectionMoveMask = null;
+        selectionMoveW = selectionMoveH = 0;
+        selectionLassoPoints.clear();
+        selectionMenuOpen = false;
+    }
+
+    private boolean isInSelection(int px, int py) {
+        return hasSelection() && isSelectedMask(px, py);
+    }
+
+    private void setSelectionFromPoints(int x1, int y1, int x2, int y2) {
+        if (canvas == null) return;
+        int w = canvas.getWidth();
+        int h = canvas.getHeight();
+        x1 = clamp(x1, 0, w - 1);
+        x2 = clamp(x2, 0, w - 1);
+        y1 = clamp(y1, 0, h - 1);
+        y2 = clamp(y2, 0, h - 1);
+        int minX = Math.min(x1, x2);
+        int maxX = Math.max(x1, x2);
+        int minY = Math.min(y1, y2);
+        int maxY = Math.max(y1, y2);
+        selectionMask = new boolean[w][h];
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                selectionMask[x][y] = true;
+            }
+        }
+        recalcSelectionBounds();
+    }
+
+    private void setSelectionFromLasso() {
+        if (canvas == null || selectionLassoPoints.size() < 3) return;
+        int w = canvas.getWidth();
+        int h = canvas.getHeight();
+        selectionMask = new boolean[w][h];
+        int minX = w - 1, minY = h - 1, maxX = 0, maxY = 0;
+        for (int[] p : selectionLassoPoints) {
+            minX = Math.min(minX, p[0]);
+            minY = Math.min(minY, p[1]);
+            maxX = Math.max(maxX, p[0]);
+            maxY = Math.max(maxY, p[1]);
+        }
+        minX = clamp(minX, 0, w - 1); minY = clamp(minY, 0, h - 1);
+        maxX = clamp(maxX, 0, w - 1); maxY = clamp(maxY, 0, h - 1);
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                if (pointInPolygon(x + 0.5, y + 0.5, selectionLassoPoints)) selectionMask[x][y] = true;
+            }
+        }
+        recalcSelectionBounds();
+    }
+
+    private static boolean pointInPolygon(double x, double y, java.util.List<int[]> poly) {
+        boolean inside = false;
+        for (int i = 0, j = poly.size() - 1; i < poly.size(); j = i++) {
+            double xi = poly.get(i)[0] + 0.5;
+            double yi = poly.get(i)[1] + 0.5;
+            double xj = poly.get(j)[0] + 0.5;
+            double yj = poly.get(j)[1] + 0.5;
+            boolean intersect = ((yi > y) != (yj > y))
+                    && (x < (xj - xi) * (y - yi) / ((yj - yi) == 0 ? 1e-9 : (yj - yi)) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    private void recalcSelectionBounds() {
+        if (selectionMask == null || canvas == null) {
+            selMinX = selMinY = selMaxX = selMaxY = -1;
+            return;
+        }
+        int w = canvas.getWidth(), h = canvas.getHeight();
+        int minX = w, minY = h, maxX = -1, maxY = -1;
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                if (!selectionMask[x][y]) continue;
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+            }
+        }
+        if (maxX < minX || maxY < minY) {
+            clearSelection();
+            return;
+        }
+        selMinX = minX; selMinY = minY; selMaxX = maxX; selMaxY = maxY;
+    }
+
+    private void invertSelectionMask() {
+        if (canvas == null) return;
+        int w = canvas.getWidth(), h = canvas.getHeight();
+        if (selectionMask == null) {
+            selectionMask = new boolean[w][h];
+            for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) selectionMask[x][y] = true;
+        } else {
+            for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) selectionMask[x][y] = !selectionMask[x][y];
+        }
+        recalcSelectionBounds();
+    }
+
+    private void openSelectionMenu(int mouseX, int mouseY) {
+        selectionMenuOpen = true;
+        selectionMenuX = mouseX;
+        selectionMenuY = mouseY;
+    }
+
+    private int getSelectionMenuItemAt(double mx, double my) {
+        if (!selectionMenuOpen) return -1;
+        int itemH = 14;
+        int menuW = 116;
+        int menuH = SELECTION_MENU_ITEMS.length * itemH + 4;
+        int x = clamp(selectionMenuX, 2, this.width - menuW - 2);
+        int y = clamp(selectionMenuY, 2, this.height - menuH - 2);
+        if (mx < x || mx >= x + menuW || my < y || my >= y + menuH) return -1;
+        int idx = (int)((my - y - 2) / itemH);
+        return (idx >= 0 && idx < SELECTION_MENU_ITEMS.length) ? idx : -1;
+    }
+
+    private int[][] copySelectionPixels() {
+        if (!hasSelection() || canvas == null) return null;
+        var active = canvas.getLayerStack().getActiveLayer();
+        if (active == null) return null;
+        int w = selMaxX - selMinX + 1;
+        int h = selMaxY - selMinY + 1;
+        int[][] out = new int[w][h];
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                int tx = selMinX + x;
+                int ty = selMinY + y;
+                out[x][y] = isSelectedMask(tx, ty) ? active.getPixel(tx, ty) : 0x00000000;
+            }
+        }
+        return out;
+    }
+
+    private boolean[][] copySelectionRelativeMask() {
+        if (!hasSelection()) return null;
+        int w = selMaxX - selMinX + 1;
+        int h = selMaxY - selMinY + 1;
+        boolean[][] out = new boolean[w][h];
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                out[x][y] = isSelectedMask(selMinX + x, selMinY + y);
+            }
+        }
+        return out;
+    }
+
+    private void clearSelectionAreaPixels() {
+        if (!hasSelection() || canvas == null) return;
+        var active = canvas.getLayerStack().getActiveLayer();
+        if (active == null) return;
+        for (int x = selMinX; x <= selMaxX; x++) {
+            for (int y = selMinY; y <= selMaxY; y++) {
+                if (isSelectedMask(x, y)) active.setPixel(x, y, 0x00000000);
+            }
+        }
+        canvas.invalidateCache();
+        canvasTextureDirty = true;
+    }
+
+    private void pastePixelsAt(int[][] px, int pw, int ph, int dstX, int dstY) {
+        if (canvas == null || px == null) return;
+        var active = canvas.getLayerStack().getActiveLayer();
+        if (active == null) return;
+        for (int x = 0; x < pw; x++) {
+            int tx = dstX + x;
+            if (tx < 0 || tx >= canvas.getWidth()) continue;
+            for (int y = 0; y < ph; y++) {
+                int ty = dstY + y;
+                if (ty < 0 || ty >= canvas.getHeight()) continue;
+                active.setPixel(tx, ty, px[x][y]);
+            }
+        }
+        canvas.invalidateCache();
+        canvasTextureDirty = true;
+    }
+
+    private void executeSelectionMenuAction(int idx, double mx, double my) {
+        if (canvas == null) return;
+        switch (idx) {
+            case 0 -> { // Copy
+                int[][] cp = copySelectionPixels();
+                if (cp != null) {
+                    selectionClipboard = cp;
+                    selectionClipboardW = cp.length;
+                    selectionClipboardH = cp[0].length;
+                }
+            }
+            case 1 -> { // Cut
+                int[][] cp = copySelectionPixels();
+                if (cp != null) {
+                    selectionClipboard = cp;
+                    selectionClipboardW = cp.length;
+                    selectionClipboardH = cp[0].length;
+                    canvas.saveSnapshot();
+                    clearSelectionAreaPixels();
+                }
+            }
+            case 2 -> { // Paste
+                if (selectionClipboard != null && selectionClipboardW > 0 && selectionClipboardH > 0) {
+                    int px = screenToCanvasX(mx);
+                    int py = screenToCanvasY(my);
+                    if (!isCanvasPixelInside(px, py)) {
+                        px = hasSelection() ? selMinX : 0;
+                        py = hasSelection() ? selMinY : 0;
+                    }
+                    canvas.saveSnapshot();
+                    pastePixelsAt(selectionClipboard, selectionClipboardW, selectionClipboardH, px, py);
+                    setSelectionFromPoints(px, py, px + selectionClipboardW - 1, py + selectionClipboardH - 1);
+                }
+            }
+            case 3 -> { // Duplicate
+                int[][] cp = copySelectionPixels();
+                if (cp != null) {
+                    boolean[][] rel = copySelectionRelativeMask();
+                    canvas.saveSnapshot();
+                    pastePixelsAt(cp, cp.length, cp[0].length, selMinX + 1, selMinY + 1);
+                    selectionMask = new boolean[canvas.getWidth()][canvas.getHeight()];
+                    if (rel != null) {
+                        for (int x = 0; x < rel.length; x++) for (int y = 0; y < rel[0].length; y++) {
+                            int tx = selMinX + 1 + x, ty = selMinY + 1 + y;
+                            if (tx >= 0 && ty >= 0 && tx < canvas.getWidth() && ty < canvas.getHeight() && rel[x][y]) selectionMask[tx][ty] = true;
+                        }
+                    }
+                    recalcSelectionBounds();
+                }
+            }
+            case 4 -> { // Delete
+                if (hasSelection()) {
+                    canvas.saveSnapshot();
+                    clearSelectionAreaPixels();
+                }
+            }
+            case 5 -> invertSelectionMask();
+            case 6 -> flipSelectionHorizontal();
+            case 7 -> flipSelectionVertical();
+            case 8 -> rotateSelection90();
+            case 9 -> selectionMode = SelectionMode.RECT;
+            case 10 -> selectionMode = SelectionMode.LASSO;
+            case 11 -> clearSelection();
+        }
+    }
+
+    private void flipSelectionHorizontal() {
+        if (!hasSelection() || canvas == null) return;
+        var active = canvas.getLayerStack().getActiveLayer();
+        if (active == null) return;
+        int[][] src = copySelectionPixels();
+        if (src == null) return;
+        int w = src.length, h = src[0].length;
+        canvas.saveSnapshot();
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                active.setPixel(selMinX + x, selMinY + y, src[w - 1 - x][y]);
+            }
+        }
+        canvas.invalidateCache();
+        canvasTextureDirty = true;
+    }
+
+    private void flipSelectionVertical() {
+        if (!hasSelection() || canvas == null) return;
+        var active = canvas.getLayerStack().getActiveLayer();
+        if (active == null) return;
+        int[][] src = copySelectionPixels();
+        if (src == null) return;
+        int w = src.length, h = src[0].length;
+        canvas.saveSnapshot();
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                active.setPixel(selMinX + x, selMinY + y, src[x][h - 1 - y]);
+            }
+        }
+        canvas.invalidateCache();
+        canvasTextureDirty = true;
+    }
+
+    private void rotateSelection90() {
+        if (!hasSelection() || canvas == null) return;
+        int[][] src = copySelectionPixels();
+        if (src == null) return;
+        int w = src.length, h = src[0].length;
+        int[][] rot = new int[h][w];
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                rot[h - 1 - y][x] = src[x][y];
+            }
+        }
+        canvas.saveSnapshot();
+        clearSelectionAreaPixels();
+        pastePixelsAt(rot, h, w, selMinX, selMinY);
+        setSelectionFromPoints(selMinX, selMinY, selMinX + h - 1, selMinY + w - 1);
+    }
+
+    private void commitSelectionMove() {
+        if (!selectionDraggingMove || selectionMovePixels == null || !hasSelection() || canvas == null) return;
+        int srcMinX = selMinX;
+        int srcMinY = selMinY;
+        int dstMinX = srcMinX + selectionMoveDx;
+        int dstMinY = srcMinY + selectionMoveDy;
+
+        canvas.saveSnapshot();
+        clearSelectionAreaPixels();
+        var active = canvas.getLayerStack().getActiveLayer();
+        if (active != null && selectionMoveMask != null) {
+            for (int x = 0; x < selectionMoveW; x++) {
+                int tx = dstMinX + x;
+                if (tx < 0 || tx >= canvas.getWidth()) continue;
+                for (int y = 0; y < selectionMoveH; y++) {
+                    if (!selectionMoveMask[x][y]) continue;
+                    int ty = dstMinY + y;
+                    if (ty < 0 || ty >= canvas.getHeight()) continue;
+                    active.setPixel(tx, ty, selectionMovePixels[x][y]);
+                }
+            }
+            canvas.invalidateCache();
+            canvasTextureDirty = true;
+        }
+
+        boolean[][] newMask = new boolean[canvas.getWidth()][canvas.getHeight()];
+        if (selectionMoveMask != null) {
+            for (int x = 0; x < selectionMoveW; x++) for (int y = 0; y < selectionMoveH; y++) {
+                if (!selectionMoveMask[x][y]) continue;
+                int tx = dstMinX + x;
+                int ty = dstMinY + y;
+                if (tx >= 0 && ty >= 0 && tx < newMask.length && ty < newMask[0].length) newMask[tx][ty] = true;
+            }
+        }
+        selectionMask = newMask;
+        recalcSelectionBounds();
+
+        selectionDraggingMove = false;
+        selectionMovePixels = null;
+        selectionMoveMask = null;
+        selectionMoveW = selectionMoveH = 0;
+        selectionMoveDx = selectionMoveDy = 0;
+    }
+
+    private void nudgeSelection(int dx, int dy) {
+        if (!hasSelection() || canvas == null) return;
+        selectionMovePixels = copySelectionPixels();
+        selectionMoveMask = copySelectionRelativeMask();
+        if (selectionMovePixels == null || selectionMoveMask == null) return;
+        selectionMoveW = selectionMovePixels.length;
+        selectionMoveH = selectionMovePixels[0].length;
+        selectionMoveDx = dx;
+        selectionMoveDy = dy;
+        selectionDraggingMove = true;
+        commitSelectionMove();
+    }
+
+    private void renderSelectionContextMenu(DrawContext ctx, int mx, int my) {
+        if (!selectionMenuOpen) return;
+        int itemH = 14;
+        int menuW = 116;
+        int menuH = SELECTION_MENU_ITEMS.length * itemH + 4;
+        int x = clamp(selectionMenuX, 2, this.width - menuW - 2);
+        int y = clamp(selectionMenuY, 2, this.height - menuH - 2);
+        ctx.fill(x, y, x + menuW, y + menuH, 0xEE202020);
+        drawRectOutline(ctx, x, y, x + menuW, y + menuH, 0xFF909090);
+        int hover = getSelectionMenuItemAt(mx, my);
+        for (int i = 0; i < SELECTION_MENU_ITEMS.length; i++) {
+            int iy = y + 2 + i * itemH;
+            if (i == hover) {
+                ctx.fill(x + 1, iy, x + menuW - 1, iy + itemH, 0x804080FF);
+            }
+            ctx.drawText(textRenderer, SELECTION_MENU_ITEMS[i], x + 4, iy + 3, 0xFFFFFFFF, false);
+        }
+    }
+
     protected boolean showFaceButton() { return getGuiScale() <= 4; }
 
     /** Effective left panel width (0 if closed) */
@@ -326,6 +766,7 @@ public abstract class AbstractEditorScreen extends Screen {
 
         ModSettings s = ModSettings.getInstance();
         currentTool = EditorTool.getToolByName(s.defaultTool);
+        clearSelection();
         ColorHistory.setMaxHistory(s.colorHistorySize);
         showGrid = s.gridOnByDefault;
 
@@ -455,13 +896,13 @@ public abstract class AbstractEditorScreen extends Screen {
             final EditorTool t1 = tools[i];
             String h1 = s.showToolHints ? s.getKeyName(t1.name().toLowerCase()) : "";
             String l1 = t1.getDisplayName() + (h1.isEmpty() ? "" : " (" + h1 + ")");
-            addDrawableChild(ButtonWidget.builder(Text.literal(l1), btn -> currentTool = t1)
+            addDrawableChild(ButtonWidget.builder(Text.literal(l1), btn -> onToolButtonPressed(t1))
                     .position(px, py - leftPanelScrollY).size(hw, bh).build());
             if (i + 1 < tools.length) {
                 final EditorTool t2 = tools[i + 1];
                 String h2 = s.showToolHints ? s.getKeyName(t2.name().toLowerCase()) : "";
                 String l2 = t2.getDisplayName() + (h2.isEmpty() ? "" : " (" + h2 + ")");
-                addDrawableChild(ButtonWidget.builder(Text.literal(l2), btn -> currentTool = t2)
+                addDrawableChild(ButtonWidget.builder(Text.literal(l2), btn -> onToolButtonPressed(t2))
                         .position(px + hw + 2, py - leftPanelScrollY).size(hw, bh).build());
             }
             py += bh + 2;
@@ -509,6 +950,14 @@ public abstract class AbstractEditorScreen extends Screen {
         py = addExtraToolButtons(py, px, w, bh);
 
         return py;
+    }
+
+    private void onToolButtonPressed(EditorTool tool) {
+        if (tool == EditorTool.SELECT && currentTool == EditorTool.SELECT) {
+            selectionMode = (selectionMode == SelectionMode.RECT) ? SelectionMode.LASSO : SelectionMode.RECT;
+            return;
+        }
+        currentTool = tool;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -632,9 +1081,12 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(leftW() + TOGGLE_BTN_W, statusY, this.width - rightW() - TOGGLE_BTN_W, this.height, pal.STATUS_BAR_BG);
         String status = "Tool: " + currentTool.getDisplayName() + " | Size: " + toolSize + "px"
                 + (canvas != null ? " | " + canvas.getWidth() + "×" + canvas.getHeight() : "");
+        if (currentTool == EditorTool.SELECT) {
+            status += " | Mode: " + selectionMode.name();
+        }
         if (canvas != null) {
-            int hx = (mx - canvasScreenX) / Math.max(1, zoom);
-            int hy = (my - canvasScreenY) / Math.max(1, zoom);
+            int hx = screenToCanvasX(mx);
+            int hy = screenToCanvasY(my);
             if (hx >= 0 && hx < canvas.getWidth() && hy >= 0 && hy < canvas.getHeight()) {
                 status += " | x:" + hx + ", y:" + hy;
             }
@@ -642,6 +1094,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.drawText(textRenderer, status, leftW() + TOGGLE_BTN_W + 4, statusY + 3, pal.STATUS_TEXT, false);
 
         super.render(ctx, mx, my, delta);
+        renderSelectionContextMenu(ctx, mx, my);
 
         if (quickSelectWheel != null) quickSelectWheel.render(ctx, textRenderer, mx, my);
 
@@ -929,10 +1382,24 @@ public abstract class AbstractEditorScreen extends Screen {
             for (int x = visMinX; x <= visMaxX; x++) ctx.fill(canvasScreenX + x * zoom, canvasScreenY + visMinY * zoom, canvasScreenX + x * zoom + 1, canvasScreenY + visMaxY * zoom, 0x30FFFFFF);
             for (int y = visMinY; y <= visMaxY; y++) ctx.fill(canvasScreenX + visMinX * zoom, canvasScreenY + y * zoom, canvasScreenX + visMaxX * zoom, canvasScreenY + y * zoom + 1, 0x30FFFFFF);
         }
+
+        // While moving a selection, draw what is below the active layer at the source area.
+        if (selectionDraggingMove && hasSelection()) {
+            int activeIdx = canvas.getLayerStack().getActiveIndex();
+            for (int x = selMinX; x <= selMaxX; x++) {
+                for (int y = selMinY; y <= selMaxY; y++) {
+                    if (!isSelectedMask(x, y)) continue;
+                    int sx = canvasScreenX + x * zoom;
+                    int sy = canvasScreenY + y * zoom;
+                    int under = canvas.getLayerStack().getPixelExcludingLayer(x, y, activeIdx);
+                    ctx.fill(sx, sy, sx + zoom, sy + zoom, renderPixel(under, x, y));
+                }
+            }
+        }
         drawRectOutline(ctx, canvasScreenX - 1, canvasScreenY - 1, canvasScreenX + w * zoom + 1, canvasScreenY + h * zoom + 1, 0xFF4444AA);
 
         // Hover highlight
-        int hx = (mx - canvasScreenX) / effectiveZoom, hy = (my - canvasScreenY) / effectiveZoom;
+        int hx = screenToCanvasX(mx), hy = screenToCanvasY(my);
         if (hx >= 0 && hx < w && hy >= 0 && hy < h) {
             int half = toolSize / 2;
             for (int dx = -half; dx < toolSize - half; dx++) for (int dy = -half; dy < toolSize - half; dy++) {
@@ -1063,6 +1530,79 @@ public abstract class AbstractEditorScreen extends Screen {
         if ((lineFirstClick || rectFirstClick) && shapeStartConfirmed && !draggingShape) {
             String msg = "Click another point to finish";
             ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(msg), canvasScreenX + (w * zoom) / 2, canvasScreenY - 26, 0xFFFFFF00);
+        }
+
+        if (currentTool == EditorTool.SELECT && selectionDraggingCreate && selectionMode == SelectionMode.LASSO && selectionLassoPoints.size() > 1) {
+            for (int i = 1; i < selectionLassoPoints.size(); i++) {
+                int[] a = selectionLassoPoints.get(i - 1);
+                int[] b = selectionLassoPoints.get(i);
+                for (int[] p : bresenhamLine(a[0], a[1], b[0], b[1])) {
+                    if (p[0] < 0 || p[1] < 0 || p[0] >= w || p[1] >= h) continue;
+                    int sx = canvasScreenX + p[0] * zoom;
+                    int sy = canvasScreenY + p[1] * zoom;
+                    drawRectOutline(ctx, sx, sy, sx + zoom, sy + zoom, 0xFF66CCFF);
+                }
+            }
+        }
+
+        // Selection overlay and move preview
+        if (currentTool == EditorTool.SELECT && hasSelection()) {
+            int drawMinX = selMinX;
+            int drawMinY = selMinY;
+            int drawMaxX = selMaxX;
+            int drawMaxY = selMaxY;
+
+            if (selectionDraggingMove && selectionMovePixels != null) {
+                drawMinX = selMinX + selectionMoveDx;
+                drawMinY = selMinY + selectionMoveDy;
+                drawMaxX = drawMinX + selectionMoveW - 1;
+                drawMaxY = drawMinY + selectionMoveH - 1;
+                for (int x = 0; x < selectionMoveW; x++) {
+                    int tx = drawMinX + x;
+                    if (tx < 0 || tx >= w) continue;
+                    for (int y = 0; y < selectionMoveH; y++) {
+                        int ty = drawMinY + y;
+                        if (ty < 0 || ty >= h) continue;
+                        int c = selectionMovePixels[x][y];
+                        int a = (c >>> 24) & 0xFF;
+                        if (a == 0) continue;
+                        int sx = canvasScreenX + tx * zoom;
+                        int sy = canvasScreenY + ty * zoom;
+                        ctx.fill(sx, sy, sx + zoom, sy + zoom, c);
+                    }
+                }
+            }
+
+            int antsPhase = (int)((System.currentTimeMillis() / 120L) % 8L);
+            for (int x = drawMinX; x <= drawMaxX; x++) {
+                for (int y = drawMinY; y <= drawMaxY; y++) {
+                    boolean selected = selectionDraggingMove
+                            ? isSelectedMoveMask(x - drawMinX, y - drawMinY)
+                            : isSelectedMask(x, y);
+                    if (!selected) continue;
+                    boolean up = selectionDraggingMove
+                            ? isSelectedMoveMask(x - drawMinX, y - drawMinY - 1)
+                            : isSelectedMask(x, y - 1);
+                    boolean down = selectionDraggingMove
+                            ? isSelectedMoveMask(x - drawMinX, y - drawMinY + 1)
+                            : isSelectedMask(x, y + 1);
+                    boolean left = selectionDraggingMove
+                            ? isSelectedMoveMask(x - drawMinX - 1, y - drawMinY)
+                            : isSelectedMask(x - 1, y);
+                    boolean right = selectionDraggingMove
+                            ? isSelectedMoveMask(x - drawMinX + 1, y - drawMinY)
+                            : isSelectedMask(x + 1, y);
+
+                    int sx = canvasScreenX + x * zoom;
+                    int sy = canvasScreenY + y * zoom;
+                    int c1 = (((x + y + antsPhase) & 1) == 0) ? 0xFFFFFFFF : 0xFF000000;
+                    int c2 = (c1 == 0xFFFFFFFF) ? 0xFF000000 : 0xFFFFFFFF;
+                    if (!up) ctx.fill(sx, sy, sx + zoom, sy + 1, c1);
+                    if (!down) ctx.fill(sx, sy + zoom - 1, sx + zoom, sy + zoom, c2);
+                    if (!left) ctx.fill(sx, sy, sx + 1, sy + zoom, c2);
+                    if (!right) ctx.fill(sx + zoom - 1, sy, sx + zoom, sy + zoom, c1);
+                }
+            }
         }
     }
 
@@ -1218,11 +1758,24 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
         double mx = click.x(), my = click.y(); int btn = click.button();
+        if (selectionMenuOpen && btn == 0) {
+            int idx = getSelectionMenuItemAt(mx, my);
+            if (idx >= 0) {
+                executeSelectionMenuAction(idx, mx, my);
+                selectionMenuOpen = false;
+                return true;
+            }
+            selectionMenuOpen = false;
+        } else if (selectionMenuOpen && btn == 1) {
+            selectionMenuOpen = false;
+            return true;
+        }
         // On press record down state so we can tell click vs drag on release
         if (btn == 0) {
             leftDown = true;
+            strokeSnapshotTaken = false;
             if (canvas != null) {
-                int dpx = (int)((mx - canvasScreenX) / zoom), dpy = (int)((my - canvasScreenY) / zoom);
+                int dpx = screenToCanvasX(mx), dpy = screenToCanvasY(my);
                 downPx = dpx; downPy = dpy; movedSinceDown = false;
             } else {
                 downPx = downPy = -1; movedSinceDown = false;
@@ -1233,6 +1786,15 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Middle click = quick wheel
         if (btn == 2) { quickSelectWheel.activate((int)mx, (int)my); return true; }
+
+        // Right click = selection context menu (when selection tool is active)
+        if (btn == 1 && currentTool == EditorTool.SELECT && hasSelection()) {
+            int px = screenToCanvasX(mx), py = screenToCanvasY(my);
+            if (isCanvasPixelInside(px, py)) {
+                openSelectionMenu((int)mx, (int)my);
+                return true;
+            }
+        }
 
         // Right click = pan
         if (btn == 1) { isPanning = true; panStartMouseX = mx; panStartMouseY = my; panStartOffsetX = panOffsetX; panStartOffsetY = panOffsetY; return true; }
@@ -1251,9 +1813,44 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Canvas press: we only record the press here; action happens on release
         if (btn == 0 && canvas != null) {
-            int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
+            int px = screenToCanvasX(mx), py = screenToCanvasY(my);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
                 lastDrawX = px; lastDrawY = py;
+                if (currentTool == EditorTool.SELECT) {
+                    selectionMenuOpen = false;
+                    if (hasSelection() && isInSelection(px, py)) {
+                        selectionDraggingMove = true;
+                        selectionDraggingCreate = false;
+                        selectionAnchorX = px;
+                        selectionAnchorY = py;
+                        selectionMoveDx = selectionMoveDy = 0;
+                        selectionMovePixels = copySelectionPixels();
+                        selectionMoveMask = copySelectionRelativeMask();
+                        if (selectionMovePixels != null) {
+                            selectionMoveW = selectionMovePixels.length;
+                            selectionMoveH = selectionMovePixels[0].length;
+                        }
+                    } else {
+                        selectionDraggingCreate = true;
+                        selectionDraggingMove = false;
+                        selectionAnchorX = px;
+                        selectionAnchorY = py;
+                        if (selectionMode == SelectionMode.LASSO) {
+                            selectionMask = null;
+                            selectionLassoPoints.clear();
+                            selectionLassoPoints.add(new int[]{px, py});
+                        } else {
+                            setSelectionFromPoints(px, py, px, py);
+                        }
+                    }
+                    return true;
+                }
+
+                if ((currentTool == EditorTool.PENCIL || currentTool == EditorTool.ERASER) && !strokeSnapshotTaken) {
+                    canvas.saveSnapshot();
+                    strokeSnapshotTaken = true;
+                }
+
                 // For LINE/RECTANGLE: start immediately on press (preserve original drag behavior)
                 if (currentTool == EditorTool.LINE) {
                     if (!lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = false; startCreatedOnPress = true; return true; }
@@ -1278,10 +1875,29 @@ public abstract class AbstractEditorScreen extends Screen {
         // If a color picker drag was active, stop it
         if (btn == 0 && (pickingSv || pickingHue || pickingAlpha)) { pickingSv = pickingHue = pickingAlpha = false; return true; }
 
+        if (btn == 0 && currentTool == EditorTool.SELECT) {
+            if (selectionDraggingMove) {
+                commitSelectionMove();
+                movedSinceDown = false;
+                leftDown = false;
+                strokeSnapshotTaken = false;
+                return true;
+            }
+            if (selectionDraggingCreate) {
+                if (selectionMode == SelectionMode.LASSO) setSelectionFromLasso();
+                selectionDraggingCreate = false;
+                selectionLassoPoints.clear();
+                movedSinceDown = false;
+                leftDown = false;
+                strokeSnapshotTaken = false;
+                return true;
+            }
+        }
+
         // Commit previewed shapes on left release. Distinguish click (no move) vs drag.
         if (btn == 0) {
             // compute release pixel coords
-            int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
+            int px = screenToCanvasX(mx), py = screenToCanvasY(my);
             boolean insideCanvas = canvas != null && px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight();
 
             if (!movedSinceDown) {
@@ -1291,11 +1907,12 @@ public abstract class AbstractEditorScreen extends Screen {
                     if (startCreatedOnPress) {
                         shapeStartConfirmed = true;
                         startCreatedOnPress = false;
+                        strokeSnapshotTaken = false;
                         return true;
                     }
                     // If no start yet (rare), set start now and mark confirmed
-                    if (currentTool == EditorTool.LINE && !lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = true; return true; }
-                    if (currentTool == EditorTool.RECTANGLE && !rectFirstClick) { rectStartX = px; rectStartY = py; rectFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = true; return true; }
+                    if (currentTool == EditorTool.LINE && !lineFirstClick) { lineStartX = px; lineStartY = py; lineFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = true; strokeSnapshotTaken = false; return true; }
+                    if (currentTool == EditorTool.RECTANGLE && !rectFirstClick) { rectStartX = px; rectStartY = py; rectFirstClick = true; previewEndX = -1; previewEndY = -1; shapeStartConfirmed = true; strokeSnapshotTaken = false; return true; }
 
                     // If a start exists and was confirmed, a second click commits
                     if (currentTool == EditorTool.LINE && lineFirstClick && shapeStartConfirmed) {
@@ -1306,7 +1923,7 @@ public abstract class AbstractEditorScreen extends Screen {
                             else canvas.drawLine(lineStartX, lineStartY, px, py, currentColor);
                             canvas.invalidateCache(); canvasTextureDirty = true;
                         }
-                        lineFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; setColor(currentColor, true); return true;
+                        lineFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; setColor(currentColor, true); strokeSnapshotTaken = false; return true;
                     }
                     if (currentTool == EditorTool.RECTANGLE && rectFirstClick && shapeStartConfirmed) {
                         if (canvas != null) {
@@ -1316,11 +1933,12 @@ public abstract class AbstractEditorScreen extends Screen {
                             else canvas.drawRect(rectStartX, rectStartY, px, py, currentColor);
                             canvas.invalidateCache(); canvasTextureDirty = true;
                         }
-                        rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; setColor(currentColor, true); return true;
+                        rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; setColor(currentColor, true); strokeSnapshotTaken = false; return true;
                     }
 
                     // Not a shape tool click: delegate to click handler
                     handleCanvasClick(px, py, btn);
+                    strokeSnapshotTaken = false;
                     return true;
                 }
             } else {
@@ -1333,7 +1951,7 @@ public abstract class AbstractEditorScreen extends Screen {
                         else canvas.drawLine(lineStartX, lineStartY, previewEndX, previewEndY, currentColor);
                         canvas.invalidateCache(); canvasTextureDirty = true;
                     }
-                    lineFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; startCreatedOnPress = false; setColor(currentColor, true); return true;
+                    lineFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; startCreatedOnPress = false; setColor(currentColor, true); strokeSnapshotTaken = false; return true;
                 }
                 if (rectFirstClick && previewEndX >= 0) {
                     if (canvas != null) {
@@ -1343,12 +1961,13 @@ public abstract class AbstractEditorScreen extends Screen {
                         else canvas.drawRectOutlineThickness(rectStartX, rectStartY, previewEndX, previewEndY, currentColor, 1, variation);
                         canvas.invalidateCache(); canvasTextureDirty = true;
                     }
-                    rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; startCreatedOnPress = false; setColor(currentColor, true); return true;
+                    rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; shapeStartConfirmed = false; startCreatedOnPress = false; setColor(currentColor, true); strokeSnapshotTaken = false; return true;
                 }
             }
             // reset movement tracking
             movedSinceDown = false;
             leftDown = false;
+            strokeSnapshotTaken = false;
             shapeStartConfirmed = shapeStartConfirmed && (lineFirstClick || rectFirstClick);
         }
 
@@ -1383,8 +2002,28 @@ public abstract class AbstractEditorScreen extends Screen {
         if (btn == 0 && rightOpen && rightTab == RightTab.COLOR && startColorPickerDrag(mx, my)) return true;
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
         if (isInUIRegion(mx, my)) return super.mouseDragged(click, dx, dy);
+        if (canvas != null && btn == 0 && currentTool == EditorTool.SELECT && (selectionDraggingCreate || selectionDraggingMove)) {
+            int px = screenToCanvasX(mx), py = screenToCanvasY(my);
+            if (selectionDraggingCreate) {
+                if (selectionMode == SelectionMode.LASSO) {
+                    if (selectionLassoPoints.isEmpty() || selectionLassoPoints.get(selectionLassoPoints.size() - 1)[0] != px || selectionLassoPoints.get(selectionLassoPoints.size() - 1)[1] != py) {
+                        selectionLassoPoints.add(new int[]{clamp(px, 0, canvas.getWidth() - 1), clamp(py, 0, canvas.getHeight() - 1)});
+                    }
+                } else {
+                    setSelectionFromPoints(selectionAnchorX, selectionAnchorY, px, py);
+                }
+                movedSinceDown = true;
+                return true;
+            }
+            if (selectionDraggingMove) {
+                selectionMoveDx = px - selectionAnchorX;
+                selectionMoveDy = py - selectionAnchorY;
+                movedSinceDown = true;
+                return true;
+            }
+        }
         if (canvas != null && btn == 0) {
-            int px = (int)((mx - canvasScreenX) / zoom), py = (int)((my - canvasScreenY) / zoom);
+            int px = screenToCanvasX(mx), py = screenToCanvasY(my);
             if (px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight()) {
                 // Update movement tracking (click vs drag)
                 if (leftDown && downPx >= 0 && downPy >= 0) {
@@ -1425,8 +2064,8 @@ public abstract class AbstractEditorScreen extends Screen {
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
         if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = true; return true; }
         ModSettings s = ModSettings.getInstance();
-        if (kc == s.getKeybind("undo"))       { canvas.undo(); return true; }
-        if (kc == s.getKeybind("redo"))       { canvas.redo(); return true; }
+        if (kc == s.getKeybind("undo"))       { if (selectionDraggingMove) commitSelectionMove(); canvas.undo(); clearSelection(); return true; }
+        if (kc == s.getKeybind("redo"))       { canvas.redo(); clearSelection(); return true; }
         if (kc == s.getKeybind("grid"))       { showGrid = !showGrid; return true; }
         if (kc == s.getKeybind("pencil"))     { currentTool = EditorTool.PENCIL; return true; }
         if (kc == s.getKeybind("eraser"))     { currentTool = EditorTool.ERASER; return true; }
@@ -1434,6 +2073,73 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
         if (kc == s.getKeybind("rectangle"))  { currentTool = EditorTool.RECTANGLE; lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
         if (kc == s.getKeybind("line"))       { currentTool = EditorTool.LINE; lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
+        if (kc == s.getKeybind("select"))     { currentTool = EditorTool.SELECT; return true; }
+
+        if (currentTool == EditorTool.SELECT) {
+            long handle = MinecraftClient.getInstance().getWindow().getHandle();
+            boolean ctrl = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
+                    || GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+            if (kc == GLFW.GLFW_KEY_1) { selectionMode = SelectionMode.RECT; return true; }
+            if (kc == GLFW.GLFW_KEY_2 || kc == GLFW.GLFW_KEY_3) { selectionMode = SelectionMode.LASSO; return true; }
+
+            if (kc == GLFW.GLFW_KEY_A && ctrl && canvas != null) {
+                selectionMode = SelectionMode.RECT;
+                setSelectionFromPoints(0, 0, canvas.getWidth() - 1, canvas.getHeight() - 1);
+                return true;
+            }
+            if (kc == GLFW.GLFW_KEY_C && ctrl) {
+                int[][] cp = copySelectionPixels();
+                if (cp != null) { selectionClipboard = cp; selectionClipboardW = cp.length; selectionClipboardH = cp[0].length; }
+                return true;
+            }
+            if (kc == GLFW.GLFW_KEY_X && ctrl) {
+                int[][] cp = copySelectionPixels();
+                if (cp != null) {
+                    selectionClipboard = cp; selectionClipboardW = cp.length; selectionClipboardH = cp[0].length;
+                    canvas.saveSnapshot();
+                    clearSelectionAreaPixels();
+                }
+                return true;
+            }
+            if (kc == GLFW.GLFW_KEY_V && ctrl && selectionClipboard != null) {
+                int px = hasSelection() ? selMinX : 0;
+                int py = hasSelection() ? selMinY : 0;
+                canvas.saveSnapshot();
+                pastePixelsAt(selectionClipboard, selectionClipboardW, selectionClipboardH, px, py);
+                selectionMode = SelectionMode.RECT;
+                setSelectionFromPoints(px, py, px + selectionClipboardW - 1, py + selectionClipboardH - 1);
+                return true;
+            }
+            if (kc == GLFW.GLFW_KEY_D && ctrl) {
+                executeSelectionMenuAction(3, 0, 0);
+                return true;
+            }
+            if (kc == GLFW.GLFW_KEY_I && ctrl) {
+                invertSelectionMask();
+                return true;
+            }
+            if (kc == GLFW.GLFW_KEY_DELETE || kc == GLFW.GLFW_KEY_BACKSPACE) {
+                if (hasSelection()) {
+                    canvas.saveSnapshot();
+                    clearSelectionAreaPixels();
+                }
+                return true;
+            }
+            if (kc == GLFW.GLFW_KEY_LEFT)  { nudgeSelection(-1, 0); return true; }
+            if (kc == GLFW.GLFW_KEY_RIGHT) { nudgeSelection(1, 0); return true; }
+            if (kc == GLFW.GLFW_KEY_UP)    { nudgeSelection(0, -1); return true; }
+            if (kc == GLFW.GLFW_KEY_DOWN)  { nudgeSelection(0, 1); return true; }
+            if (kc == GLFW.GLFW_KEY_ESCAPE) {
+                if (selectionMenuOpen) {
+                    selectionMenuOpen = false;
+                    return true;
+                }
+                if (hasSelection()) {
+                    clearSelection();
+                    return true;
+                }
+            }
+        }
         // brush key removed
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
         if (openKey != null && openKey.matchesKey(keyInput)) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
@@ -1652,8 +2358,8 @@ public abstract class AbstractEditorScreen extends Screen {
     protected void handleCanvasClick(int px, int py, int btn) {
         float variation = ModSettings.getInstance().variationPercent;
         switch (currentTool) {
-            case PENCIL   -> { canvas.saveSnapshot(); if (variation > 0f) { if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation); else canvas.drawBrushPixel(px, py, currentColor, variation); } else { if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor); else canvas.drawPixel(px, py, currentColor); } setColor(currentColor, true); }
-            case ERASER   -> { canvas.saveSnapshot(); if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize); else canvas.erasePixel(px, py); }
+            case PENCIL   -> { if (!strokeSnapshotTaken) { canvas.saveSnapshot(); strokeSnapshotTaken = true; } if (variation > 0f) { if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation); else canvas.drawBrushPixel(px, py, currentColor, variation); } else { if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor); else canvas.drawPixel(px, py, currentColor); } setColor(currentColor, true); }
+            case ERASER   -> { if (!strokeSnapshotTaken) { canvas.saveSnapshot(); strokeSnapshotTaken = true; } if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize); else canvas.erasePixel(px, py); }
             case FILL     -> { canvas.saveSnapshot(); float v = ModSettings.getInstance().variationPercent; if (v > 0f) canvas.floodFill(px, py, currentColor, v); else canvas.floodFill(px, py, currentColor); setColor(currentColor, true); }
             case EYEDROPPER -> {
                 int raw = canvas.pickColorComposited(px, py);
@@ -1678,6 +2384,10 @@ public abstract class AbstractEditorScreen extends Screen {
                     else canvas.drawRect(rectStartX, rectStartY, px, py, currentColor);
                     rectFirstClick = false; setColor(currentColor, true);
                 }
+            }
+
+            case SELECT -> {
+                // Selection interactions are handled in mouse press/drag/release.
             }
         }
     }

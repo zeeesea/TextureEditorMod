@@ -175,6 +175,21 @@ public class LayerStack {
         return new Layer(width, height, "Composite", composite);
     }
 
+    /**
+     * Composite a single pixel from all visible layers except skipLayerIndex.
+     */
+    public int getPixelExcludingLayer(int x, int y, int skipLayerIndex) {
+        if (x < 0 || y < 0 || x >= width || y >= height) return 0x00000000;
+        int out = 0x00000000;
+        for (int i = 0; i < layers.size(); i++) {
+            if (i == skipLayerIndex) continue;
+            Layer layer = layers.get(i);
+            if (!layer.isVisible()) continue;
+            out = alphaBlend(layer.getPixel(x, y), out);
+        }
+        return out;
+    }
+
     public void mergeDown(int index) {
         if (index <= 0 || index >= layers.size()) return;
         var top = layers.get(index);

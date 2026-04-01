@@ -22,7 +22,7 @@ public class KeybindSettingsScreen extends Screen {
 
     private static final String[][] ACTIONS = {
             {"pencil", "Pencil Tool"},
-            {"brush", "Brush Tool"},
+            {"select", "Select Tool"},
             {"eraser", "Eraser Tool"},
             {"fill", "Fill Tool"},
             {"eyedropper", "Eyedropper Tool"},

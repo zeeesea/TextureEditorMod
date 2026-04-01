@@ -28,9 +28,9 @@ public class QuickSelectWheel {
         ERASER ("Eraser","E"),
         EYEDROPPER ("Eyedropper","I"),
         RECTANGLE ("Rectangle","R"),
-        //COLOR_WHEEL ("Color Wheel"),
         LINE ("Line","L"),
-        FILL ("Fill","F");
+        FILL ("Fill","F"),
+        SELECT ("Select","S");
 
         private final String name;
         private final String tag;
@@ -45,10 +45,11 @@ public class QuickSelectWheel {
             return switch (this) {
                 case PENCIL -> EditorTool.PENCIL;
                 case ERASER -> EditorTool.ERASER;
-                    case LINE -> EditorTool.LINE;
+                case LINE -> EditorTool.LINE;
                 case FILL -> EditorTool.FILL;
-                    case EYEDROPPER -> EditorTool.EYEDROPPER;
-                    case RECTANGLE -> EditorTool.RECTANGLE;
+                case EYEDROPPER -> EditorTool.EYEDROPPER;
+                case RECTANGLE -> EditorTool.RECTANGLE;
+                case SELECT -> EditorTool.SELECT;
                 default -> null; // COLOR_WHEEL has no direct EditorTool
             };
         }

@@ -6,7 +6,8 @@ public enum EditorTool {
     FILL("Fill", "🪣"),
     EYEDROPPER("Eyedropper", "💉"),
     RECTANGLE("Rectangle", "▭"),
-    LINE("Line", "╱");
+    LINE("Line", "╱"),
+    SELECT("Select", "▦");
 
     private final String name;
     private final String icon;
