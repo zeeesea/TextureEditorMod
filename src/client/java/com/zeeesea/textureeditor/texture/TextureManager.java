@@ -21,7 +21,10 @@ import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.systems.RenderPass;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -39,8 +42,35 @@ public class TextureManager {
     private final Map<Identifier, int[][]> modifiedTextures = new HashMap<>();
     private final Map<Identifier, int[]> textureDimensions = new HashMap<>();
     private final Map<Identifier, int[][]> originalTextures = new HashMap<>();
+    private final Map<Identifier, ItemAnimationData> itemAnimations = new HashMap<>();
+    private final Map<Identifier, LiveItemAnimation> liveItemAnimations = new HashMap<>();
     private boolean previewingOriginals = false;
     private volatile boolean itemGuiAtlasDirty = false;
+
+    public record ItemAnimationData(Identifier textureId, Identifier spriteId, List<int[][]> frames, int width, int height, int frameTimeTicks) {}
+
+    private static final class LiveItemAnimation {
+        private final Identifier textureId;
+        private final Identifier spriteId;
+        private final List<int[][]> frames;
+        private final int width;
+        private final int height;
+        private final int frameTimeTicks;
+        private int tickCounter = 0;
+        private int frameIndex = 0;
+        private int lastGeometryHash;
+
+        private LiveItemAnimation(Identifier textureId, Identifier spriteId, List<int[][]> frames,
+                                  int width, int height, int frameTimeTicks) {
+            this.textureId = textureId;
+            this.spriteId = spriteId;
+            this.frames = frames;
+            this.width = width;
+            this.height = height;
+            this.frameTimeTicks = Math.max(1, frameTimeTicks);
+            this.lastGeometryHash = frames.isEmpty() ? 0 : computeOpaqueMaskHash(frames.getFirst(), width, height);
+        }
+    }
 
     private TextureManager() {}
 
@@ -161,7 +191,9 @@ public class TextureManager {
     public Set<Identifier> getModifiedTextureIds() { return modifiedTextures.keySet(); }
     public int[][] getPixels(Identifier textureId) { return modifiedTextures.get(textureId); }
     public int[] getDimensions(Identifier textureId) { return textureDimensions.get(textureId); }
-    public boolean hasModifiedTextures() { return !modifiedTextures.isEmpty(); }
+    public boolean hasModifiedTextures() { return !modifiedTextures.isEmpty() || !itemAnimations.isEmpty(); }
+    public Set<Identifier> getAnimatedTextureIds() { return itemAnimations.keySet(); }
+    public ItemAnimationData getItemAnimation(Identifier textureId) { return itemAnimations.get(textureId); }
 
     /**
      * Consumed by GuiRenderer mixin to rebuild its per-frame item icon atlas once
@@ -189,6 +221,88 @@ public class TextureManager {
 
     public void removeOriginal(Identifier textureId) {
         originalTextures.remove(textureId);
+    }
+
+    public void setItemAnimation(Identifier textureId, Identifier spriteId, List<int[][]> frames,
+                                 int width, int height, int frameTimeTicks) {
+        if (textureId == null || spriteId == null || frames == null || frames.isEmpty() || width <= 0 || height <= 0) return;
+        List<int[][]> frameCopies = new ArrayList<>(frames.size());
+        for (int[][] frame : frames) {
+            if (frame == null || frame.length != width || frame[0].length != height) continue;
+            frameCopies.add(copyFrame(frame, width, height));
+        }
+        if (frameCopies.isEmpty()) return;
+        itemAnimations.put(textureId, new ItemAnimationData(textureId, spriteId, frameCopies, width, height, Math.max(1, frameTimeTicks)));
+    }
+
+    public void removeItemAnimation(Identifier textureId) {
+        if (textureId == null) return;
+        itemAnimations.remove(textureId);
+        liveItemAnimations.remove(textureId);
+    }
+
+    public void startItemAnimationLive(Identifier textureId, Identifier spriteId, List<int[][]> frames,
+                                       int width, int height, int frameTimeTicks, int[][] origPixels) {
+        if (textureId == null || spriteId == null || frames == null || frames.isEmpty()) return;
+        setItemAnimation(textureId, spriteId, frames, width, height, frameTimeTicks);
+        ItemAnimationData data = itemAnimations.get(textureId);
+        if (data == null) return;
+
+        LiveItemAnimation live = new LiveItemAnimation(textureId, spriteId, data.frames(), data.width(), data.height(), data.frameTimeTicks());
+        liveItemAnimations.put(textureId, live);
+
+        if (origPixels != null) {
+            applyLive(spriteId, live.frames.getFirst(), live.width, live.height, origPixels, true);
+        } else {
+            applyLive(spriteId, live.frames.getFirst(), live.width, live.height, null, true);
+        }
+    }
+
+    public void stopItemAnimationLive(Identifier textureId) {
+        if (textureId == null) return;
+        liveItemAnimations.remove(textureId);
+    }
+
+    public void tickItemAnimations() {
+        if (liveItemAnimations.isEmpty()) return;
+        Iterator<LiveItemAnimation> it = liveItemAnimations.values().iterator();
+        while (it.hasNext()) {
+            LiveItemAnimation live = it.next();
+            if (live.frames.isEmpty() || live.spriteId == null) {
+                it.remove();
+                continue;
+            }
+
+            live.tickCounter++;
+            if (live.tickCounter < live.frameTimeTicks) continue;
+            live.tickCounter = 0;
+            live.frameIndex = (live.frameIndex + 1) % live.frames.size();
+            int[][] frame = live.frames.get(live.frameIndex);
+            int geometryHash = computeOpaqueMaskHash(frame, live.width, live.height);
+            boolean rebake = geometryHash != live.lastGeometryHash;
+            live.lastGeometryHash = geometryHash;
+            applyLive(live.spriteId, frame, live.width, live.height, null, rebake);
+        }
+    }
+
+    private static int computeOpaqueMaskHash(int[][] frame, int width, int height) {
+        if (frame == null || width <= 0 || height <= 0) return 0;
+        int hash = 1;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int a = (frame[x][y] >>> 24) & 0xFF;
+                hash = 31 * hash + (a > 0 ? 1 : 0);
+            }
+        }
+        return hash;
+    }
+
+    private static int[][] copyFrame(int[][] src, int w, int h) {
+        int[][] out = new int[w][h];
+        for (int x = 0; x < w; x++) {
+            System.arraycopy(src[x], 0, out[x], 0, h);
+        }
+        return out;
     }
 
     /**
@@ -421,13 +535,17 @@ public class TextureManager {
     }
 
     public void applyLive(Identifier spriteId, int[][] pixels, int width, int height) {
-        applyLive(spriteId, pixels, width, height, null);
+        applyLive(spriteId, pixels, width, height, null, true);
     }
 
     /**
      * Apply live by writing directly into the sprite's NativeImage and re-uploading.
      */
     public void applyLive(Identifier spriteId, int[][] pixels, int width, int height, int[][] origPixels) {
+        applyLive(spriteId, pixels, width, height, origPixels, true);
+    }
+
+    public void applyLive(Identifier spriteId, int[][] pixels, int width, int height, int[][] origPixels, boolean rebakeModel) {
         Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
 
         if (origPixels != null) {
@@ -440,11 +558,12 @@ public class TextureManager {
         writeSpritePixels(spriteId, pixels, width, height);
         markItemGuiAtlasDirty(spriteId);
 
-
-        try {
-            ItemModelRebaker.rebake(spriteId);
-        } catch (Exception e) {
-            System.out.println("[TextureEditor] ItemModelRebaker failed: " + e.getMessage());
+        if (rebakeModel) {
+            try {
+                ItemModelRebaker.rebake(spriteId);
+            } catch (Exception e) {
+                System.out.println("[TextureEditor] ItemModelRebaker failed: " + e.getMessage());
+            }
         }
     }
 
@@ -572,6 +691,8 @@ public class TextureManager {
         modifiedTextures.clear();
         textureDimensions.clear();
         originalTextures.clear();
+        itemAnimations.clear();
+        liveItemAnimations.clear();
         previewingOriginals = false;
         itemGuiAtlasDirty = false;
         ItemModelRebaker.invalidateCache();

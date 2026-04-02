@@ -78,6 +78,8 @@
   "textureeditor.button.face": "Seite: %s",
   "textureeditor.button.preview_3d": "3D-Vorschau",
   "textureeditor.button.edit_item": "Item bearbeiten",
+  "textureeditor.button.create_animation": "Animation erstellen",
+  "textureeditor.button.delete_animation": "Animation löschen",
   "textureeditor.button.edit_mob_entity": "Mob/Entity bearbeiten",
   "textureeditor.button.edit_wing_tex": "Flügel-Textur bearbeiten",
   "textureeditor.label.tinted": "[Gefärbt]",

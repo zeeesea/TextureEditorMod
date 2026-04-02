@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -99,8 +101,51 @@ public class ResourcePackExporter {
                 }
             }
 
-            // Write each modified texture
+            Set<Identifier> exportedAnimatedTextures = new HashSet<>();
+
+            // Write animated textures first (stacked PNG + mcmeta)
+            for (Identifier textureId : manager.getAnimatedTextureIds()) {
+                TextureManager.ItemAnimationData anim = manager.getItemAnimation(textureId);
+                if (anim == null || anim.frames() == null || anim.frames().size() <= 1) continue;
+
+                int frameCount = anim.frames().size();
+                int w = anim.width();
+                int h = anim.height();
+                if (w <= 0 || h <= 0) continue;
+
+                String path = "assets/" + textureId.getNamespace() + "/" + textureId.getPath();
+
+                try (NativeImage stacked = new NativeImage(w, h * frameCount, false)) {
+                    for (int i = 0; i < frameCount; i++) {
+                        int[][] frame = anim.frames().get(i);
+                        if (frame == null || frame.length != w || frame[0].length != h) continue;
+                        for (int x = 0; x < w; x++) {
+                            for (int y = 0; y < h; y++) {
+                                stacked.setColorArgb(x, y + i * h, frame[x][y]);
+                            }
+                        }
+                    }
+
+                    byte[] pngBytes = nativeImageToBytes(stacked);
+                    zos.putNextEntry(new ZipEntry(path));
+                    zos.write(pngBytes);
+                    zos.closeEntry();
+                }
+
+                JsonObject animationMcmeta = new JsonObject();
+                JsonObject animation = new JsonObject();
+                animation.addProperty("frametime", Math.max(1, anim.frameTimeTicks()));
+                animationMcmeta.add("animation", animation);
+                zos.putNextEntry(new ZipEntry(path + ".mcmeta"));
+                zos.write(animationMcmeta.toString().getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+
+                exportedAnimatedTextures.add(textureId);
+            }
+
+            // Write each non-animated modified texture
             for (Identifier textureId : manager.getModifiedTextureIds()) {
+                if (exportedAnimatedTextures.contains(textureId)) continue;
                 int[][] pixels = manager.getPixels(textureId);
                 int[] dims = manager.getDimensions(textureId);
                 if (pixels == null || dims == null) continue;

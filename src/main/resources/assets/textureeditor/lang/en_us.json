@@ -78,6 +78,8 @@
   "textureeditor.button.face": "Face: %s",
   "textureeditor.button.preview_3d": "3D Preview",
   "textureeditor.button.edit_item": "Edit Item",
+  "textureeditor.button.create_animation": "Create Animation",
+  "textureeditor.button.delete_animation": "Delete Animation",
   "textureeditor.button.edit_mob_entity": "Edit Mob/Entity",
   "textureeditor.button.edit_wing_tex": "Edit Wing Tex",
   "textureeditor.label.tinted": "[Tinted]",

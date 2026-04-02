@@ -3,6 +3,7 @@ package com.zeeesea.textureeditor.screen;
 import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.settings.ModSettings;
+import com.zeeesea.textureeditor.texture.ItemAnimationResourceLoader;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.EntityMapper;
@@ -15,6 +16,8 @@ import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
+import java.util.List;
+
 /**
  * Item texture editor. Optionally has a parent screen for back navigation.
  */
@@ -23,6 +26,10 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     private final ItemStack itemStack;
     private final String itemName;
     private final Screen parent;
+    private boolean redirectEvaluated = false;
+    private boolean redirectToAnimationEditor = false;
+    private List<int[][]> redirectFrames = null;
+    private int redirectFrameTimeTicks = 1;
 
     public ItemEditorScreen(ItemStack itemStack, Screen parent) {
         super(Text.translatable("textureeditor.screen.item.title"));
@@ -53,7 +60,32 @@ public class ItemEditorScreen extends AbstractEditorScreen {
             } else {
                 canvas = new PixelCanvas(tex.width(), tex.height(), tex.pixels());
             }
+
+            evaluateAnimationRedirect(savedPixels);
         }
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        if (!redirectEvaluated || !redirectToAnimationEditor || textureId == null || spriteId == null) return;
+
+        int[][] current = (canvas != null) ? copyPixels(canvas.getPixels(), canvas.getWidth(), canvas.getHeight()) : null;
+        int[][] orig = null;
+        if (originalPixels != null && originalPixels.length > 0 && originalPixels[0].length > 0) {
+            orig = copyPixels(originalPixels, originalPixels.length, originalPixels[0].length);
+        }
+
+        MinecraftClient.getInstance().setScreen(new ItemAnimationEditorScreen(
+                itemStack,
+                parent,
+                textureId,
+                spriteId,
+                orig,
+                current,
+                redirectFrames,
+                redirectFrameTimeTicks
+        ));
     }
 
     @Override
@@ -67,10 +99,18 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_item").getString(); }
 
     @Override
-    protected int addExtraButtons(int toolY) {
-        int rsw = getRightSidebarWidth();
-        int resetBtnW = rsw - 10;
-        int tbh = getToolButtonHeight();
+    protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
+        int px = x;
+
+        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.create_animation"), btn -> {
+            int[][] current = (canvas != null) ? copyPixels(canvas.getPixels(), canvas.getWidth(), canvas.getHeight()) : null;
+            int[][] orig = null;
+            if (originalPixels != null && originalPixels.length > 0 && originalPixels[0].length > 0) {
+                orig = copyPixels(originalPixels, originalPixels.length, originalPixels[0].length);
+            }
+            MinecraftClient.getInstance().setScreen(new ItemAnimationEditorScreen(itemStack, this, textureId, spriteId, orig, current));
+        }).position(px, y).size(w, bh).build());
+        y += bh + 4;
 
         // "Edit Mob/Entity" button for spawn eggs, boats, minecarts, etc.
         if (EntityMapper.hasEntityMode(itemStack)) {
@@ -79,23 +119,29 @@ public class ItemEditorScreen extends AbstractEditorScreen {
                 if (entity != null) {
                     MinecraftClient.getInstance().setScreen(new MobEditorScreen(entity, parent));
                 }
-            }).position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
+            }).position(px, y).size(w, bh).build());
+            y += bh + 4;
         }
 
-        // "Edit Wing Texture" button for elytra → opens the entity/elytra.png texture
+        // "Edit Wing Texture" button for elytra -> opens the entity/elytra.png texture
         if (itemStack.getItem() == Items.ELYTRA) {
             addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_wing_tex"), btn -> {
                 Identifier elytraTexId = Identifier.of("minecraft", "textures/entity/elytra.png");
                 MinecraftClient.getInstance().setScreen(new GuiTextureEditorScreen(elytraTexId, Text.translatable("textureeditor.elytra.wings").getString(), parent != null ? parent : this));
-            }).position(this.width - rsw + 5, this.height - 148).size(resetBtnW, tbh).build());
+            }).position(px, y).size(w, bh).build());
+            y += bh + 4;
         }
 
-        return toolY;
+        return y;
     }
 
     @Override
     protected void applyLive() {
         if (spriteId == null || canvas == null) return;
+        if (textureId != null) {
+            TextureManager.getInstance().stopItemAnimationLive(textureId);
+            TextureManager.getInstance().removeItemAnimation(textureId);
+        }
         System.out.println("[TextureEditor] ItemEditor.applyLive: spriteId=" + spriteId + " textureId=" + textureId + " canvas=" + canvas.getWidth() + "x" + canvas.getHeight());
         final int[][] origCopy = originalPixels;
         MinecraftClient.getInstance().execute(() ->
@@ -140,9 +186,35 @@ public class ItemEditorScreen extends AbstractEditorScreen {
         canvas.invalidateCache();
 
         if (textureId != null) {
+            TextureManager.getInstance().removeItemAnimation(textureId);
             TextureManager.getInstance().removeTexture(textureId);
             TextureManager.getInstance().removeOriginal(textureId);
         }
         applyLive();
+    }
+
+    private void evaluateAnimationRedirect(int[][] savedPixels) {
+        if (redirectEvaluated || textureId == null) return;
+        redirectEvaluated = true;
+
+        TextureManager tm = TextureManager.getInstance();
+
+        TextureManager.ItemAnimationData data = tm.getItemAnimation(textureId);
+        if (data != null && data.frames() != null && data.frames().size() > 1) {
+            redirectToAnimationEditor = true;
+            redirectFrames = data.frames();
+            redirectFrameTimeTicks = Math.max(1, data.frameTimeTicks());
+            return;
+        }
+
+        // Local non-animated override should win over pack animation auto-open behavior.
+        if (savedPixels != null) return;
+
+        ItemAnimationResourceLoader.LoadedAnimation loaded = ItemAnimationResourceLoader.load(textureId);
+        if (loaded != null && loaded.frames() != null && loaded.frames().size() > 1) {
+            redirectToAnimationEditor = true;
+            redirectFrames = loaded.frames();
+            redirectFrameTimeTicks = Math.max(1, loaded.frameTimeTicks());
+        }
     }
 }

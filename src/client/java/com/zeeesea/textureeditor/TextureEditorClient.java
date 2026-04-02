@@ -75,6 +75,7 @@ public class TextureEditorClient implements ClientModInitializer {
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            TextureManager.getInstance().tickItemAnimations();
             while (toggleEditorKey.wasPressed()) {
                 s.modEnabled = !s.modEnabled;
                 s.save();
