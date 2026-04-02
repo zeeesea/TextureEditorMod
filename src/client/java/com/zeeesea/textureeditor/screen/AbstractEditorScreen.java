@@ -55,8 +55,9 @@ public abstract class AbstractEditorScreen extends Screen {
     private int panStartOffsetX, panStartOffsetY;
     private boolean rightDown = false;
     private double rightDownMouseX, rightDownMouseY;
+    private boolean rightDownStartedInWorkspace = false;
     private boolean rightMovedPastThreshold = false;
-    private static final double RIGHT_DRAG_THRESHOLD_SQ = 9.0; // 3px
+    private static final double RIGHT_DRAG_THRESHOLD_SQ = 36.0; // 6px tolerance before panning
 
     // ── Line tool ─────────────────────────────────────────────────────────────
     private int lineStartX = -1, lineStartY = -1;
@@ -2307,12 +2308,14 @@ public abstract class AbstractEditorScreen extends Screen {
         if (btn == 2) { quickSelectWheel.activate((int)mx, (int)my); return true; }
 
         // Right click: menu is deferred to release unless drag starts panning.
+        // Allow this in the whole central workspace area (outside side/top/bottom UI),
+        // not only on strict canvas pixels.
         if (btn == 1) {
-            int px = screenToCanvasX(mx), py = screenToCanvasY(my);
-            if (isCanvasPixelInside(px, py)) {
+            if (!isInUIRegion(mx, my)) {
                 rightDown = true;
                 rightDownMouseX = mx;
                 rightDownMouseY = my;
+                rightDownStartedInWorkspace = true;
                 rightMovedPastThreshold = false;
                 return true;
             }
@@ -2416,17 +2419,21 @@ public abstract class AbstractEditorScreen extends Screen {
         if (handleExtraRelease(mx, my, btn)) return true;
         if (btn == 1) {
             boolean hadRightDown = rightDown;
+            boolean pressWasInWorkspace = rightDownStartedInWorkspace;
             boolean movedPastThreshold = rightMovedPastThreshold;
             boolean wasPanning = isPanning;
 
             rightDown = false;
+            rightDownStartedInWorkspace = false;
             rightMovedPastThreshold = false;
             isPanning = false;
 
-            if (hadRightDown && !movedPastThreshold && !wasPanning) {
-                int px = screenToCanvasX(mx), py = screenToCanvasY(my);
-                if (isCanvasPixelInside(px, py)) {
+            if (hadRightDown && pressWasInWorkspace && !movedPastThreshold && !wasPanning) {
+                if (!isInUIRegion(mx, my)) {
                     openSelectionMenu((int) mx, (int) my);
+                } else {
+                    // If the press was valid but release slipped into UI, open near press position.
+                    openSelectionMenu((int) rightDownMouseX, (int) rightDownMouseY);
                 }
                 return true;
             }

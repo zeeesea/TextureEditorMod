@@ -35,7 +35,7 @@ public class ColorPalette {
     public int CELL_BORDER;
     public int MODIFIED_BORDER;
 
-    // Tooltip / panels
+    // Tooltip / panels v
     public int PANEL_BG; // semi-transparent dark by default
     public int TOOLTIP_BORDER;
 

@@ -177,14 +177,15 @@ public class ExternalEditorSettingsScreen extends Screen {
             List<ExternalEditorDetector.DetectedEditor> detected = ExternalEditorDetector.detectEditors();
             int labelY = contentTop + 30 - scrollY;
             if (!detected.isEmpty()) {
-                context.drawText(textRenderer, "\u00a7eDetected Editors:", centerX - 118, labelY, 0xFFFFFF, false);
+                context.drawText(textRenderer, "\u00a7eDetected Editors:", centerX - 118, labelY, 0xFFFFFFFF, false);
             } else {
-                context.drawText(textRenderer, "\u00a7cNo editors auto-detected", centerX - 118, labelY + 4, 0xFF5555, false);
+                context.drawText(textRenderer, "\u00a7cNo editors auto-detected", centerX - 118, labelY + 4, 0xFFFF5555, false);
             }
 
             // "Custom Editor Path" label (descriptive, scrolled)
             int customLabelY = detectedEditorsEndY + 8 - scrollY;
-            context.drawText(textRenderer, "Custom Editor Path (overrides auto-detection):", centerX - 118, customLabelY, 0xAAAAAA, false);
+            // Short, clear label placed directly above the custom path text field
+            context.drawText(textRenderer, "Custom Path (overrides selection above)", centerX - 118, customLabelY, 0xFFAAAAAA, false);
 
             super.render(context, mouseX, mouseY, delta);
         } finally {
