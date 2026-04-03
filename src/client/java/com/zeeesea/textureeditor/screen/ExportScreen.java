@@ -7,6 +7,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.text.Text;
@@ -189,7 +190,7 @@ public class ExportScreen extends Screen {
 
         int drawW = ICON_SIZE * iconZoom;
         int drawH = ICON_SIZE * iconZoom;
-        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, ICON_TEX_ID,
+        context.drawTexture(RenderLayer::getGuiTextured, ICON_TEX_ID,
             iconScreenX, iconScreenY, 0, 0, drawW, drawH, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 
         if (showGrid) {
@@ -213,8 +214,7 @@ public class ExportScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
-        double mouseX = click.x(); double mouseY = click.y();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Reset line interpolation on new click
         lastDrawX = -1;
         lastDrawY = -1;
@@ -231,14 +231,13 @@ public class ExportScreen extends Screen {
         }
 
         if (handleIconCanvasClick(mouseX, mouseY)) return true;
-        return super.mouseClicked(click, bl);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double deltaX, double deltaY) {
-        double mouseX = click.x(); double mouseY = click.y();
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         if (handleIconCanvasClick(mouseX, mouseY)) return true;
-        return super.mouseDragged(click, deltaX, deltaY);
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     private boolean handleIconCanvasClick(double mouseX, double mouseY) {
@@ -296,12 +295,12 @@ public class ExportScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             client.setScreen(parent);
             return true;
         }
-        return super.keyPressed(keyInput);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private int getWindowHeight() {

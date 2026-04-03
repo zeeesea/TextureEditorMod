@@ -4,8 +4,6 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ExampleClientMixin",
-		"GuiRendererMixin",
-		"SpriteAccessor",
 		"SpriteContentsAccessor",
 		"BasicItemModelAccessor",
 		"BakedModelManagerAccessor"

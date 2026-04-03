@@ -2,9 +2,6 @@ package com.zeeesea.textureeditor.screen;
 
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.*;
-import com.mojang.blaze3d.vertex.*;
-import net.minecraft.client.gl.RenderPipelines;
 import com.zeeesea.textureeditor.editor.EditorTool;
 
 public class QuickSelectWheel {
@@ -18,10 +15,6 @@ public class QuickSelectWheel {
 
     Slice highlightedSlice;
 
-    private static final RenderLayer PIE_SLICE_LAYER = RenderLayer.of(
-            "pie_slice",
-            RenderSetup.builder(RenderPipelines.GUI).translucent().build()
-    );
 
     public enum Slice {
         PENCIL ("Pencil","P"),

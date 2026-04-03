@@ -1,51 +1,49 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.google.common.base.Suppliers;
-import com.zeeesea.textureeditor.mixin.client.BasicItemModelAccessor;
 import com.zeeesea.textureeditor.mixin.client.BakedModelManagerAccessor;
+import com.zeeesea.textureeditor.mixin.client.BasicItemModelAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.item.model.BasicItemModel;
 import net.minecraft.client.render.item.model.ItemModel;
-import net.minecraft.client.render.model.*;
+import net.minecraft.client.render.model.BakedGeometry;
+import net.minecraft.client.render.model.BakedModelManager;
+import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BakedSimpleModel;
+import net.minecraft.client.render.model.Baker;
+import net.minecraft.client.render.model.ErrorCollectingSpriteGetter;
+import net.minecraft.client.render.model.Geometry;
+import net.minecraft.client.render.model.ModelRotation;
+import net.minecraft.client.render.model.ModelTextures;
+import net.minecraft.client.render.model.SimpleModel;
 import net.minecraft.client.render.model.json.GeneratedItemModel;
+import net.minecraft.client.texture.atlas.Atlases;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.SpriteIdentifier;
 import net.minecraft.util.Identifier;
-import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
 
 /**
- * Rebakes item models after texture edits to update the 3D thickness quads.
- *
- * When a player edits an item texture (e.g. adds pixels outside the original shape),
- * Minecraft's item model still has the old baked quads that only include thickness
- * for the original pixel shape. This class regenerates those quads from the updated
- * sprite data so newly-drawn pixels also get proper 3D thickness.
+ * Rebakes item models after live sprite edits so generated item thickness reflects new opaque pixels.
  */
-public class ItemModelRebaker {
+public final class ItemModelRebaker {
+    private static final Identifier ITEMS_ATLAS_TEXTURE_ID = Identifier.ofVanilla("textures/atlas/items.png");
+    private static Map<Identifier, List<Identifier>> spriteToItemModels;
 
-    // Cache mapping spriteId -> list of item model identifiers that use that sprite
-    // Built lazily on first rebake to avoid scanning all models every time
-    private static Map<Identifier, List<Identifier>> spriteToItemModels = null;
+    private ItemModelRebaker() {}
 
-    /**
-     * Rebake all item models that reference the given sprite.
-     * Must be called on the render thread after the sprite's NativeImage has been updated.
-     *
-     * @param spriteId The sprite identifier (e.g. minecraft:item/diamond_sword)
-     */
     public static void rebake(Identifier spriteId) {
-        // Only rebake for item sprites (item/diamond_sword, etc.)
-        // Block sprites (block/stone, block/grass_block_top, etc.) must NOT be rebaked
-        // because block items use 3D cube models, not flat GeneratedItemModel geometry.
-        // Rebaking a block sprite with GeneratedItemModel would turn the 3D block into a 1px flat sheet.
-        String path = spriteId.getPath();
-        if (!path.startsWith("item/")) {
-            return;
-        }
+        if (spriteId == null || !spriteId.getPath().startsWith("item/")) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null || client.getBakedModelManager() == null) return;
@@ -54,202 +52,129 @@ public class ItemModelRebaker {
         Map<Identifier, ItemModel> bakedItemModels;
         try {
             bakedItemModels = ((BakedModelManagerAccessor) modelManager).getBakedItemModels();
-        } catch (Exception e) {
-            System.out.println("[TextureEditor] ItemModelRebaker: Failed to access bakedItemModels: " + e.getMessage());
+        } catch (Throwable ignored) {
             return;
         }
-
         if (bakedItemModels == null || bakedItemModels.isEmpty()) return;
 
-        // Build reverse index if not cached yet
         if (spriteToItemModels == null) {
             buildReverseIndex(bakedItemModels);
         }
 
-        // Find item models that use this sprite
-        List<Identifier> affectedModels = spriteToItemModels.get(spriteId);
-        if (affectedModels == null || affectedModels.isEmpty()) {
-            // Sprite not found in cache - might be a new mapping, rebuild and retry
+        List<Identifier> affected = spriteToItemModels.get(spriteId);
+        if (affected == null || affected.isEmpty()) {
             buildReverseIndex(bakedItemModels);
-            affectedModels = spriteToItemModels.get(spriteId);
-            if (affectedModels == null || affectedModels.isEmpty()) {
-                System.out.println("[TextureEditor] ItemModelRebaker: No item models found for sprite " + spriteId);
-                return;
-            }
+            affected = spriteToItemModels.get(spriteId);
+            if (affected == null || affected.isEmpty()) return;
         }
 
-        System.out.println("[TextureEditor] ItemModelRebaker: Rebaking " + affectedModels.size() + " model(s) for sprite " + spriteId);
-
-        for (Identifier modelId : affectedModels) {
+        for (Identifier modelId : affected) {
             ItemModel model = bakedItemModels.get(modelId);
-            if (model instanceof BasicItemModel basicModel) {
-                rebakeBasicItemModel(basicModel, spriteId);
+            if (model instanceof BasicItemModel basic) {
+                rebakeBasicItemModel(basic, spriteId);
             }
         }
     }
 
-    /**
-     * Build a reverse index: sprite ID -> list of item model IDs that use it.
-     */
-    private static void buildReverseIndex(Map<Identifier, ItemModel> bakedItemModels) {
-        spriteToItemModels = new HashMap<>();
-
-        for (Map.Entry<Identifier, ItemModel> entry : bakedItemModels.entrySet()) {
-            Identifier modelId = entry.getKey();
-            ItemModel model = entry.getValue();
-
-            if (model instanceof BasicItemModel basicModel) {
-                BasicItemModelAccessor accessor = (BasicItemModelAccessor) basicModel;
-                List<BakedQuad> quads = accessor.getQuads();
-                if (quads != null) {
-                    Set<Identifier> seenSprites = new HashSet<>();
-                    for (BakedQuad quad : quads) {
-                        if (quad.sprite() != null) {
-                            Identifier sid = quad.sprite().getContents().getId();
-                            if (seenSprites.add(sid)) {
-                                spriteToItemModels.computeIfAbsent(sid, k -> new ArrayList<>()).add(modelId);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        System.out.println("[TextureEditor] ItemModelRebaker: Built reverse index with " + spriteToItemModels.size() + " sprite entries");
-    }
-
-    /**
-     * Rebake a single BasicItemModel by regenerating quads from the updated sprite.
-     */
-    private static void rebakeBasicItemModel(BasicItemModel model, Identifier spriteId) {
-        BasicItemModelAccessor accessor = (BasicItemModelAccessor) model;
-        List<BakedQuad> oldQuads = accessor.getQuads();
-        if (oldQuads == null || oldQuads.isEmpty()) return;
-
-        // Find the sprite in the atlas (it should be updated already)
-        Sprite sprite = findSprite(spriteId);
-        if (sprite == null) {
-            System.out.println("[TextureEditor] ItemModelRebaker: Could not find sprite " + spriteId + " in any atlas");
-            return;
-        }
-
-        try {
-            // Create a minimal Baker that returns sprites from the atlas
-            MinimalBaker baker = new MinimalBaker(sprite, spriteId);
-
-            // Build ModelTextures for the generated item model
-            // Items typically have layer0 = the sprite, and optionally more layers
-            // We need to figure out which layers this model uses
-            Map<String, SpriteIdentifier> texMap = new HashMap<>();
-            Set<Identifier> usedSprites = new LinkedHashSet<>();
-            for (BakedQuad quad : oldQuads) {
-                if (quad.sprite() != null) {
-                    usedSprites.add(quad.sprite().getContents().getId());
-                }
-            }
-
-            // Map layers to sprites
-            int layerIdx = 0;
-            for (Identifier sid : usedSprites) {
-                String layerName = "layer" + layerIdx;
-                texMap.put(layerName, new SpriteIdentifier(BakedModelManager.BLOCK_OR_ITEM, sid));
-                layerIdx++;
-            }
-            // Particle texture = layer0
-            if (!usedSprites.isEmpty()) {
-                texMap.put("particle", new SpriteIdentifier(BakedModelManager.BLOCK_OR_ITEM, usedSprites.iterator().next()));
-            }
-
-            ModelTextures modelTextures = new ModelTextures(texMap);
-
-            // Use GeneratedItemModel's geometry to rebake
-            GeneratedItemModel generatedModel = new GeneratedItemModel();
-            Geometry geometry = generatedModel.geometry();
-
-            // Create a dummy SimpleModel for the bake call
-            SimpleModel dummyModel = () -> "textureeditor:rebake/" + spriteId;
-
-            BakedGeometry bakedGeometry = geometry.bake(modelTextures, baker, ModelRotation.IDENTITY, dummyModel);
-            List<BakedQuad> newQuads = bakedGeometry.getAllQuads();
-
-            if (newQuads != null && !newQuads.isEmpty()) {
-                // Replace quads and vector
-                accessor.setQuads(newQuads);
-                accessor.setVector(Suppliers.memoize(() -> BasicItemModel.bakeQuads(newQuads)));
-
-                System.out.println("[TextureEditor] ItemModelRebaker: Rebaked model with " + newQuads.size() +
-                    " quads (was " + oldQuads.size() + ") for sprite " + spriteId);
-            }
-        } catch (Exception e) {
-            System.out.println("[TextureEditor] ItemModelRebaker: Failed to rebake model for " + spriteId + ": " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Find a sprite in the items or block atlas.
-     */
-    private static Sprite findSprite(Identifier spriteId) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.getTextureManager() == null) return null;
-
-        // Try items atlas first
-        try {
-            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
-            if (tex instanceof SpriteAtlasTexture atlas) {
-                Sprite sprite = atlas.getSprite(spriteId);
-                if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                    return sprite;
-                }
-            }
-        } catch (Exception ignored) {}
-
-        // Try block atlas
-        try {
-            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
-            if (tex instanceof SpriteAtlasTexture atlas) {
-                Sprite sprite = atlas.getSprite(spriteId);
-                if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
-                    return sprite;
-                }
-            }
-        } catch (Exception ignored) {}
-
-        return null;
-    }
-
-    /**
-     * Invalidate the cached reverse index (e.g. after resource reload).
-     */
     public static void invalidateCache() {
         spriteToItemModels = null;
     }
 
-    /**
-     * Minimal Baker implementation that provides just enough functionality
-     * to rebake item model quads from atlas sprites.
-     */
-    private static class MinimalBaker implements Baker {
-        private final Sprite primarySprite;
-        private final Identifier primarySpriteId;
-        private final ErrorCollectingSpriteGetter spriteGetter;
-        private final Vec3fInterner interner;
+    private static void buildReverseIndex(Map<Identifier, ItemModel> bakedItemModels) {
+        Map<Identifier, List<Identifier>> reverse = new HashMap<>();
+        for (Map.Entry<Identifier, ItemModel> entry : bakedItemModels.entrySet()) {
+            if (!(entry.getValue() instanceof BasicItemModel basic)) continue;
+            BasicItemModelAccessor acc = (BasicItemModelAccessor) basic;
+            List<BakedQuad> quads = acc.getQuads();
+            if (quads == null || quads.isEmpty()) continue;
 
-        MinimalBaker(Sprite primarySprite, Identifier primarySpriteId) {
-            this.primarySprite = primarySprite;
-            this.primarySpriteId = primarySpriteId;
+            Set<Identifier> seen = new HashSet<>();
+            for (BakedQuad quad : quads) {
+                if (quad.sprite() == null) continue;
+                Identifier sid = quad.sprite().getContents().getId();
+                if (seen.add(sid)) {
+                    reverse.computeIfAbsent(sid, k -> new ArrayList<>()).add(entry.getKey());
+                }
+            }
+        }
+        spriteToItemModels = reverse;
+    }
+
+    private static void rebakeBasicItemModel(BasicItemModel model, Identifier editedSpriteId) {
+        BasicItemModelAccessor accessor = (BasicItemModelAccessor) model;
+        List<BakedQuad> oldQuads = accessor.getQuads();
+        if (oldQuads == null || oldQuads.isEmpty()) return;
+
+        Sprite primary = findSprite(editedSpriteId);
+        if (primary == null) return;
+
+        try {
+            Set<Identifier> usedSprites = new LinkedHashSet<>();
+            for (BakedQuad q : oldQuads) {
+                if (q.sprite() != null) usedSprites.add(q.sprite().getContents().getId());
+            }
+            if (usedSprites.isEmpty()) usedSprites.add(editedSpriteId);
+
+            Map<String, SpriteIdentifier> texMap = new HashMap<>();
+            int idx = 0;
+            for (Identifier sid : usedSprites) {
+                texMap.put("layer" + idx, new SpriteIdentifier(Atlases.BLOCKS, sid));
+                idx++;
+            }
+            texMap.put("particle", new SpriteIdentifier(Atlases.BLOCKS, usedSprites.iterator().next()));
+
+            ModelTextures modelTextures = new ModelTextures(texMap);
+            Geometry geometry = new GeneratedItemModel().geometry();
+            SimpleModel dummyModel = () -> "textureeditor:rebake/" + editedSpriteId;
+            Baker baker = new MinimalBaker(primary);
+
+            BakedGeometry baked = geometry.bake(modelTextures, baker, ModelRotation.X0_Y0, dummyModel);
+            List<BakedQuad> newQuads = baked.getAllQuads();
+            if (newQuads == null || newQuads.isEmpty()) return;
+
+            accessor.setQuads(newQuads);
+            Supplier<Vector3fc[]> vec = Suppliers.memoize(() -> BasicItemModel.bakeQuads(newQuads));
+            accessor.setVector(vec);
+        } catch (Throwable ignored) {
+            // Keep old model intact if rebake fails for any reason.
+        }
+    }
+
+    private static Sprite findSprite(Identifier spriteId) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.getTextureManager() == null) return null;
+
+        try {
+            var tex = client.getTextureManager().getTexture(ITEMS_ATLAS_TEXTURE_ID);
+            if (tex instanceof SpriteAtlasTexture atlas) {
+                Sprite s = atlas.getSprite(spriteId);
+                if (s != null && !s.getContents().getId().getPath().equals("missingno")) return s;
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+            if (tex instanceof SpriteAtlasTexture atlas) {
+                Sprite s = atlas.getSprite(spriteId);
+                if (s != null && !s.getContents().getId().getPath().equals("missingno")) return s;
+            }
+        } catch (Throwable ignored) {}
+
+        return null;
+    }
+
+    private static final class MinimalBaker implements Baker {
+        private final Sprite fallbackSprite;
+        private final ErrorCollectingSpriteGetter spriteGetter;
+
+        private MinimalBaker(Sprite fallbackSprite) {
+            this.fallbackSprite = fallbackSprite;
             this.spriteGetter = new MinimalSpriteGetter();
-            this.interner = vec -> vec; // Simple passthrough, no interning needed for rebake
         }
 
         @Override
         public BakedSimpleModel getModel(Identifier id) {
-            throw new UnsupportedOperationException("ItemModelRebaker minimal baker does not support getModel()");
-        }
-
-        @Override
-        public BlockModelPart getBlockPart() {
-            throw new UnsupportedOperationException("ItemModelRebaker minimal baker does not support getBlockPart()");
+            throw new UnsupportedOperationException();
         }
 
         @Override
@@ -258,33 +183,20 @@ public class ItemModelRebaker {
         }
 
         @Override
-        public Vec3fInterner getVec3fInterner() {
-            return interner;
-        }
-
-        @Override
         public <T> T compute(ResolvableCacheKey<T> key) {
             return key.compute(this);
         }
 
-        /**
-         * Sprite getter that resolves sprites from the live atlases.
-         */
-        private class MinimalSpriteGetter implements ErrorCollectingSpriteGetter {
+        private final class MinimalSpriteGetter implements ErrorCollectingSpriteGetter {
             @Override
             public Sprite get(SpriteIdentifier id, SimpleModel model) {
-                Identifier textureId = id.getTextureId();
-                Sprite found = findSprite(textureId);
-                if (found != null) return found;
-
-                // Fallback: return primary sprite
-                System.out.println("[TextureEditor] MinimalSpriteGetter: Could not find sprite " + textureId + ", using primary");
-                return primarySprite;
+                Sprite found = findSprite(id.getTextureId());
+                return found != null ? found : fallbackSprite;
             }
 
             @Override
             public Sprite getMissing(String name, SimpleModel model) {
-                return primarySprite; // Use primary as fallback
+                return fallbackSprite;
             }
         }
     }

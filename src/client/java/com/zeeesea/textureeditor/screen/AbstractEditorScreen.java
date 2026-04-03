@@ -12,6 +12,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.toast.SystemToast;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -1856,7 +1857,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(innerX, maskTop, innerX + innerW, maskBottom, pal.PANEL_DARK);
 
         // Draw the picker and controls on top of the mask so it remains visible
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
+        ctx.drawTexture(RenderLayer::getGuiTextured, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
         drawRectOutline(ctx, svX - 1, svY - 1, svX + PICKER_SV_W + 1, svY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         // Cursor on SV
         int scx = svX + (int)(pickerSat * (PICKER_SV_W - 1));
@@ -1865,7 +1866,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(scx, scy - 2, scx + 1, scy + 3, pal.TEXT_NORMAL);
 
         // Draw hue and alpha bars on top as well
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_HUE_ID, hueX, hueY, 0, 0, hueW, PICKER_SV_H, hueW, PICKER_SV_H, hueW, PICKER_SV_H);
+        ctx.drawTexture(RenderLayer::getGuiTextured, PICKER_HUE_ID, hueX, hueY, 0, 0, hueW, PICKER_SV_H, hueW, PICKER_SV_H, hueW, PICKER_SV_H);
         drawRectOutline(ctx, hueX - 1, hueY - 1, hueX + hueW + 1, hueY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int hcy = hueY + (int)(pickerHue * (PICKER_SV_H - 1));
         ctx.fill(hueX - 1, hcy, hueX + hueW + 1, hcy + 1, 0xFFFFFFFF);
@@ -1878,7 +1879,7 @@ public abstract class AbstractEditorScreen extends Screen {
             int parity = ((absX / 4) + (absY / 4)) & 1;
             ctx.fill(absX, absY, absX + 4, absY + 4, (parity == 0) ? pal.CHECKER_DARK : pal.CHECKER_LIGHT);
         }
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
+        ctx.drawTexture(RenderLayer::getGuiTextured, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
         drawRectOutline(ctx, alphaX - 1, alphaY - 1, alphaX + alphaW + 1, alphaY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int acy = alphaY + (int)((1f - pickerAlpha) * (PICKER_SV_H - 1));
         ctx.fill(alphaX - 1, acy, alphaX + alphaW + 1, acy + 1, pal.TEXT_NORMAL);
@@ -2120,7 +2121,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 }
             }
             if (w * zoom > 0 && h * zoom > 0)
-                ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, CANVAS_TEX_ID, canvasScreenX, canvasScreenY, 0, 0, w * zoom, h * zoom, w, h, w, h);
+                ctx.drawTexture(RenderLayer::getGuiTextured, CANVAS_TEX_ID, canvasScreenX, canvasScreenY, 0, 0, w * zoom, h * zoom, w, h, w, h);
         } else {
             for (int x = visMinX; x < visMaxX; x++) for (int y = visMinY; y < visMaxY; y++) {
                 int c = previewingOriginal && originalPixels != null ? originalPixels[x][y] : canvas.getPixel(x, y);
@@ -2633,8 +2634,7 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
-        double mx = click.x(), my = click.y(); int btn = click.button();
+    public boolean mouseClicked(double mx, double my, int btn) {
         if (selectionMenuOpen) {
             suppressMenuClickThroughUntilRelease = true;
             if (btn == 0) {
@@ -2677,7 +2677,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 downPx = downPy = -1; movedSinceDown = false;
             }
         }
-        if (super.mouseClicked(click, bl)) return true;
+        if (super.mouseClicked(mx, my, btn)) return true;
         if (handleExtraClick(mx, my, btn)) return true;
 
         // Middle click = quick wheel
@@ -2869,8 +2869,7 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
-        double mx = click.x(), my = click.y(); int btn = click.button();
+    public boolean mouseReleased(double mx, double my, int btn) {
         boolean hadLeftDown = leftDown;
         if (suppressMenuClickThroughUntilRelease) {
             if (btn == 0) {
@@ -3021,12 +3020,11 @@ public abstract class AbstractEditorScreen extends Screen {
             return true;
         }
         lastDrawX = -1; lastDrawY = -1;
-        return super.mouseReleased(click);
+        return super.mouseReleased(mx, my, btn);
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
-        double mx = click.x(), my = click.y(); int btn = click.button();
+    public boolean mouseDragged(double mx, double my, int btn, double dx, double dy) {
         if (suppressMenuClickThroughUntilRelease) return true;
         if (selectionMenuOpen) return true;
         if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) return true;
@@ -3061,7 +3059,7 @@ public abstract class AbstractEditorScreen extends Screen {
         // If left button is down and we're in the color panel, begin a drag-capture (prevents jump when entering slider)
         if (btn == 0 && rightOpen && rightTab == RightTab.COLOR && startColorPickerDrag(mx, my)) return true;
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
-        if (isInUIRegion(mx, my)) return super.mouseDragged(click, dx, dy);
+        if (isInUIRegion(mx, my)) return super.mouseDragged(mx, my, btn, dx, dy);
         if (canvas != null && btn == 0 && currentTool == EditorTool.SELECT
                 && (selectionDraggingCreate || selectionDraggingMove || selectionTransformingResize || selectionTransformingRotate)) {
             int px = screenToCanvasX(mx), py = screenToCanvasY(my);
@@ -3128,12 +3126,12 @@ public abstract class AbstractEditorScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseDragged(click, dx, dy);
+        return super.mouseDragged(mx, my, btn, dx, dy);
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        int kc = keyInput.key();
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        int kc = keyCode;
         if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) {
             if (kc == GLFW.GLFW_KEY_ESCAPE) {
                 closeProfileMenu();
@@ -3157,12 +3155,12 @@ public abstract class AbstractEditorScreen extends Screen {
             }
         }
         if (hexInput != null && hexInput.isFocused()) {
-            super.keyPressed(keyInput);
+            super.keyPressed(keyCode, scanCode, modifiers);
             // Keep tool/browse keybinds from firing while the hex input is focused.
             return true;
         }
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
-        if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = true; return true; }
+        if (previewKey != null && previewKey.matchesKey(keyCode, scanCode)) { previewingOriginal = true; return true; }
         ModSettings s = ModSettings.getInstance();
         if (kc == s.getKeybind("undo"))       { if (selectionDraggingMove) commitSelectionMove(); canvas.undo(); clearSelection(); return true; }
         if (kc == s.getKeybind("redo"))       { canvas.redo(); clearSelection(); return true; }
@@ -3244,7 +3242,7 @@ public abstract class AbstractEditorScreen extends Screen {
         }
         // brush key removed
         var openKey = com.zeeesea.textureeditor.TextureEditorClient.getOpenEditorKey();
-        if (openKey != null && openKey.matchesKey(keyInput)) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
+        if (openKey != null && openKey.matchesKey(keyCode, scanCode)) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
         // Browse keybind: jump back to the previous/backing screen or open BrowseScreen
         if (kc == s.getKeybind("browse")) {
             if (ModSettings.getInstance().autoApplyLive) applyLive();
@@ -3253,28 +3251,28 @@ public abstract class AbstractEditorScreen extends Screen {
             return true;
         }
         if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
-        return super.keyPressed(keyInput);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean charTyped(net.minecraft.client.input.CharInput charInput) {
+    public boolean charTyped(char chr, int modifiers) {
         if (profileMenuOpen && profileNameEditing) {
-            int cp = charInput.codepoint();
-            if (!charInput.isValidChar() || Character.isISOControl(cp)) return true;
+            int cp = chr;
+            if (Character.isISOControl(cp)) return true;
             if (profileNameDraft == null) profileNameDraft = "";
             if (profileNameDraft.length() < 32) {
-                profileNameDraft += Character.toString(cp);
+                profileNameDraft += chr;
             }
             return true;
         }
-        return super.charTyped(charInput);
+        return super.charTyped(chr, modifiers);
     }
 
     @Override
-    public boolean keyReleased(net.minecraft.client.input.KeyInput keyInput) {
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
-        if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = false; return true; }
-        return super.keyReleased(keyInput);
+        if (previewKey != null && previewKey.matchesKey(keyCode, scanCode)) { previewingOriginal = false; return true; }
+        return super.keyReleased(keyCode, scanCode, modifiers);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

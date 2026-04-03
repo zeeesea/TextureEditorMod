@@ -256,7 +256,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Apply widget Y offset used for rendering so hitboxes match visual positions
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
@@ -266,7 +266,7 @@ public class SettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseClicked(click, doubled);
+        boolean res = super.mouseClicked(mouseX, mouseY, button);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -279,7 +279,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -288,7 +288,7 @@ public class SettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseReleased(click);
+        boolean res = super.mouseReleased(mouseX, mouseY, button);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -301,7 +301,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double offsetX, double offsetY) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -310,7 +310,7 @@ public class SettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseDragged(click, offsetX, offsetY);
+        boolean res = super.mouseDragged(mouseX, mouseY, button, offsetX, offsetY);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -349,9 +349,9 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
-        return super.keyPressed(keyInput);
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

@@ -162,8 +162,8 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
-        boolean b = super.mouseDragged(click, dx, dy);
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        boolean b = super.mouseDragged(mouseX, mouseY, button, dx, dy);
         if (mobPreviewActive) applyLive();
         return b;
     }

@@ -22,6 +22,7 @@ import java.util.List;
  * Items use the same block atlas for their sprites.
  */
 public class ItemTextureExtractor {
+    private static final Identifier ITEMS_ATLAS_TEXTURE_ID = Identifier.ofVanilla("textures/atlas/items.png");
 
     public record ItemTexture(Identifier textureId, Identifier spriteId, int[][] pixels, int width, int height) {}
 
@@ -54,7 +55,7 @@ public class ItemTextureExtractor {
         // Strategy 2: Try to get sprite directly from ITEMS atlas (1.21.11+ has separate items atlas)
         Identifier directSpriteId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath());
         try {
-            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
+            var tex = client.getTextureManager().getTexture(ITEMS_ATLAS_TEXTURE_ID);
             if (tex instanceof SpriteAtlasTexture sat) {
                 Sprite directSprite = sat.getSprite(directSpriteId);
                 if (directSprite != null && !directSprite.getContents().getId().getPath().equals("missingno")) {
@@ -224,7 +225,7 @@ public class ItemTextureExtractor {
     private static Sprite findSpriteInAnyAtlas(MinecraftClient client, Identifier spriteId) {
         // Try items atlas
         try {
-            var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
+            var tex = client.getTextureManager().getTexture(ITEMS_ATLAS_TEXTURE_ID);
             if (tex instanceof SpriteAtlasTexture sat) {
                 Sprite s = sat.getSprite(spriteId);
                 if (s != null && !s.getContents().getId().getPath().equals("missingno")) return s;

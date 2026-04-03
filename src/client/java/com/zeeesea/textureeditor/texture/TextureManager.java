@@ -1,35 +1,20 @@
 package com.zeeesea.textureeditor.texture;
 
-import com.zeeesea.textureeditor.mixin.client.SpriteAccessor;
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GpuSampler;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.systems.RenderPass;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalInt;
 import java.util.Set;
-import org.joml.Matrix4f;
-import org.lwjgl.system.MemoryUtil;
 
 /**
  * Manages modified textures and applies them live by uploading to the block atlas.
@@ -38,12 +23,14 @@ import org.lwjgl.system.MemoryUtil;
  */
 public class TextureManager {
     private static final TextureManager INSTANCE = new TextureManager();
+    private static final Identifier ITEMS_ATLAS_TEXTURE_ID = Identifier.ofVanilla("textures/atlas/items.png");
 
     private final Map<Identifier, int[][]> modifiedTextures = new HashMap<>();
     private final Map<Identifier, int[]> textureDimensions = new HashMap<>();
     private final Map<Identifier, int[][]> originalTextures = new HashMap<>();
     private final Map<Identifier, ItemAnimationData> itemAnimations = new HashMap<>();
     private final Map<Identifier, LiveItemAnimation> liveItemAnimations = new HashMap<>();
+    private final Map<Identifier, Integer> lastAppliedSpriteHash = new HashMap<>();
     private boolean previewingOriginals = false;
     private volatile boolean itemGuiAtlasDirty = false;
 
@@ -220,6 +207,13 @@ public class TextureManager {
     public void removeTexture(Identifier textureId) {
         modifiedTextures.remove(textureId);
         textureDimensions.remove(textureId);
+        if (textureId != null) {
+            String path = textureId.getPath();
+            if (path.startsWith("textures/") && path.endsWith(".png")) {
+                Identifier spriteId = Identifier.of(textureId.getNamespace(), path.substring("textures/".length(), path.length() - 4));
+                lastAppliedSpriteHash.remove(spriteId);
+            }
+        }
     }
 
     public void removeOriginal(Identifier textureId) {
@@ -242,6 +236,11 @@ public class TextureManager {
         if (textureId == null) return;
         itemAnimations.remove(textureId);
         liveItemAnimations.remove(textureId);
+        String path = textureId.getPath();
+        if (path.startsWith("textures/") && path.endsWith(".png")) {
+            Identifier spriteId = Identifier.of(textureId.getNamespace(), path.substring("textures/".length(), path.length() - 4));
+            lastAppliedSpriteHash.remove(spriteId);
+        }
     }
 
     public void startItemAnimationLive(Identifier textureId, Identifier spriteId, List<int[][]> frames,
@@ -372,7 +371,7 @@ public class TextureManager {
                 SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE, "BLOCK");
         try {
             int itemsHit = tryBlitToAtlas(client, spriteId, pixels, width, height,
-                    SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE, "ITEMS");
+                    ITEMS_ATLAS_TEXTURE_ID, "ITEMS");
             System.out.println("[TextureEditor] ITEMS atlas hit: " + itemsHit + " for " + spriteId);
             hitCount += itemsHit;
         } catch (Exception e) {
@@ -427,7 +426,6 @@ public class TextureManager {
             return;
         }
 
-        int padding = ((SpriteAccessor) sprite).getPadding();
         int spriteX = sprite.getX();
         int spriteY = sprite.getY();
         int writeW = Math.min(width, image.getWidth());
@@ -451,97 +449,15 @@ public class TextureManager {
         NativeImage[] mipmaps = contentsAccessor.getMipmapLevelsImages();
         int spriteMipLevels = mipmaps.length;
 
-        // Step 3: Upload via RenderPass blit
+        // Step 3: Upload updated sprite mip levels directly to the atlas texture
         try {
             GpuTexture atlasTexture = atlas.getGlTexture();
-            int atlasW = atlasTexture.getWidth(0);
-            int atlasH = atlasTexture.getHeight(0);
             int atlasMipLevels = atlasTexture.getMipLevels();
-            int numMipLevels = Math.min(spriteMipLevels, atlasMipLevels);
-            if (numMipLevels <= 0) numMipLevels = 1;
-
-            // Create temp GpuTexture for the sprite
-            GpuTexture tempTexture = RenderSystem.getDevice().createTexture(
-                () -> "TextureEditor temp " + spriteId,
-                5, // COPY_DST(1) | TEXTURE_BINDING(4)
-                TextureFormat.RGBA8,
-                contents.getWidth(),
-                contents.getHeight(),
-                1,
-                numMipLevels
-            );
-
-            // Upload each mip level to the temp texture
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                int mipW = contents.getWidth() >> mip;
-                int mipH = contents.getHeight() >> mip;
-                if (mipW <= 0 || mipH <= 0) break;
-                RenderSystem.getDevice()
-                    .createCommandEncoder()
-                    .writeToTexture(tempTexture, mipmaps[mip], mip, 0, 0, 0, mipW, mipH, 0, 0);
-            }
-
-            // Build the sprite info uniform buffer (same layout as Sprite.putSpriteInfo)
-            int uniformAlignment = RenderSystem.getDevice().getUniformOffsetAlignment();
-            int spriteInfoSize = SpriteContents.SPRITE_INFO_SIZE;
-            int stride = MathHelper.roundUpToMultiple(spriteInfoSize, uniformAlignment);
-            int totalSize = stride * numMipLevels;
-            ByteBuffer buffer = MemoryUtil.memAlloc(totalSize);
-
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                int bufOffset = mip * stride;
-                Std140Builder.intoBuffer(MemoryUtil.memSlice(buffer, bufOffset, stride))
-                    .putMat4f(new Matrix4f().ortho2D(0.0F, atlasW >> mip, 0.0F, atlasH >> mip))
-                    .putMat4f(new Matrix4f()
-                        .translate(spriteX >> mip, spriteY >> mip, 0.0F)
-                        .scale(contents.getWidth() + padding * 2 >> mip, contents.getHeight() + padding * 2 >> mip, 1.0F))
-                    .putFloat((float) padding / contents.getWidth())
-                    .putFloat((float) padding / contents.getHeight())
-                    .putInt(mip);
-            }
-
-            GpuBuffer uniformBuffer = RenderSystem.getDevice().createBuffer(
-                () -> "TextureEditor uniform",
-                GpuBuffer.USAGE_UNIFORM,
-                buffer
-            );
-            MemoryUtil.memFree(buffer);
-
-            GpuSampler sampler = RenderSystem.getSamplerCache().get(FilterMode.NEAREST, true);
-
-            GpuTextureView[] atlasMipViews = new GpuTextureView[numMipLevels];
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                atlasMipViews[mip] = RenderSystem.getDevice().createTextureView(atlasTexture, mip, 1);
-            }
-
-            GpuTextureView[] tempViews = new GpuTextureView[numMipLevels];
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                tempViews[mip] = RenderSystem.getDevice().createTextureView(tempTexture);
-            }
-
-            // Blit via RenderPass (same as SpriteAtlasTexture.upload)
-            for (int mip = 0; mip < numMipLevels; mip++) {
-                try (RenderPass renderPass = RenderSystem.getDevice()
-                        .createCommandEncoder()
-                        .createRenderPass(
-                            () -> "TextureEditor blit " + spriteId,
-                            atlasMipViews[mip],
-                            OptionalInt.empty())) {
-                    renderPass.setPipeline(RenderPipelines.ANIMATE_SPRITE_BLIT);
-                    renderPass.bindTexture("Sprite", tempViews[mip], sampler);
-                    renderPass.setUniform("SpriteAnimationInfo", uniformBuffer.slice((long)mip * stride, spriteInfoSize));
-                    renderPass.draw(0, 6);
-                }
-            }
-
-            // Cleanup
-            for (GpuTextureView v : atlasMipViews) v.close();
-            for (GpuTextureView v : tempViews) v.close();
-            tempTexture.close();
-            uniformBuffer.close();
+            int numMipLevels = Math.max(1, Math.min(spriteMipLevels, atlasMipLevels));
+            sprite.upload(atlasTexture);
 
             System.out.println("[TextureEditor] Blitted " + spriteId + " to " + atlasName +
-                " atlas (" + atlasW + "x" + atlasH + ") at " + spriteX + "," + spriteY +
+                " atlas (" + atlasTexture.getWidth(0) + "x" + atlasTexture.getHeight(0) + ") at " + spriteX + "," + spriteY +
                 " mips=" + numMipLevels);
         } catch (Throwable t) {
             System.out.println("[TextureEditor] ERROR during " + atlasName + " upload: " + t.getClass().getName() + ": " + t.getMessage());
@@ -569,9 +485,17 @@ public class TextureManager {
             ensureOriginalStored(textureId);
         }
 
+        int currentHash = computePixelHash(pixels, width, height);
+        Integer previousHash = lastAppliedSpriteHash.get(spriteId);
+        if (previousHash != null && previousHash == currentHash) {
+            putTexture(textureId, pixels, width, height);
+            return;
+        }
+
         putTexture(textureId, pixels, width, height);
         writeSpritePixels(spriteId, pixels, width, height);
         markItemGuiAtlasDirty(spriteId);
+        lastAppliedSpriteHash.put(spriteId, currentHash);
 
         if (rebakeModel) {
             try {
@@ -667,6 +591,17 @@ public class TextureManager {
             for (int y = 0; y < dstH; y++)
                 result[x][y] = src[(int)(x * srcW / (float)dstW)][(int)(y * srcH / (float)dstH)];
         return result;
+    }
+
+    private static int computePixelHash(int[][] pixels, int width, int height) {
+        if (pixels == null || width <= 0 || height <= 0) return 0;
+        int hash = 31 * width + height;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                hash = 31 * hash + pixels[x][y];
+            }
+        }
+        return hash;
     }
 
     /**

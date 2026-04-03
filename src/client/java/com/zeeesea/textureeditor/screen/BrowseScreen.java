@@ -10,6 +10,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.item.*;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
@@ -1065,7 +1066,7 @@ public class BrowseScreen extends Screen {
                     int drawX = x + (CELL_SIZE - drawW) / 2;
                     int drawY = y + (CELL_SIZE - drawH) / 2;
                     // Use same form as ExportScreen to render a dynamic NativeImageBackedTexture
-                    context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
+                    context.drawTexture(RenderLayer::getGuiTextured,
                             cache.dynamicId, drawX, drawY, 0, 0, drawW, drawH, cache.width, cache.height, cache.width, cache.height);
                 } else {
                     // GUI entries: draw abbreviated name as fallback
@@ -1092,7 +1093,6 @@ public class BrowseScreen extends Screen {
         }
         // Draw tooltip — use createNewRootLayer to render above item icons
         if (tooltipParts != null && !tooltipParts.isEmpty()) {
-            context.createNewRootLayer();
             int tw = 8; // padding
             for (String s : tooltipParts) tw += textRenderer.getWidth(s);
             int tx = Math.min(mouseX + 10, this.width - tw - 5);
@@ -1448,9 +1448,8 @@ public class BrowseScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
-        if (super.mouseClicked(click, bl)) return true;
-        double mouseX = click.x(); double mouseY = click.y(); int button = click.button();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) return true;
 
         // Left-click: open editor, Right-click: reset texture
         if (button == 0 || button == 1) {
@@ -1729,12 +1728,12 @@ public class BrowseScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             this.close();
             return true;
         }
-        return super.keyPressed(keyInput);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

@@ -51,7 +51,7 @@ public class TextureEditorClient implements ClientModInitializer {
     public void onInitializeClient() {
         ModSettings s = ModSettings.getInstance();
 
-        KeyBinding.Category category = KeyBinding.Category.create(Identifier.of("textureeditor", "category"));
+        String category = "category.textureeditor";
 
         toggleEditorKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.toggle",
@@ -112,7 +112,7 @@ public class TextureEditorClient implements ClientModInitializer {
 
                 // Preview original texture (hold key) — world-level preview
                 boolean previewKeyHeld = InputUtil.isKeyPressed(
-                        client.getWindow(),
+                        client.getWindow().getHandle(),
                         KeyBindingHelper.getBoundKeyOf(previewOriginalKey).getCode()
                 );
                 TextureManager tm = TextureManager.getInstance();

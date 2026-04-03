@@ -144,7 +144,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Apply the same widget Y offset used during rendering so hitboxes align with visual positions
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
@@ -154,7 +154,7 @@ public class KeybindSettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseClicked(click, doubled);
+        boolean res = super.mouseClicked(mouseX, mouseY, button);
         // restore positions
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
@@ -168,7 +168,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -177,7 +177,7 @@ public class KeybindSettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseReleased(click);
+        boolean res = super.mouseReleased(mouseX, mouseY, button);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -190,7 +190,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double offsetX, double offsetY) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -199,7 +199,7 @@ public class KeybindSettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseDragged(click, offsetX, offsetY);
+        boolean res = super.mouseDragged(mouseX, mouseY, button, offsetX, offsetY);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -233,8 +233,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        int keyCode = keyInput.key();
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (waitingForKey != null) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 // Cancel rebind
@@ -248,7 +247,7 @@ public class KeybindSettingsScreen extends Screen {
             return true;
         }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
-        return super.keyPressed(keyInput);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

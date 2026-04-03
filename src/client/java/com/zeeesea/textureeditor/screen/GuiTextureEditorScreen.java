@@ -293,7 +293,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
         // Check items atlas
         try {
-            var tex = client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
+            var tex = client.getTextureManager().getTexture(Identifier.ofVanilla("textures/atlas/items.png"));
             if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture itemsAtlas) {
                 var sprite = itemsAtlas.getSprite(id);
                 if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
