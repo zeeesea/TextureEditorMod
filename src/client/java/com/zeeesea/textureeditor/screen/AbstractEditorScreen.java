@@ -80,7 +80,9 @@ public abstract class AbstractEditorScreen extends Screen {
 
     // ── Selection tool ────────────────────────────────────────────────────────
     private enum SelectionMode { RECT, LASSO }
+    private enum SelectionCombineMode { REPLACE, ADD, SUBTRACT }
     private SelectionMode selectionMode = SelectionMode.RECT;
+    private SelectionCombineMode selectionCombineMode = SelectionCombineMode.REPLACE;
     private int selMinX = -1, selMinY = -1, selMaxX = -1, selMaxY = -1;
     private boolean[][] selectionMask = null;
     private boolean selectionDraggingCreate = false;
@@ -93,6 +95,7 @@ public abstract class AbstractEditorScreen extends Screen {
     private int selectionMoveW = 0, selectionMoveH = 0;
     private boolean[][] selectionMoveMask = null;
     private java.util.List<int[]> selectionLassoPoints = new java.util.ArrayList<>();
+    private boolean[][] selectionCreateBaseMask = null;
     // Shared clipboard across all editor screen instances so copy/paste works between textures.
     private static int[][] selectionClipboard = null;
     private static int selectionClipboardW = 0, selectionClipboardH = 0;
@@ -208,6 +211,16 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean suppressHexCallback = false;
     // Size slider reference so we can programmatically update it when toolSize changes
     private net.minecraft.client.gui.widget.SliderWidget sizeSlider = null;
+    private net.minecraft.client.gui.widget.SliderWidget variationSlider = null;
+    private net.minecraft.client.gui.widget.SliderWidget fillToleranceSlider = null;
+    private int toolSettingsHeaderX = -1;
+    private int toolSettingsHeaderY = -1;
+    private static final long TOOLTIP_HOVER_DELAY_MS = 450L;
+    private String tooltipHoverKey = null;
+    private long tooltipHoverStartMs = 0L;
+    private boolean tooltipRequestedThisFrame = false;
+    private record HoverTooltipArea(int x, int y, int w, int h, String text) {}
+    private final java.util.List<HoverTooltipArea> toolOptionTooltips = new java.util.ArrayList<>();
     // When programmatically updating the size slider, suppress its applyValue callback
     private boolean suppressSizeSliderCallback = false;
     // (No separate alpha slider widget — the alpha bar at the right of the picker
@@ -318,6 +331,34 @@ public abstract class AbstractEditorScreen extends Screen {
         return "Variation: " + pct + "%";
     }
 
+    private String getToleranceLabel() {
+        int t = clamp(ModSettings.getInstance().fillTolerance, 0, 255);
+        if (t <= 0) return "Tolerance: OFF";
+        return "Tolerance: " + t;
+    }
+
+    private String getSelectionModeLabel() {
+        return "Mode: " + (selectionMode == SelectionMode.RECT ? "Rectangle" : "Lasso");
+    }
+
+    private void addToolOptionTooltip(int x, int y, int w, int h, String text) {
+        if (text == null || text.isEmpty()) return;
+        toolOptionTooltips.add(new HoverTooltipArea(x, y, w, h, text));
+    }
+
+    private void refreshToolsPanelIfVisible() {
+        if (!leftOpen || leftTab != LeftTab.TOOLS) return;
+        clearChildren();
+        recalcCanvasPos();
+        buildWidgets();
+    }
+
+    private void setCurrentTool(EditorTool tool) {
+        if (tool == null || currentTool == tool) return;
+        currentTool = tool;
+        refreshToolsPanelIfVisible();
+    }
+
     // Deterministic variation for preview: adjust RGB by a pseudo-random factor based on coordinates
     private int applyPreviewVariation(int baseColor, int x, int y, float var) {
         int a = (baseColor >> 24) & 0xFF;
@@ -388,6 +429,7 @@ public abstract class AbstractEditorScreen extends Screen {
         selectionTransformW = selectionTransformH = 0;
         selectionResizeHandle = -1;
         selectionLassoPoints.clear();
+        selectionCreateBaseMask = null;
         selectionMenuOpen = false;
         contextMenuItems = List.of();
     }
@@ -406,7 +448,19 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     private void setSelectionFromPoints(int x1, int y1, int x2, int y2) {
-        if (canvas == null) return;
+        selectionMask = buildRectSelectionMask(x1, y1, x2, y2);
+        recalcSelectionBounds();
+    }
+
+    private void setSelectionFromLasso() {
+        boolean[][] next = buildLassoSelectionMask();
+        if (next == null) return;
+        selectionMask = next;
+        recalcSelectionBounds();
+    }
+
+    private boolean[][] buildRectSelectionMask(int x1, int y1, int x2, int y2) {
+        if (canvas == null) return null;
         int w = canvas.getWidth();
         int h = canvas.getHeight();
         x1 = clamp(x1, 0, w - 1);
@@ -417,20 +471,20 @@ public abstract class AbstractEditorScreen extends Screen {
         int maxX = Math.max(x1, x2);
         int minY = Math.min(y1, y2);
         int maxY = Math.max(y1, y2);
-        selectionMask = new boolean[w][h];
+        boolean[][] next = new boolean[w][h];
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
-                selectionMask[x][y] = true;
+                next[x][y] = true;
             }
         }
-        recalcSelectionBounds();
+        return next;
     }
 
-    private void setSelectionFromLasso() {
-        if (canvas == null || selectionLassoPoints.size() < 3) return;
+    private boolean[][] buildLassoSelectionMask() {
+        if (canvas == null || selectionLassoPoints.size() < 3) return null;
         int w = canvas.getWidth();
         int h = canvas.getHeight();
-        selectionMask = new boolean[w][h];
+        boolean[][] next = new boolean[w][h];
         int minX = w - 1, minY = h - 1, maxX = 0, maxY = 0;
         for (int[] p : selectionLassoPoints) {
             minX = Math.min(minX, p[0]);
@@ -438,13 +492,47 @@ public abstract class AbstractEditorScreen extends Screen {
             maxX = Math.max(maxX, p[0]);
             maxY = Math.max(maxY, p[1]);
         }
-        minX = clamp(minX, 0, w - 1); minY = clamp(minY, 0, h - 1);
-        maxX = clamp(maxX, 0, w - 1); maxY = clamp(maxY, 0, h - 1);
+        minX = clamp(minX, 0, w - 1);
+        minY = clamp(minY, 0, h - 1);
+        maxX = clamp(maxX, 0, w - 1);
+        maxY = clamp(maxY, 0, h - 1);
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
-                if (pointInPolygon(x + 0.5, y + 0.5, selectionLassoPoints)) selectionMask[x][y] = true;
+                if (pointInPolygon(x + 0.5, y + 0.5, selectionLassoPoints)) next[x][y] = true;
             }
         }
+        return next;
+    }
+
+    private boolean[][] copyMask(boolean[][] src) {
+        if (src == null) return null;
+        boolean[][] out = new boolean[src.length][];
+        for (int x = 0; x < src.length; x++) out[x] = java.util.Arrays.copyOf(src[x], src[x].length);
+        return out;
+    }
+
+    private boolean[][] mergeSelectionMasks(boolean[][] baseMask, boolean[][] incoming, SelectionCombineMode mode) {
+        if (incoming == null || canvas == null) return baseMask;
+        int w = canvas.getWidth();
+        int h = canvas.getHeight();
+        boolean[][] result = new boolean[w][h];
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                boolean base = baseMask != null && x < baseMask.length && y < baseMask[x].length && baseMask[x][y];
+                boolean inc = x < incoming.length && y < incoming[x].length && incoming[x][y];
+                result[x][y] = switch (mode) {
+                    case REPLACE -> inc;
+                    case ADD -> base || inc;
+                    case SUBTRACT -> base && !inc;
+                };
+            }
+        }
+        return result;
+    }
+
+    private void updateSelectionFromToolMask(boolean[][] incoming) {
+        boolean[][] base = selectionCombineMode == SelectionCombineMode.REPLACE ? null : selectionCreateBaseMask;
+        selectionMask = mergeSelectionMasks(base, incoming, selectionCombineMode);
         recalcSelectionBounds();
     }
 
@@ -1185,6 +1273,9 @@ public abstract class AbstractEditorScreen extends Screen {
         int bh = getToolButtonHeight();
         // reset computed left-panel content height before constructing
         leftPanelContentHeight = 0;
+        toolOptionTooltips.clear();
+        toolSettingsHeaderX = -1;
+        toolSettingsHeaderY = -1;
 
         // ── LEFT panel toggle button ──────────────────────────────────────────
         addDrawableChild(ButtonWidget.builder(
@@ -1339,29 +1430,137 @@ public abstract class AbstractEditorScreen extends Screen {
                 .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
+        py += 2;
+        toolSettingsHeaderX = px + 2;
+        toolSettingsHeaderY = py - leftPanelScrollY + Math.max(0, (bh - this.textRenderer.fontHeight) / 2);
+        py += bh + 2;
 
-        // Tool size slider
-        sizeSlider = new net.minecraft.client.gui.widget.SliderWidget(
-                px, py, w, bh, Text.literal("Size: " + toolSize + "px"), (toolSize - 1) / 9.0) {
-            @Override protected void updateMessage() { setMessage(Text.literal("Size: " + toolSize + "px")); }
-            @Override protected void applyValue() {
-                if (suppressSizeSliderCallback) return;
-                toolSize = (int)(value * 9) + 1;
+        sizeSlider = null;
+        variationSlider = null;
+        fillToleranceSlider = null;
+
+        switch (currentTool) {
+            case SELECT -> {
+                ButtonWidget modeButton = ButtonWidget.builder(Text.literal(getSelectionModeLabel()), btn -> {
+                            selectionMode = (selectionMode == SelectionMode.RECT) ? SelectionMode.LASSO : SelectionMode.RECT;
+                            clearChildren(); recalcCanvasPos(); buildWidgets();
+                        })
+                        .position(px, py - leftPanelScrollY).size(w, bh).build();
+                addDrawableChild(modeButton);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w, bh, "Switch between rectangle and freehand lasso selection.");
+                py += bh + 2;
+
+                int third = Math.max(24, (w - 2) / 3);
+                int rem = w - (third * 3 + 2);
+                int w1 = third + Math.max(0, rem);
+                int w2 = third;
+                int w3 = third;
+
+                ButtonWidget replaceBtn = ButtonWidget.builder(Text.literal(selectionCombineMode == SelectionCombineMode.REPLACE ? "[=]" : "="), btn -> {
+                            selectionCombineMode = SelectionCombineMode.REPLACE;
+                            clearChildren(); recalcCanvasPos(); buildWidgets();
+                        })
+                        .position(px, py - leftPanelScrollY).size(w1, bh).build();
+                addDrawableChild(replaceBtn);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w1, bh, "Replace the current selection with the new one.");
+
+                int addX = px + w1 + 1;
+                ButtonWidget addBtn = ButtonWidget.builder(Text.literal(selectionCombineMode == SelectionCombineMode.ADD ? "[+]" : "+"), btn -> {
+                            selectionCombineMode = SelectionCombineMode.ADD;
+                            clearChildren(); recalcCanvasPos(); buildWidgets();
+                        })
+                        .position(addX, py - leftPanelScrollY).size(w2, bh).build();
+                addDrawableChild(addBtn);
+                addToolOptionTooltip(addX, py - leftPanelScrollY, w2, bh, "Add the new selection area to the existing selection.");
+
+                int subX = addX + w2 + 1;
+                ButtonWidget subBtn = ButtonWidget.builder(Text.literal(selectionCombineMode == SelectionCombineMode.SUBTRACT ? "[-]" : "-"), btn -> {
+                            selectionCombineMode = SelectionCombineMode.SUBTRACT;
+                            clearChildren(); recalcCanvasPos(); buildWidgets();
+                        })
+                        .position(subX, py - leftPanelScrollY).size(w3, bh).build();
+                addDrawableChild(subBtn);
+                addToolOptionTooltip(subX, py - leftPanelScrollY, w3, bh, "Subtract the new selection area from the current selection.");
+                py += bh + 4;
             }
-        };
-        sizeSlider.setX(px); sizeSlider.setY(py - leftPanelScrollY); addDrawableChild(sizeSlider);
-        py += bh + 4;
+            case FILL -> {
+                variationSlider = new net.minecraft.client.gui.widget.SliderWidget(px, py, w, bh, Text.literal(getVarLabel()), ModSettings.getInstance().variationPercent) {
+                    @Override protected void updateMessage() { setMessage(Text.literal(getVarLabel())); }
+                    @Override protected void applyValue() { ModSettings.getInstance().variationPercent = (float) this.value; ModSettings.getInstance().save(); }
+                };
+                variationSlider.setX(px);
+                variationSlider.setY(py - leftPanelScrollY);
+                addDrawableChild(variationSlider);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w, bh, "Adds random color variation to filled pixels.");
+                py += bh + 2;
 
-        // Variation percent slider (0..100). When value == 0 show "OFF" instead of "0%".
-        net.minecraft.client.gui.widget.SliderWidget varSlider = new net.minecraft.client.gui.widget.SliderWidget(px, py, w, bh, Text.literal(getVarLabel()), ModSettings.getInstance().variationPercent) {
-            @Override protected void updateMessage() { setMessage(Text.literal(getVarLabel())); }
-            @Override protected void applyValue() { ModSettings.getInstance().variationPercent = (float)this.value; ModSettings.getInstance().save(); }
-        };
-        varSlider.setX(px); varSlider.setY(py - leftPanelScrollY); addDrawableChild(varSlider);
-        py += bh + 4;
+                fillToleranceSlider = new net.minecraft.client.gui.widget.SliderWidget(px, py, w, bh, Text.literal(getToleranceLabel()), clamp(ModSettings.getInstance().fillTolerance, 0, 255) / 255.0) {
+                    @Override protected void updateMessage() { setMessage(Text.literal(getToleranceLabel())); }
+                    @Override protected void applyValue() {
+                        ModSettings settings = ModSettings.getInstance();
+                        settings.fillTolerance = clamp((int) Math.round(this.value * 255.0), 0, 255);
+                        settings.save();
+                    }
+                };
+                fillToleranceSlider.setX(px);
+                fillToleranceSlider.setY(py - leftPanelScrollY);
+                addDrawableChild(fillToleranceSlider);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w, bh, "Matches similar colors when filling. OFF means exact color only.");
+                py += bh + 2;
 
-        // Helper to display label for variation slider
-        // (kept as a local method below via lambda-like closure through a private helper)
+                ButtonWidget contiguousButton = ButtonWidget.builder(Text.literal("Contiguous: " + (ModSettings.getInstance().fillContiguous ? "ON" : "OFF")), btn -> {
+                            ModSettings settings = ModSettings.getInstance();
+                            settings.fillContiguous = !settings.fillContiguous;
+                            settings.save();
+                            clearChildren(); recalcCanvasPos(); buildWidgets();
+                        })
+                        .position(px, py - leftPanelScrollY).size(w, bh).build();
+                addDrawableChild(contiguousButton);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w, bh, "ON: fill connected pixels only. OFF: fill matching pixels across the whole texture.");
+                py += bh + 2;
+
+                ButtonWidget scopeButton = ButtonWidget.builder(Text.literal("Scope: " + (ModSettings.getInstance().fillWholeCanvas ? "Whole Canvas" : "Active Layer")), btn -> {
+                            ModSettings settings = ModSettings.getInstance();
+                            settings.fillWholeCanvas = !settings.fillWholeCanvas;
+                            settings.save();
+                            clearChildren(); recalcCanvasPos(); buildWidgets();
+                        })
+                        .position(px, py - leftPanelScrollY).size(w, bh).build();
+                addDrawableChild(scopeButton);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w, bh, "Choose whether fill color matching is based on the active layer or the full composited canvas.");
+                py += bh + 4;
+            }
+            case EYEDROPPER -> {
+                addDrawableChild(ButtonWidget.builder(Text.literal("No tool-specific settings"), btn -> {})
+                        .position(px, py - leftPanelScrollY).size(w, bh).build());
+                py += bh + 4;
+            }
+            default -> {
+                sizeSlider = new net.minecraft.client.gui.widget.SliderWidget(
+                        px, py, w, bh, Text.literal("Size: " + toolSize + "px"), (toolSize - 1) / 9.0) {
+                    @Override protected void updateMessage() { setMessage(Text.literal("Size: " + toolSize + "px")); }
+                    @Override protected void applyValue() {
+                        if (suppressSizeSliderCallback) return;
+                        toolSize = (int) (value * 9) + 1;
+                    }
+                };
+                sizeSlider.setX(px);
+                sizeSlider.setY(py - leftPanelScrollY);
+                addDrawableChild(sizeSlider);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w, bh, "Adjusts tool brush/line thickness.");
+                py += bh + 2;
+
+                variationSlider = new net.minecraft.client.gui.widget.SliderWidget(px, py, w, bh, Text.literal(getVarLabel()), ModSettings.getInstance().variationPercent) {
+                    @Override protected void updateMessage() { setMessage(Text.literal(getVarLabel())); }
+                    @Override protected void applyValue() { ModSettings.getInstance().variationPercent = (float) this.value; ModSettings.getInstance().save(); }
+                };
+                variationSlider.setX(px);
+                variationSlider.setY(py - leftPanelScrollY);
+                addDrawableChild(variationSlider);
+                addToolOptionTooltip(px, py - leftPanelScrollY, w, bh, "Adds random color variation while painting.");
+                py += bh + 4;
+            }
+        }
 
         // Extra tool buttons from subclass
         py = addExtraToolButtons(py, px, w, bh);
@@ -1372,9 +1571,10 @@ public abstract class AbstractEditorScreen extends Screen {
     private void onToolButtonPressed(EditorTool tool) {
         if (tool == EditorTool.SELECT && currentTool == EditorTool.SELECT) {
             selectionMode = (selectionMode == SelectionMode.RECT) ? SelectionMode.LASSO : SelectionMode.RECT;
+            refreshToolsPanelIfVisible();
             return;
         }
-        currentTool = tool;
+        setCurrentTool(tool);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1619,6 +1819,7 @@ public abstract class AbstractEditorScreen extends Screen {
 
     @Override
     public void render(DrawContext ctx, int mx, int my, float delta) {
+        tooltipRequestedThisFrame = false;
         int bg = getBackgroundColor();
         ctx.fill(0, 0, this.width, this.height, bg);
 
@@ -1665,7 +1866,7 @@ public abstract class AbstractEditorScreen extends Screen {
         String status = "Tool: " + currentTool.getDisplayName() + " | Size: " + toolSize + "px"
                 + (canvas != null ? " | " + canvas.getWidth() + "×" + canvas.getHeight() : "");
         if (currentTool == EditorTool.SELECT) {
-            status += " | Mode: " + selectionMode.name();
+            status += " | Mode: " + selectionMode.name() + " | Op: " + selectionCombineMode.name();
         }
         if (canvas != null) {
             int hx = screenToCanvasX(mx);
@@ -1684,6 +1885,24 @@ public abstract class AbstractEditorScreen extends Screen {
         }
 
         if (quickSelectWheel != null) quickSelectWheel.render(ctx, textRenderer, mx, my);
+
+        if (leftOpen && leftTab == LeftTab.TOOLS) {
+            if (toolSettingsHeaderX >= 0 && toolSettingsHeaderY >= 0) {
+                ctx.drawText(textRenderer, "Tool Settings", toolSettingsHeaderX, toolSettingsHeaderY, pal.TITLE_TEXT, false);
+            }
+            for (HoverTooltipArea area : toolOptionTooltips) {
+                if (mx >= area.x() && mx < area.x() + area.w() && my >= area.y() && my < area.y() + area.h()) {
+                    String key = "toolopt:" + area.x() + ":" + area.y() + ":" + area.w() + ":" + area.h();
+                    drawSimpleTooltip(ctx, mx, my, area.text(), key);
+                    break;
+                }
+            }
+        }
+
+        if (!tooltipRequestedThisFrame) {
+            tooltipHoverKey = null;
+            tooltipHoverStartMs = 0L;
+        }
 
         renderExtra(ctx, mx, my);
     }
@@ -1907,12 +2126,22 @@ public abstract class AbstractEditorScreen extends Screen {
             if (hoveredActionIndex == COLOR_ACTION_REPLACE && paletteReplaceMode) {
                 tip = "Replace active";
             }
-            drawSimpleTooltip(ctx, mx, my, tip);
+            drawSimpleTooltip(ctx, mx, my, tip, "color_action:" + hoveredActionIndex);
         }
     }
 
-    private void drawSimpleTooltip(DrawContext ctx, int mouseX, int mouseY, String text) {
+    private void drawSimpleTooltip(DrawContext ctx, int mouseX, int mouseY, String text, String hoverKey) {
         if (text == null || text.isEmpty()) return;
+        tooltipRequestedThisFrame = true;
+        long now = System.currentTimeMillis();
+        String resolvedKey = (hoverKey == null || hoverKey.isEmpty()) ? text : hoverKey;
+        if (!resolvedKey.equals(tooltipHoverKey)) {
+            tooltipHoverKey = resolvedKey;
+            tooltipHoverStartMs = now;
+            return;
+        }
+        if (now - tooltipHoverStartMs < TOOLTIP_HOVER_DELAY_MS) return;
+
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         int tw = textRenderer.getWidth(text) + 8;
         int tx = Math.min(mouseX + 8, this.width - tw - 4);
@@ -2286,8 +2515,9 @@ public abstract class AbstractEditorScreen extends Screen {
         // Fill preview: if fill is active (start set, waiting for previewEnd) show affected cells
         if (!lineFirstClick && !rectFirstClick && currentTool == EditorTool.FILL && previewEndX >= 0 && previewEndY >= 0) {
             // compute flood region on preview coords
-            var region = canvas.computeFloodRegion(previewEndX, previewEndY);
-            float var = ModSettings.getInstance().variationPercent;
+            ModSettings s = ModSettings.getInstance();
+            var region = canvas.computeFloodRegion(previewEndX, previewEndY, s.fillTolerance, s.fillContiguous, s.fillWholeCanvas);
+            float var = s.variationPercent;
             for (var p : region) {
                 int tx = p[0], ty = p[1];
                 if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
@@ -2770,12 +3000,12 @@ public abstract class AbstractEditorScreen extends Screen {
                         selectionDraggingMove = false;
                         selectionAnchorX = px;
                         selectionAnchorY = py;
+                        selectionCreateBaseMask = copyMask(selectionMask);
                         if (selectionMode == SelectionMode.LASSO) {
-                            selectionMask = null;
                             selectionLassoPoints.clear();
                             selectionLassoPoints.add(new int[]{px, py});
                         } else {
-                            setSelectionFromPoints(px, py, px, py);
+                            updateSelectionFromToolMask(buildRectSelectionMask(px, py, px, py));
                         }
                     }
                     return true;
@@ -2951,8 +3181,11 @@ public abstract class AbstractEditorScreen extends Screen {
                 return true;
             }
             if (selectionDraggingCreate) {
-                if (selectionMode == SelectionMode.LASSO) setSelectionFromLasso();
+                if (selectionMode == SelectionMode.LASSO) {
+                    updateSelectionFromToolMask(buildLassoSelectionMask());
+                }
                 selectionDraggingCreate = false;
+                selectionCreateBaseMask = null;
                 selectionLassoPoints.clear();
                 movedSinceDown = false;
                 leftDown = false;
@@ -3040,7 +3273,7 @@ public abstract class AbstractEditorScreen extends Screen {
 
         if (btn == 2) {
             var sel = quickSelectWheel.getSelectedSlice();
-            if (sel != null && sel.toTool() != null) currentTool = sel.toTool();
+            if (sel != null && sel.toTool() != null) setCurrentTool(sel.toTool());
             quickSelectWheel.deactivate();
             return true;
         }
@@ -3105,7 +3338,7 @@ public abstract class AbstractEditorScreen extends Screen {
                         selectionLassoPoints.add(new int[]{clamp(px, 0, canvas.getWidth() - 1), clamp(py, 0, canvas.getHeight() - 1)});
                     }
                 } else {
-                    setSelectionFromPoints(selectionAnchorX, selectionAnchorY, px, py);
+                    updateSelectionFromToolMask(buildRectSelectionMask(selectionAnchorX, selectionAnchorY, px, py));
                 }
                 movedSinceDown = true;
                 return true;
@@ -3191,13 +3424,13 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("undo"))       { if (selectionDraggingMove) commitSelectionMove(); canvas.undo(); clearSelection(); return true; }
         if (kc == s.getKeybind("redo"))       { canvas.redo(); clearSelection(); return true; }
         if (kc == s.getKeybind("grid"))       { showGrid = !showGrid; return true; }
-        if (kc == s.getKeybind("pencil"))     { currentTool = EditorTool.PENCIL; return true; }
-        if (kc == s.getKeybind("eraser"))     { currentTool = EditorTool.ERASER; return true; }
-        if (kc == s.getKeybind("fill"))       { currentTool = EditorTool.FILL; return true; }
-        if (kc == s.getKeybind("eyedropper")) { currentTool = EditorTool.EYEDROPPER; return true; }
-        if (kc == s.getKeybind("rectangle"))  { currentTool = EditorTool.RECTANGLE; lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
-        if (kc == s.getKeybind("line"))       { currentTool = EditorTool.LINE; lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
-        if (kc == s.getKeybind("select"))     { currentTool = EditorTool.SELECT; return true; }
+        if (kc == s.getKeybind("pencil"))     { setCurrentTool(EditorTool.PENCIL); return true; }
+        if (kc == s.getKeybind("eraser"))     { setCurrentTool(EditorTool.ERASER); return true; }
+        if (kc == s.getKeybind("fill"))       { setCurrentTool(EditorTool.FILL); return true; }
+        if (kc == s.getKeybind("eyedropper")) { setCurrentTool(EditorTool.EYEDROPPER); return true; }
+        if (kc == s.getKeybind("rectangle"))  { setCurrentTool(EditorTool.RECTANGLE); lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
+        if (kc == s.getKeybind("line"))       { setCurrentTool(EditorTool.LINE); lineFirstClick = rectFirstClick = false; previewEndX = previewEndY = -1; draggingShape = false; return true; }
+        if (kc == s.getKeybind("select"))     { setCurrentTool(EditorTool.SELECT); return true; }
 
         if (currentTool == EditorTool.SELECT) {
             long handle = MinecraftClient.getInstance().getWindow().getHandle();
@@ -3559,7 +3792,13 @@ public abstract class AbstractEditorScreen extends Screen {
         switch (currentTool) {
             case PENCIL   -> { if (!strokeSnapshotTaken) { canvas.saveSnapshot(); strokeSnapshotTaken = true; } if (variation > 0f) { if (toolSize > 1) canvas.drawBrushArea(px, py, toolSize, currentColor, variation); else canvas.drawBrushPixel(px, py, currentColor, variation); } else { if (toolSize > 1) canvas.drawPixelArea(px, py, toolSize, currentColor); else canvas.drawPixel(px, py, currentColor); } setColor(currentColor, true); }
             case ERASER   -> { if (!strokeSnapshotTaken) { canvas.saveSnapshot(); strokeSnapshotTaken = true; } if (toolSize > 1) canvas.erasePixelArea(px, py, toolSize); else canvas.erasePixel(px, py); }
-            case FILL     -> { canvas.saveSnapshot(); float v = ModSettings.getInstance().variationPercent; if (v > 0f) canvas.floodFill(px, py, currentColor, v); else canvas.floodFill(px, py, currentColor); setColor(currentColor, true); }
+            case FILL     -> {
+                canvas.saveSnapshot();
+                ModSettings settings = ModSettings.getInstance();
+                float v = settings.variationPercent;
+                canvas.floodFill(px, py, currentColor, v, settings.fillTolerance, settings.fillContiguous, settings.fillWholeCanvas);
+                setColor(currentColor, true);
+            }
             case EYEDROPPER -> {
                 int raw = canvas.pickColorComposited(px, py);
                 if (raw == 0) { NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE, "Layer is empty!"); return; }

@@ -226,33 +226,7 @@ public class PixelCanvas {
      * Flood fill from (x, y) with the given color on the active layer.
      */
     public void floodFill(int x, int y, int color) {
-        Layer active = layerStack.getActiveLayer();
-        if (active == null) return;
-        if (x < 0 || x >= width || y < 0 || y >= height) return;
-        int targetColor = active.getPixel(x, y);
-        if (targetColor == color) return;
-
-        Queue<int[]> queue = new LinkedList<>();
-        queue.add(new int[]{x, y});
-        boolean[][] visited = new boolean[width][height];
-
-        while (!queue.isEmpty()) {
-            int[] pos = queue.poll();
-            int px = pos[0], py = pos[1];
-            if (px < 0 || px >= width || py < 0 || py >= height) continue;
-            if (visited[px][py]) continue;
-            if (active.getPixel(px, py) != targetColor) continue;
-
-            visited[px][py] = true;
-            active.setPixel(px, py, color);
-
-            queue.add(new int[]{px + 1, py});
-            queue.add(new int[]{px - 1, py});
-            queue.add(new int[]{px, py + 1});
-            queue.add(new int[]{px, py - 1});
-        }
-        dirty = true;
-        invalidateCache();
+        floodFill(x, y, color, 0f, 0, true, false);
     }
 
     /**
@@ -260,11 +234,27 @@ public class PixelCanvas {
      * starting at (x,y). Returns a list of int[]{px,py} positions. Does not modify the canvas.
      */
     public java.util.List<int[]> computeFloodRegion(int x, int y) {
+        return computeFloodRegion(x, y, 0, true, false);
+    }
+
+    public java.util.List<int[]> computeFloodRegion(int x, int y, int tolerance, boolean contiguous, boolean wholeCanvas) {
         java.util.List<int[]> acc = new java.util.ArrayList<>();
         Layer active = layerStack.getActiveLayer();
         if (active == null) return acc;
         if (x < 0 || x >= width || y < 0 || y >= height) return acc;
-        int targetColor = active.getPixel(x, y);
+        int targetColor = wholeCanvas ? getPixel(x, y) : active.getPixel(x, y);
+
+        if (!contiguous) {
+            for (int px = 0; px < width; px++) {
+                for (int py = 0; py < height; py++) {
+                    int candidate = wholeCanvas ? getPixel(px, py) : active.getPixel(px, py);
+                    if (isWithinTolerance(candidate, targetColor, tolerance)) {
+                        acc.add(new int[]{px, py});
+                    }
+                }
+            }
+            return acc;
+        }
 
         Queue<int[]> queue = new LinkedList<>();
         queue.add(new int[]{x, y});
@@ -275,7 +265,8 @@ public class PixelCanvas {
             int px = pos[0], py = pos[1];
             if (px < 0 || px >= width || py < 0 || py >= height) continue;
             if (visited[px][py]) continue;
-            if (active.getPixel(px, py) != targetColor) continue;
+            int candidate = wholeCanvas ? getPixel(px, py) : active.getPixel(px, py);
+            if (!isWithinTolerance(candidate, targetColor, tolerance)) continue;
 
             visited[px][py] = true;
             acc.add(new int[]{px, py});
@@ -445,34 +436,43 @@ public class PixelCanvas {
      * Flood fill with optional variation applied when setting pixels.
      */
     public void floodFill(int x, int y, int color, float variation) {
+        floodFill(x, y, color, variation, 0, true, false);
+    }
+
+    public void floodFill(int x, int y, int color, float variation, int tolerance, boolean contiguous, boolean wholeCanvas) {
         Layer active = layerStack.getActiveLayer();
         if (active == null) return;
         if (x < 0 || x >= width || y < 0 || y >= height) return;
-        int targetColor = active.getPixel(x, y);
-        if (targetColor == color) return;
 
-        Queue<int[]> queue = new LinkedList<>();
-        queue.add(new int[]{x, y});
-        boolean[][] visited = new boolean[width][height];
+        int targetColor = wholeCanvas ? getPixel(x, y) : active.getPixel(x, y);
+        if (variation <= 0f && tolerance <= 0 && targetColor == color) return;
 
-        while (!queue.isEmpty()) {
-            int[] pos = queue.poll();
-            int px = pos[0], py = pos[1];
-            if (px < 0 || px >= width || py < 0 || py >= height) continue;
-            if (visited[px][py]) continue;
-            if (active.getPixel(px, py) != targetColor) continue;
+        java.util.List<int[]> region = computeFloodRegion(x, y, tolerance, contiguous, wholeCanvas);
+        if (region.isEmpty()) return;
 
-            visited[px][py] = true;
+        for (int[] p : region) {
+            int px = p[0], py = p[1];
             if (variation > 0f) drawBrushPixel(px, py, color, variation);
             else active.setPixel(px, py, color);
-
-            queue.add(new int[]{px + 1, py});
-            queue.add(new int[]{px - 1, py});
-            queue.add(new int[]{px, py + 1});
-            queue.add(new int[]{px, py - 1});
         }
         dirty = true;
         invalidateCache();
+    }
+
+    private static boolean isWithinTolerance(int candidate, int target, int tolerance) {
+        if (tolerance <= 0) return candidate == target;
+        int ca = (candidate >> 24) & 0xFF;
+        int cr = (candidate >> 16) & 0xFF;
+        int cg = (candidate >> 8) & 0xFF;
+        int cb = candidate & 0xFF;
+        int ta = (target >> 24) & 0xFF;
+        int tr = (target >> 16) & 0xFF;
+        int tg = (target >> 8) & 0xFF;
+        int tb = target & 0xFF;
+        return Math.abs(ca - ta) <= tolerance
+                && Math.abs(cr - tr) <= tolerance
+                && Math.abs(cg - tg) <= tolerance
+                && Math.abs(cb - tb) <= tolerance;
     }
 
     /**

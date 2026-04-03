@@ -41,6 +41,10 @@ public class ModSettings {
     public float brushVariation = 0.15f; // legacy, kept for compatibility
     // Global variation percent applied to tools; 0.0 means OFF
     public float variationPercent = 0.0f;
+    // Fill tool options
+    public int fillTolerance = 0; // 0..255 (0 = exact match)
+    public boolean fillContiguous = true;
+    public boolean fillWholeCanvas = false;
 
     public boolean multiplayerSync = false;
 
