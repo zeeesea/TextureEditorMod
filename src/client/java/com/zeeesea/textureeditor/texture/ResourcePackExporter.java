@@ -64,7 +64,7 @@ public class ResourcePackExporter {
             // Write pack.mcmeta
             JsonObject packMcmeta = new JsonObject();
             JsonObject pack = new JsonObject();
-            pack.addProperty("pack_format", 75); // 1.21.11
+            pack.addProperty("pack_format", 84);
             // For pack_format > 64, Minecraft requires min_format and max_format as
             // top-level fields in the pack object (not inside supported_formats)
             pack.addProperty("min_format", 1);
