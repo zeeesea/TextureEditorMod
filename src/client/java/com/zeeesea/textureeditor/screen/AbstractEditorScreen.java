@@ -185,6 +185,10 @@ public abstract class AbstractEditorScreen extends Screen {
     private net.minecraft.client.texture.NativeImageBackedTexture pickerSvTexture = null;
     private net.minecraft.client.texture.NativeImageBackedTexture pickerHueTexture = null;
     private net.minecraft.client.texture.NativeImageBackedTexture pickerAlphaTexture = null;
+    private int pickerHueTexW = -1;
+    private int pickerHueTexH = -1;
+    private int pickerAlphaTexW = -1;
+    private int pickerAlphaTexH = -1;
     private boolean pickerHueBarBuilt = false;
     private boolean pickerAlphaBarBuilt = false;
     // Scrolling state for right-panel content (palette/history and layers)
@@ -1146,6 +1150,8 @@ public abstract class AbstractEditorScreen extends Screen {
         if (pickerSvTexture  != null) { pickerSvTexture.close();  pickerSvTexture  = null; }
         if (pickerHueTexture != null) { pickerHueTexture.close(); pickerHueTexture = null; }
         if (pickerAlphaTexture != null) { pickerAlphaTexture.close(); pickerAlphaTexture = null; }
+        pickerHueTexW = pickerHueTexH = -1;
+        pickerAlphaTexW = pickerAlphaTexH = -1;
     }
 
     @Override
@@ -1727,20 +1733,18 @@ public abstract class AbstractEditorScreen extends Screen {
                 MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_SV_ID, pickerSvTexture);
             }
         }
-        if (!pickerHueBarBuilt || pickerHueTexture == null || pickerHueTexture.getGlTexture().getWidth(0) != hueW) {
+        if (!pickerHueBarBuilt || pickerHueTexture == null || pickerHueTexW != hueW || pickerHueTexH != PICKER_SV_H) {
             var himg = new net.minecraft.client.texture.NativeImage(hueW, PICKER_SV_H, false);
             for (int y = 0; y < PICKER_SV_H; y++) {
                 int c = hsvToArgb(y / (float)(PICKER_SV_H - 1), 1f, 1f, 1f);
                 for (int x = 0; x < hueW; x++) himg.setColorArgb(x, y, c);
             }
-            if (pickerHueTexture != null) { pickerHueTexture.setImage(himg); pickerHueTexture.upload(); }
-            else {
-                pickerHueTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_hue", himg);
-                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_HUE_ID, pickerHueTexture);
-            }
+            pickerHueTexture = replacePickerTexture(PICKER_HUE_ID, pickerHueTexture, () -> "picker_hue", himg);
+            pickerHueTexW = hueW;
+            pickerHueTexH = PICKER_SV_H;
             pickerHueBarBuilt = true;
         }
-        if (!pickerAlphaBarBuilt || pickerAlphaTexture == null || pickerAlphaTexture.getGlTexture().getWidth(0) != alphaW) rebuildAlphaBar(alphaW);
+        if (!pickerAlphaBarBuilt || pickerAlphaTexture == null || pickerAlphaTexW != alphaW || pickerAlphaTexH != PICKER_SV_H) rebuildAlphaBar(alphaW);
 
         // Current swatch + hex are positioned under the picker: compute their Y now so we can
         // use it to mask the palette/history that scroll under this area.
@@ -1986,18 +1990,38 @@ public abstract class AbstractEditorScreen extends Screen {
 
     private void rebuildAlphaBar(int width) {
         int r = (currentColor >> 16) & 0xFF, g = (currentColor >> 8) & 0xFF, b = currentColor & 0xFF;
-        var img = new net.minecraft.client.texture.NativeImage(Math.max(1, width), PICKER_SV_H, false);
+        int safeW = Math.max(1, width);
+        var img = new net.minecraft.client.texture.NativeImage(safeW, PICKER_SV_H, false);
         for (int y = 0; y < PICKER_SV_H; y++) {
             float a = 1f - y / (float)(PICKER_SV_H - 1);
             int argb = ((int)(a * 255) << 24) | (r << 16) | (g << 8) | b;
-            for (int x = 0; x < Math.max(1, width); x++) img.setColorArgb(x, y, argb);
+            for (int x = 0; x < safeW; x++) img.setColorArgb(x, y, argb);
         }
-        if (pickerAlphaTexture != null) { pickerAlphaTexture.setImage(img); pickerAlphaTexture.upload(); }
-        else {
-            pickerAlphaTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_alpha", img);
-            MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_ALPHA_ID, pickerAlphaTexture);
-        }
+        pickerAlphaTexture = replacePickerTexture(PICKER_ALPHA_ID, pickerAlphaTexture, () -> "picker_alpha", img);
+        pickerAlphaTexW = safeW;
+        pickerAlphaTexH = PICKER_SV_H;
         pickerAlphaBarBuilt = true;
+    }
+
+    private net.minecraft.client.texture.NativeImageBackedTexture replacePickerTexture(
+            Identifier id,
+            net.minecraft.client.texture.NativeImageBackedTexture existing,
+            java.util.function.Supplier<String> nameSupplier,
+            net.minecraft.client.texture.NativeImage image
+    ) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return existing;
+        try {
+            client.getTextureManager().destroyTexture(id);
+        } catch (Exception ignored) {}
+        if (existing != null) {
+            try {
+                existing.close();
+            } catch (Exception ignored) {}
+        }
+        net.minecraft.client.texture.NativeImageBackedTexture texture = new net.minecraft.client.texture.NativeImageBackedTexture(nameSupplier, image);
+        client.getTextureManager().registerTexture(id, texture);
+        return texture;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
