@@ -2,8 +2,6 @@ package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.editor.ColorHistory;
-import com.zeeesea.textureeditor.helper.NotificationHelper;
-import net.minecraft.client.toast.SystemToast;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -23,7 +21,6 @@ public class SettingsScreen extends Screen {
     private final java.util.List<Integer> baseYs = new java.util.ArrayList<>();
 
     public SettingsScreen(Screen parent) {
-        // Nutzt jetzt den Key aus deiner JSON für den Fenstertitel
         super(Text.translatable("textureeditor.screen.settings.title"));
         this.parent = parent;
     }
@@ -36,12 +33,10 @@ public class SettingsScreen extends Screen {
         int startY = 40;
         int y = startY;
 
-        // Hilfs-Texte für ON/OFF
         Text textOn = Text.translatable("textureeditor.label.on");
         Text textOff = Text.translatable("textureeditor.label.off");
 
         // Auto Apply live
-        // Wir nutzen hier Text.translatable(KEY, ARGUMENT), um das %s in deiner JSON zu füllen
         addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.auto_apply_live", s.autoApplyLive ? textOn : textOff), btn -> {
             s.autoApplyLive = !s.autoApplyLive;
             s.save();
