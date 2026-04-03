@@ -1,7 +1,7 @@
 # 🎨 In-Game Texture Editor Mod
 
 ![Fabric](https://img.shields.io/badge/Loader-Fabric-beige?style=for-the-badge&logo=fabric)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-green?style=for-the-badge&logo=minecraft)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.5-green?style=for-the-badge&logo=minecraft)
 
 **Stop closing Minecraft to edit a single pixel.**
 
