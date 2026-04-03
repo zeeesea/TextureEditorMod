@@ -1,6 +1,7 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.texture.NativeImage;
@@ -135,6 +136,12 @@ public class ResourcePackExporter {
                 JsonObject animationMcmeta = new JsonObject();
                 JsonObject animation = new JsonObject();
                 animation.addProperty("frametime", Math.max(1, anim.frameTimeTicks()));
+                if (anim.pingPong() && frameCount > 1) {
+                    JsonArray frames = new JsonArray();
+                    for (int i = 0; i < frameCount; i++) frames.add(i);
+                    for (int i = frameCount - 2; i >= 1; i--) frames.add(i);
+                    animation.add("frames", frames);
+                }
                 animationMcmeta.add("animation", animation);
                 zos.putNextEntry(new ZipEntry(path + ".mcmeta"));
                 zos.write(animationMcmeta.toString().getBytes(StandardCharsets.UTF_8));

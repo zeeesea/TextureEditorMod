@@ -45,6 +45,10 @@ public class ColorHistory {
     }
 
     public static void setMaxHistory(int maxHistory) {
-        MAX_HISTORY = maxHistory;
+        MAX_HISTORY = Math.max(1, maxHistory);
+        ColorHistory hist = getInstance();
+        while (hist.history.size() > MAX_HISTORY) {
+            hist.history.remove(hist.history.size() - 1);
+        }
     }
 }

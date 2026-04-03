@@ -210,7 +210,7 @@ public abstract class AbstractEditorScreen extends Screen {
     // is the single alpha control used.)
 
     // ── Palette ───────────────────────────────────────────────────────────────
-    protected static final int[] PALETTE = {
+    protected static final int[] DEFAULT_PALETTE = {
             0xFF000000, 0xFF404040, 0xFF808080, 0xFFC0C0C0, 0xFFFFFFFF,
             0xFFFF0000, 0xFFFF8000, 0xFFFFFF00, 0xFF80FF00,
             0xFF00FF00, 0xFF00FF80, 0xFF00FFFF, 0xFF0080FF,
@@ -220,6 +220,22 @@ public abstract class AbstractEditorScreen extends Screen {
             0xFF000080, 0xFF400080, 0xFF800080, 0xFF800040,
             0xFFFFB3B3, 0xFFFFD9B3, 0xFFFFFFB3, 0xFFB3FFB3, 0xFFB3FFFF
     };
+    private static final int COLOR_ACTION_PROFILES = 0;
+    private static final int COLOR_ACTION_ADD = 1;
+    private static final int COLOR_ACTION_REMOVE = 2;
+    private static final int COLOR_ACTION_REPLACE = 3;
+    private static final String[] COLOR_ACTION_TOOLTIPS = {
+            "Profiles",
+            "Add color",
+            "Remove color",
+            "Replace"
+    };
+    private boolean paletteReplaceMode = false;
+    private boolean profileMenuOpen = false;
+    private int profileMenuSelectedIndex = 0;
+    private int profileMenuScroll = 0;
+    private String profileNameDraft = "";
+    private boolean profileNameEditing = false;
 
     // ── Canvas texture cache ──────────────────────────────────────────────────
     private net.minecraft.client.texture.NativeImageBackedTexture canvasTexture = null;
@@ -1065,10 +1081,10 @@ public abstract class AbstractEditorScreen extends Screen {
                 List<ContextMenuItem> child = item.children();
                 int childW = measureContextMenuWidth(child);
                 int childH = measureContextMenuHeight(child);
-                int childXRight = x + menuW - 1;
-                int childXLeft = x - childW + 1;
-                int childX = (childXRight + childW <= this.width - 2) ? childXRight : Math.max(2, childXLeft);
-                int childY = clamp(iy, 2, this.height - childH - 2);
+                int openRightX = x + menuW - 1;
+                int openLeftX = x - childW + 1;
+                int childX = (openRightX + childW <= this.width - 2) ? openRightX : Math.max(2, openLeftX);
+                int childY = clamp(y + 2 + i * CONTEXT_MENU_ITEM_H, 2, this.height - childH - 2);
                 renderContextMenuLevel(ctx, child, childX, childY, hoverPath, depth + 1);
             }
         }
@@ -1197,7 +1213,12 @@ public abstract class AbstractEditorScreen extends Screen {
         int rtx = this.width - rightW();
         addDrawableChild(ButtonWidget.builder(
                 Text.literal(rightOpen ? ">" : "<"),
-                btn -> { rightOpen = !rightOpen; sessionRightOpen = rightOpen; clearChildren(); recalcCanvasPos(); buildWidgets(); }
+                btn -> {
+                    rightOpen = !rightOpen;
+                    if (!rightOpen) closeProfileMenu();
+                    sessionRightOpen = rightOpen;
+                    clearChildren(); recalcCanvasPos(); buildWidgets();
+                }
         ).position(rtx, 0).size(TOGGLE_BTN_W, bh).build());
 
         if (rightOpen) {
@@ -1207,7 +1228,12 @@ public abstract class AbstractEditorScreen extends Screen {
                             btn -> { rightTab = RightTab.COLOR; sessionRightTab = rightTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
                     .position(rpx, bh).size(getPanelWidth() / 2, TAB_H).build());
             addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.layers"),
-                            btn -> { rightTab = RightTab.LAYERS; sessionRightTab = rightTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
+                            btn -> {
+                                rightTab = RightTab.LAYERS;
+                                closeProfileMenu();
+                                sessionRightTab = rightTab;
+                                clearChildren(); recalcCanvasPos(); buildWidgets();
+                            })
                     .position(rpx + getPanelWidth() / 2, bh).size(getPanelWidth() / 2, TAB_H).build());
 
             if (rightTab == RightTab.COLOR) {
@@ -1385,6 +1411,168 @@ public abstract class AbstractEditorScreen extends Screen {
         // No extra alpha slider widget; the alpha bar on the right is interactive.
     }
 
+    private record ColorTabMetrics(int innerX, int innerW, int bh, int swatchY, int contentStartY,
+                                   int actionButtonH, int actionHeight,
+                                   int paletteCell, int paletteCols, int historyCell, int historyLabelY,
+                                   int paletteStartY, int paletteHeight, int historyStartY, int historyHeight,
+                                   int contentHeight, int visibleTop, int visibleHeight, int maxScroll) {}
+
+    private record ProfileMenuMetrics(int x, int y, int w, int h,
+                                      int listX, int listY, int listW, int listH,
+                                      int nameX, int nameY, int nameW, int nameH,
+                                      int buttonY, int buttonW, int buttonH) {}
+
+    private List<Integer> getActivePaletteColors() {
+        return ModSettings.getInstance().getActivePaletteColors();
+    }
+
+    private void closeProfileMenu() {
+        profileMenuOpen = false;
+        profileNameEditing = false;
+        profileMenuScroll = 0;
+    }
+
+    private void openProfileMenu() {
+        profileMenuOpen = true;
+        profileNameEditing = false;
+        List<String> names = ModSettings.getInstance().getPaletteProfileNames();
+        String active = ModSettings.getInstance().getActivePaletteProfileName();
+        profileMenuSelectedIndex = Math.max(0, names.indexOf(active));
+        if (profileMenuSelectedIndex < 0) profileMenuSelectedIndex = 0;
+        if (!names.isEmpty()) {
+            profileNameDraft = names.get(profileMenuSelectedIndex);
+        }
+    }
+
+    private ProfileMenuMetrics computeProfileMenuMetrics() {
+        int menuW = 210;
+        int menuH = 190;
+        int x = this.width - getRightSidebarWidth() - menuW - 8;
+        int y = 34;
+        if (x < getLeftSidebarWidth() + 6) x = getLeftSidebarWidth() + 6;
+        int listX = x + 8;
+        int listY = y + 20;
+        int listW = menuW - 16;
+        int listH = 98;
+        int nameX = x + 8;
+        int nameY = listY + listH + 12;
+        int nameW = menuW - 16;
+        int nameH = 14;
+        int buttonY = nameY + nameH + 8;
+        int buttonW = (menuW - 16 - 3) / 4;
+        int buttonH = 14;
+        return new ProfileMenuMetrics(x, y, menuW, menuH, listX, listY, listW, listH, nameX, nameY, nameW, nameH, buttonY, buttonW, buttonH);
+    }
+
+    private void setActivePaletteColors(List<Integer> colors) {
+        ModSettings.getInstance().setActivePaletteColors(colors);
+    }
+
+    private ColorTabMetrics computeColorTabMetrics(int rpx, int py, int pw) {
+        int bh = getToolButtonHeight();
+        int innerX = getPanelInnerX(rpx);
+        int innerW = pw - 8;
+        int swatchY = py + PICKER_SV_H + 6;
+        int contentStartY = swatchY + bh + 4 + bh + 8;
+        int actionButtonH = Math.max(10, bh - 2);
+        int actionHeight = actionButtonH * 2 + 1;
+        int paletteStartY = contentStartY + actionHeight + 4 + bh;
+
+        List<Integer> palette = getActivePaletteColors();
+        int paletteCols = 5;
+        int paletteCell = (innerW - (paletteCols - 1) * 1) / paletteCols;
+        int totalPaletteRows = (palette.size() + paletteCols - 1) / paletteCols;
+        int paletteHeight = totalPaletteRows * (paletteCell + 1);
+
+        int historyLabelY = paletteStartY + paletteHeight + 4;
+        int historyCell = Math.max(8, paletteCell - 2);
+        int historyRows = Math.max(1, (ColorHistory.getInstance().size() + paletteCols - 1) / paletteCols);
+        int historyStartY = historyLabelY + 10;
+        int historyHeight = historyRows * (historyCell + 1);
+
+        int contentHeight = actionHeight + 4 + bh + paletteHeight + 4 + 10 + historyHeight;
+        int visibleTop = contentStartY;
+        int visibleHeight = Math.max(20, this.height - visibleTop - 20);
+        int maxScroll = Math.max(0, contentHeight - visibleHeight);
+
+        return new ColorTabMetrics(innerX, innerW, bh, swatchY, contentStartY,
+                actionButtonH, actionHeight,
+                paletteCell, paletteCols, historyCell, historyLabelY,
+                paletteStartY, paletteHeight, historyStartY, historyHeight,
+                contentHeight, visibleTop, visibleHeight, maxScroll);
+    }
+
+    private String buildPaletteExportPayload(String profileName, List<Integer> colors) {
+        StringBuilder sb = new StringBuilder("TEPAL1|");
+        sb.append(profileName == null ? "Profile" : profileName.replace("|", " "));
+        sb.append('|');
+        boolean first = true;
+        for (Integer c : colors) {
+            if (c == null) continue;
+            if (!first) sb.append(',');
+            String hex = Integer.toHexString(c).toUpperCase();
+            while (hex.length() < 8) hex = "0" + hex;
+            sb.append(hex);
+            first = false;
+        }
+        return sb.toString();
+    }
+
+    private List<Integer> parsePaletteImportPayload(String payload) {
+        if (payload == null) return null;
+        String text = payload.trim();
+        if (!text.startsWith("TEPAL1|")) return null;
+        String[] parts = text.split("\\|", 3);
+        if (parts.length < 3) return null;
+        String[] colorParts = parts[2].split(",");
+        List<Integer> out = new ArrayList<>();
+        for (String p : colorParts) {
+            String hex = p.trim();
+            if (hex.startsWith("#")) hex = hex.substring(1);
+            if (!(hex.length() == 6 || hex.length() == 8)) continue;
+            try {
+                int c = (int) Long.parseLong(hex.length() == 6 ? "FF" + hex : hex, 16);
+                out.add(c);
+            } catch (Exception ignored) {}
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    private String parsePaletteImportName(String payload) {
+        if (payload == null) return null;
+        String text = payload.trim();
+        if (!text.startsWith("TEPAL1|")) return null;
+        String[] parts = text.split("\\|", 3);
+        if (parts.length < 2) return null;
+        String name = parts[1].trim();
+        return name.isEmpty() ? "Imported" : name;
+    }
+
+    private List<Integer> extractDominantColors(int maxColors) {
+        if (canvas == null) return List.of();
+        java.util.Map<Integer, Integer> counts = new java.util.HashMap<>();
+        for (int x = 0; x < canvas.getWidth(); x++) {
+            for (int y = 0; y < canvas.getHeight(); y++) {
+                int c = canvas.getPixel(x, y);
+                int a = (c >>> 24) & 0xFF;
+                if (a < 16) continue;
+                int rq = ((c >> 16) & 0xFF) & 0xF0;
+                int gq = ((c >> 8) & 0xFF) & 0xF0;
+                int bq = (c & 0xFF) & 0xF0;
+                int q = 0xFF000000 | (rq << 16) | (gq << 8) | bq;
+                counts.merge(q, 1, Integer::sum);
+            }
+        }
+        if (counts.isEmpty()) return List.of();
+        List<java.util.Map.Entry<Integer, Integer>> entries = new ArrayList<>(counts.entrySet());
+        entries.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+        List<Integer> out = new ArrayList<>();
+        for (int i = 0; i < entries.size() && i < maxColors; i++) {
+            out.add(entries.get(i).getKey());
+        }
+        return out;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Canvas texture cache
     // ─────────────────────────────────────────────────────────────────────────
@@ -1451,8 +1639,12 @@ public abstract class AbstractEditorScreen extends Screen {
             ctx.fill(tabLineX, getToolButtonHeight() + TAB_H - 2, tabLineX + panelW / 2, getToolButtonHeight() + TAB_H, pal.TAB_UNDERLINE);
             // Draw color/layer tab content
             if (rightTab == RightTab.COLOR) drawColorTabContent(ctx, mx, my, this.width - panelW, getToolButtonHeight() + TAB_H + 4, panelW);
-            else drawLayerTabContent(ctx, mx, my, this.width - panelW, getToolButtonHeight() + TAB_H + 4, panelW);
+            else {
+                closeProfileMenu();
+                drawLayerTabContent(ctx, mx, my, this.width - panelW, getToolButtonHeight() + TAB_H + 4, panelW);
+            }
         } else {
+            closeProfileMenu();
             ctx.fill(this.width - TOGGLE_BTN_W, 0, this.width, this.height, pal.PANEL_DARK);
         }
 
@@ -1481,6 +1673,10 @@ public abstract class AbstractEditorScreen extends Screen {
         super.render(ctx, mx, my, delta);
         renderSelectionContextMenu(ctx, mx, my);
 
+        if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) {
+            drawProfileMenu(ctx, mx, my);
+        }
+
         if (quickSelectWheel != null) quickSelectWheel.render(ctx, textRenderer, mx, my);
 
         renderExtra(ctx, mx, my);
@@ -1495,6 +1691,10 @@ public abstract class AbstractEditorScreen extends Screen {
         int bh = getToolButtonHeight();
         int innerX = getPanelInnerX(rpx);
         int innerW = pw - 8;
+
+        ColorTabMetrics initialMetrics = computeColorTabMetrics(rpx, py, pw);
+        if (paletteScrollY > initialMetrics.maxScroll()) paletteScrollY = initialMetrics.maxScroll();
+        if (paletteScrollY < 0) paletteScrollY = 0;
 
         // ── SV square
         int svX = innerX;
@@ -1548,14 +1748,17 @@ public abstract class AbstractEditorScreen extends Screen {
         int swatchY = svY + PICKER_SV_H + 6;
         // Build the y used by original code for palette start
         int paletteStartY = swatchY + bh + 4 + bh + 8;
+        ColorTabMetrics metrics = computeColorTabMetrics(rpx, py, pw);
+        List<Integer> paletteColors = getActivePaletteColors();
 
-        // ── Palette (centered)
+        // ── Action rows + palette (centered, scrollable)
         int cols = 5;
-        int cs = (innerW - (cols - 1) * 1) / cols;
-        int totalPaletteRows = (PALETTE.length + cols - 1) / cols;
-        int paletteHeight = totalPaletteRows * (cs + 1);
-        // allow scrolling only for palette + history combined; apply paletteScrollY as vertical offset
-        int startY = paletteStartY - paletteScrollY;
+        int cs = metrics.paletteCell();
+        int centerOffsetX = (innerW - (cols * cs + (cols - 1))) / 2;
+        int paletteHeight = metrics.paletteHeight();
+        // allow scrolling for action rows + palette + history; apply paletteScrollY as vertical offset
+        int actionStartY = metrics.contentStartY() - paletteScrollY;
+        int startY = metrics.paletteStartY() - paletteScrollY;
         // picker clipping area so palette/history draw behind the picker
         int pickerLeft = svX - 1;
         int pickerRight = alphaX + alphaW + 1;
@@ -1568,48 +1771,91 @@ public abstract class AbstractEditorScreen extends Screen {
         int maskTop = py - 2; // reach up to the top of the color tab content (near the tabs)
         int maskBottom = swatchY + bh + 1; // hide everything above the bottom of swatch/hex area
 
+        int hoveredActionIndex = -1;
+        int actionH = metrics.actionButtonH();
+        int gap = 1;
+        int profilesX = innerX;
+        int profilesY = actionStartY;
+        int profilesW = innerW;
+        int row2Y = profilesY + actionH + gap;
+        int smallW = Math.max(14, (innerW - 2 - 1) / 4);
+        int addX = innerX;
+        int removeX = addX + smallW + 1;
+        int replaceX = removeX + smallW + 1;
+        int replaceW = innerW - (smallW * 2 + 2);
+
+        ctx.fill(profilesX, profilesY, profilesX + profilesW, profilesY + actionH, pal.CELL_BG);
+        if (mx >= profilesX && mx < profilesX + profilesW && my >= profilesY && my < profilesY + actionH) hoveredActionIndex = COLOR_ACTION_PROFILES;
+        drawRectOutline(ctx, profilesX, profilesY, profilesX + profilesW, profilesY + actionH, pal.PANEL_SEPARATOR);
+        String profilesLabel = "Profiles";
+        ctx.drawText(textRenderer, profilesLabel, profilesX + (profilesW - textRenderer.getWidth(profilesLabel)) / 2, profilesY + 3, pal.TEXT_NORMAL, false);
+
+        ctx.fill(addX, row2Y, addX + smallW, row2Y + actionH, pal.CELL_BG);
+        if (mx >= addX && mx < addX + smallW && my >= row2Y && my < row2Y + actionH) hoveredActionIndex = COLOR_ACTION_ADD;
+        drawRectOutline(ctx, addX, row2Y, addX + smallW, row2Y + actionH, pal.PANEL_SEPARATOR);
+        ctx.drawText(textRenderer, "+", addX + (smallW - textRenderer.getWidth("+")) / 2, row2Y + 3, pal.TEXT_NORMAL, false);
+
+        ctx.fill(removeX, row2Y, removeX + smallW, row2Y + actionH, pal.CELL_BG);
+        if (mx >= removeX && mx < removeX + smallW && my >= row2Y && my < row2Y + actionH) hoveredActionIndex = COLOR_ACTION_REMOVE;
+        drawRectOutline(ctx, removeX, row2Y, removeX + smallW, row2Y + actionH, pal.PANEL_SEPARATOR);
+        ctx.drawText(textRenderer, "-", removeX + (smallW - textRenderer.getWidth("-")) / 2, row2Y + 3, pal.TEXT_NORMAL, false);
+
+        ctx.fill(replaceX, row2Y, replaceX + replaceW, row2Y + actionH, pal.CELL_BG);
+        if (mx >= replaceX && mx < replaceX + replaceW && my >= row2Y && my < row2Y + actionH) hoveredActionIndex = COLOR_ACTION_REPLACE;
+        int replaceBorder = paletteReplaceMode ? pal.HEADER_UNDERLINE : pal.PANEL_SEPARATOR;
+        drawRectOutline(ctx, replaceX, row2Y, replaceX + replaceW, row2Y + actionH, replaceBorder);
+        String replaceLabel = "Replace";
+        ctx.drawText(textRenderer, replaceLabel, replaceX + (replaceW - textRenderer.getWidth(replaceLabel)) / 2, row2Y + 3, pal.TEXT_NORMAL, false);
+
         // Calculate starting row index so we don't draw any partial rows that intersect the masked area
         int rowHeight = cs + 1;
         int firstRow = Math.max(0, (int) Math.ceil((maskBottom - startY) / (double) rowHeight));
         int startIndex = firstRow * cols;
-        startIndex = Math.max(0, Math.min(startIndex, PALETTE.length));
+        startIndex = Math.max(0, Math.min(startIndex, paletteColors.size()));
 
-        for (int i = startIndex; i < PALETTE.length; i++) {
+        for (int i = startIndex; i < paletteColors.size(); i++) {
             int col = i % cols, row = i / cols;
-            int px2 = innerX + col * (cs + 1) + (innerW - (cols * cs + (cols - 1))) / 2; // center horizontally
+            int px2 = innerX + col * (cs + 1) + centerOffsetX; // center horizontally
             int py2 = startY + row * (cs + 1);
             // Skip any swatches that would overlap the picker's horizontal area
             if (!(px2 + cs > pickerLeft && px2 < pickerRight && py2 + cs > pickerTop && py2 < pickerBottom)) {
-                ctx.fill(px2, py2, px2 + cs, py2 + cs, PALETTE[i]);
+                ctx.fill(px2, py2, px2 + cs, py2 + cs, paletteColors.get(i));
             }
-            if (PALETTE[i] == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + cs + 1, py2 + cs + 1, pal.HEADER_UNDERLINE);
+            if (paletteColors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + cs + 1, py2 + cs + 1, pal.HEADER_UNDERLINE);
         }
 
-        int afterPaletteY = paletteStartY + paletteHeight + 4 - paletteScrollY;
+        int paletteTitleY = metrics.paletteStartY() - 10 - paletteScrollY;
+        if (paletteTitleY >= maskBottom) {
+            String title = "Color Palette";
+            ctx.drawText(textRenderer, title, innerX + (innerW - textRenderer.getWidth(title)) / 2, paletteTitleY, pal.STATUS_TEXT, false);
+        }
+
+        int afterPaletteY = metrics.historyLabelY() - paletteScrollY;
 
         // ── Color history (centered)
         ColorHistory hist = ColorHistory.getInstance();
-        if (hist.size() > 0) {
-            ctx.drawText(textRenderer, "History", innerX + (innerW - textRenderer.getWidth("History")) / 2, afterPaletteY, pal.STATUS_TEXT, false);
-            int hy = afterPaletteY + 10;
-            List<Integer> colors = hist.getColors();
-            int hcs = Math.max(8, cs - 2);
-            for (int i = 0; i < Math.min(colors.size(), 10); i++) {
-                int col = i % cols, row = i / cols;
-                int px2 = innerX + col * (hcs + 1) + (innerW - (cols * hcs + (cols - 1))) / 2;
-                int py2 = hy + row * (hcs + 1);
-                if (py2 >= maskBottom && !(px2 + hcs > pickerLeft && px2 < pickerRight && py2 + hcs > pickerTop && py2 < pickerBottom)) {
-                    ctx.fill(px2, py2, px2 + hcs, py2 + hcs, colors.get(i));
-                }
-                if (colors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + hcs + 1, py2 + hcs + 1, pal.HEADER_UNDERLINE);
+        ctx.drawText(textRenderer, "History", innerX + (innerW - textRenderer.getWidth("History")) / 2, afterPaletteY, pal.STATUS_TEXT, false);
+        int hy = afterPaletteY + 10;
+        List<Integer> colors = hist.getColors();
+        int hcs = Math.max(8, cs - 2);
+        for (int i = 0; i < colors.size(); i++) {
+            int col = i % cols, row = i / cols;
+            int px2 = innerX + col * (hcs + 1) + centerOffsetX, py2 = hy + row * (hcs + 1);
+            if (py2 >= maskBottom && !(px2 + hcs > pickerLeft && px2 < pickerRight && py2 + hcs > pickerTop && py2 < pickerBottom)) {
+                ctx.fill(px2, py2, px2 + hcs, py2 + hcs, colors.get(i));
             }
+            if (colors.get(i) == currentColor) drawRectOutline(ctx, px2 - 1, py2 - 1, px2 + hcs + 1, py2 + hcs + 1, pal.HEADER_UNDERLINE);
+        }
+        if (colors.isEmpty()) {
+            String empty = "No history yet";
+            ctx.drawText(textRenderer, empty, innerX + (innerW - textRenderer.getWidth(empty)) / 2, hy, pal.TEXT_SUBTLE, false);
         }
 
         // Mask the whole upper area (picker + swatch/hex region) so scrolled
         // palette/history content is fully hidden beneath the foreground UI.
         ctx.fill(innerX, maskTop, innerX + innerW, maskBottom, pal.PANEL_DARK);
 
-        // Draw the picker and controls on top
+        // Draw the picker and controls on top of the mask so it remains visible
         ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
         drawRectOutline(ctx, svX - 1, svY - 1, svX + PICKER_SV_W + 1, svY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         // Cursor on SV
@@ -1640,6 +1886,102 @@ public abstract class AbstractEditorScreen extends Screen {
         // Draw the current color swatch on top of the mask so it remains visible
         ctx.fill(innerX, swatchY, innerX + swatchW, swatchY + bh, currentColor);
         drawRectOutline(ctx, innerX, swatchY, innerX + swatchW, swatchY + bh, pal.SWATCH_BORDER);
+
+        if (metrics.maxScroll() > 0) {
+            int trackX = innerX + innerW - 3;
+            int trackY = metrics.visibleTop();
+            int trackH = metrics.visibleHeight();
+            ctx.fill(trackX, trackY, trackX + 2, trackY + trackH, pal.SCROLLBAR_BG);
+            int thumbH = Math.max(8, Math.round(trackH * (metrics.visibleHeight() / (float) metrics.contentHeight())));
+            int usableH = Math.max(1, trackH - thumbH);
+            int thumbY = trackY + Math.round((paletteScrollY / (float) metrics.maxScroll()) * usableH);
+            ctx.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, pal.SCROLL_THUMB);
+        }
+
+        if (hoveredActionIndex >= 0) {
+            String tip = COLOR_ACTION_TOOLTIPS[hoveredActionIndex];
+            if (hoveredActionIndex == COLOR_ACTION_REPLACE && paletteReplaceMode) {
+                tip = "Replace active";
+            }
+            drawSimpleTooltip(ctx, mx, my, tip);
+        }
+    }
+
+    private void drawSimpleTooltip(DrawContext ctx, int mouseX, int mouseY, String text) {
+        if (text == null || text.isEmpty()) return;
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        int tw = textRenderer.getWidth(text) + 8;
+        int tx = Math.min(mouseX + 8, this.width - tw - 4);
+        int ty = Math.max(4, mouseY - 14);
+        ctx.fill(tx, ty, tx + tw, ty + 12, pal.PANEL_BG);
+        drawRectOutline(ctx, tx, ty, tx + tw, ty + 12, pal.PANEL_SEPARATOR);
+        ctx.drawText(textRenderer, text, tx + 4, ty + 2, pal.TEXT_NORMAL, false);
+    }
+
+    private void drawProfileMenu(DrawContext ctx, int mx, int my) {
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        ProfileMenuMetrics m = computeProfileMenuMetrics();
+        List<String> names = ModSettings.getInstance().getPaletteProfileNames();
+        if (names.isEmpty()) {
+            closeProfileMenu();
+            return;
+        }
+
+        if (profileMenuSelectedIndex < 0) profileMenuSelectedIndex = 0;
+        if (profileMenuSelectedIndex >= names.size()) profileMenuSelectedIndex = names.size() - 1;
+
+        int rowH = 14;
+        int visibleRows = Math.max(1, m.listH() / rowH);
+        int maxScroll = Math.max(0, names.size() - visibleRows);
+        if (profileMenuScroll > maxScroll) profileMenuScroll = maxScroll;
+        if (profileMenuScroll < 0) profileMenuScroll = 0;
+
+        ctx.fill(m.x(), m.y(), m.x() + m.w(), m.y() + m.h(), pal.PANEL_DARK);
+        drawRectOutline(ctx, m.x(), m.y(), m.x() + m.w(), m.y() + m.h(), pal.PANEL_SEPARATOR);
+        ctx.drawText(textRenderer, "Color Profiles", m.x() + 8, m.y() + 6, pal.TITLE_TEXT, false);
+
+        ctx.fill(m.listX(), m.listY(), m.listX() + m.listW(), m.listY() + m.listH(), pal.CELL_BG);
+        drawRectOutline(ctx, m.listX(), m.listY(), m.listX() + m.listW(), m.listY() + m.listH(), pal.PANEL_SEPARATOR);
+
+        String active = ModSettings.getInstance().getActivePaletteProfileName();
+        for (int i = 0; i < visibleRows; i++) {
+            int idx = profileMenuScroll + i;
+            if (idx >= names.size()) break;
+            int ry = m.listY() + i * rowH;
+            boolean selected = idx == profileMenuSelectedIndex;
+            if (selected) ctx.fill(m.listX() + 1, ry + 1, m.listX() + m.listW() - 1, ry + rowH - 1, pal.CELL_BG_HOVER);
+            String name = names.get(idx);
+            String prefix = name.equals(active) ? "* " : "  ";
+            String text = prefix + (name.length() > 21 ? name.substring(0, 21) : name);
+            ctx.drawText(textRenderer, text, m.listX() + 4, ry + 3, selected ? pal.TITLE_TEXT : pal.TEXT_NORMAL, false);
+        }
+
+        String nameLabel = "Selected name:";
+        ctx.drawText(textRenderer, nameLabel, m.nameX(), m.nameY() - 10, pal.STATUS_TEXT, false);
+        ctx.fill(m.nameX(), m.nameY(), m.nameX() + m.nameW(), m.nameY() + m.nameH(), pal.CELL_BG);
+        drawRectOutline(ctx, m.nameX(), m.nameY(), m.nameX() + m.nameW(), m.nameY() + m.nameH(), profileNameEditing ? pal.TAB_UNDERLINE : pal.PANEL_SEPARATOR);
+        String shownName = profileNameDraft == null ? "" : profileNameDraft;
+        if (shownName.length() > 30) shownName = shownName.substring(0, 30);
+        ctx.drawText(textRenderer, shownName, m.nameX() + 3, m.nameY() + 3, pal.TEXT_NORMAL, false);
+
+        String[] menuBtns = {"Set", "Add", "Delete", "Rename"};
+        for (int i = 0; i < 4; i++) {
+            int bx = m.nameX() + i * (m.buttonW() + 1);
+            ctx.fill(bx, m.buttonY(), bx + m.buttonW(), m.buttonY() + m.buttonH(), pal.CELL_BG);
+            drawRectOutline(ctx, bx, m.buttonY(), bx + m.buttonW(), m.buttonY() + m.buttonH(), pal.PANEL_SEPARATOR);
+            String label = menuBtns[i];
+            ctx.drawText(textRenderer, label, bx + (m.buttonW() - textRenderer.getWidth(label)) / 2, m.buttonY() + 3, pal.TEXT_NORMAL, false);
+        }
+
+        int secondRowY = m.buttonY() + m.buttonH() + 1;
+        String[] toolsBtns = {"Export", "Import", "Reset", "Get"};
+        for (int i = 0; i < 4; i++) {
+            int bx = m.nameX() + i * (m.buttonW() + 1);
+            ctx.fill(bx, secondRowY, bx + m.buttonW(), secondRowY + m.buttonH(), pal.CELL_BG);
+            drawRectOutline(ctx, bx, secondRowY, bx + m.buttonW(), secondRowY + m.buttonH(), pal.PANEL_SEPARATOR);
+            String label = toolsBtns[i];
+            ctx.drawText(textRenderer, label, bx + (m.buttonW() - textRenderer.getWidth(label)) / 2, secondRowY + 3, pal.TEXT_NORMAL, false);
+        }
     }
 
     private void rebuildAlphaBar(int width) {
@@ -1678,6 +2020,11 @@ public abstract class AbstractEditorScreen extends Screen {
         int secondActionY = actionY + bh + 2;
         int listStartY = secondActionY + bh + 4;
         int contentY = listStartY - layerScrollY;
+        int listHeightForClamp = stack.getLayerCount() * (rowH + 1);
+        int visibleForClamp = Math.max(10, this.height - listStartY - 20);
+        int maxLayerScroll = Math.max(0, listHeightForClamp - visibleForClamp);
+        if (layerScrollY > maxLayerScroll) layerScrollY = maxLayerScroll;
+        if (layerScrollY < 0) layerScrollY = 0;
         // Compute mask bounds so top action area fully occludes the scrolling list
         // Extend mask to the absolute top so scrolled layers remain hidden all
         // the way up (prevents any layer from being visible above the action area).
@@ -1714,6 +2061,27 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(innerX + btnW + 2, secondActionY, innerX + 2 * btnW + 2, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Merge", innerX + btnW + 4, secondActionY + 4, pal.TEXT_NORMAL, false);
         ctx.fill(innerX + 2 * btnW + 4, secondActionY, innerX + innerW, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Dup", innerX + 2 * btnW + 6, secondActionY + 4, pal.TEXT_NORMAL, false);
         // No fixed bottom buttons anymore; actions are at top and the layer list scrolls underneath
+
+        int listHeight = stack.getLayerCount() * (rowH + 1);
+        int visibleH = Math.max(10, this.height - listStartY - 20);
+        int maxScroll = Math.max(0, listHeight - visibleH);
+        if (maxScroll > 0) {
+            int trackX = innerX + innerW - 3;
+            int trackY = listStartY;
+            int trackH = visibleH;
+            ctx.fill(trackX, trackY, trackX + 2, trackY + trackH, pal.SCROLLBAR_BG);
+            int thumbH = Math.max(8, Math.round(trackH * (visibleH / (float) listHeight)));
+            int usableH = Math.max(1, trackH - thumbH);
+            int thumbY = trackY + Math.round((layerScrollY / (float) maxScroll) * usableH);
+            ctx.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, pal.SCROLL_THUMB);
+
+            // Show explicit direction hints so scrollability is visible at a glance.
+            int hintX = innerX + innerW - 9;
+            int upColor = layerScrollY > 0 ? pal.TEXT_NORMAL : pal.TEXT_SUBTLE;
+            int downColor = layerScrollY < maxScroll ? pal.TEXT_NORMAL : pal.TEXT_SUBTLE;
+            ctx.drawText(textRenderer, "^", hintX, trackY - 9, upColor, false);
+            ctx.drawText(textRenderer, "v", hintX, trackY + trackH + 1, downColor, false);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1790,7 +2158,8 @@ public abstract class AbstractEditorScreen extends Screen {
             for (int dx = -half; dx < toolSize - half; dx++) for (int dy = -half; dy < toolSize - half; dy++) {
                 int tx = hx + dx, ty = hy + dy;
                 if (tx >= 0 && tx < w && ty >= 0 && ty < h) {
-                    int sx = canvasScreenX + tx * zoom, sy = canvasScreenY + ty * zoom;
+                    int sx = canvasScreenX + tx * zoom;
+                    int sy = canvasScreenY + ty * zoom;
                     drawRectOutline(ctx, sx, sy, sx + zoom, sy + zoom, 0xAAFFFF00);
                 }
             }
@@ -1803,18 +2172,16 @@ public abstract class AbstractEditorScreen extends Screen {
             for (int[] pt : bresenhamLine(lineStartX, lineStartY, previewEndX, previewEndY)) {
                 int cx = pt[0], cy = pt[1];
                 // iterate over the square area for the thickness and only draw cells inside canvas
-                for (int dx = -half; dx < toolSize - half; dx++) {
-                    for (int dy = -half; dy < toolSize - half; dy++) {
-                        int tx = cx + dx, ty = cy + dy;
-                        if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
-                        int sx = canvasScreenX + tx * zoom;
-                        int sy = canvasScreenY + ty * zoom;
-                        // apply preview variation if configured (deterministic per-cell based on coords)
-                        float var = ModSettings.getInstance().variationPercent;
-                        int drawColor = currentColor;
-                        if (var > 0f) drawColor = applyPreviewVariation(currentColor, tx, ty, var);
-                        ctx.fill(sx, sy, sx + zoom, sy + zoom, drawColor);
-                    }
+                for (int dx = -half; dx < toolSize - half; dx++) for (int dy = -half; dy < toolSize - half; dy++) {
+                    int tx = cx + dx, ty = cy + dy;
+                    if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
+                    int sx = canvasScreenX + tx * zoom;
+                    int sy = canvasScreenY + ty * zoom;
+                    // apply preview variation if configured (deterministic per-cell based on coords)
+                    float var = ModSettings.getInstance().variationPercent;
+                    int drawColor = currentColor;
+                    if (var > 0f) drawColor = applyPreviewVariation(currentColor, tx, ty, var);
+                    ctx.fill(sx, sy, sx + zoom, sy + zoom, drawColor);
                 }
             }
         }
@@ -1944,10 +2311,10 @@ public abstract class AbstractEditorScreen extends Screen {
                 drawMaxY = drawMinY + selectionMoveH - 1;
                 for (int x = 0; x < selectionMoveW; x++) {
                     int tx = drawMinX + x;
-                    if (tx < 0 || tx >= w) continue;
+                    if (tx < 0 || tx >= canvas.getWidth()) continue;
                     for (int y = 0; y < selectionMoveH; y++) {
                         int ty = drawMinY + y;
-                        if (ty < 0 || ty >= h) continue;
+                        if (ty < 0 || ty >= canvas.getHeight()) continue;
                         int c = selectionMovePixels[x][y];
                         int a = (c >>> 24) & 0xFF;
                         if (a == 0) continue;
@@ -1963,11 +2330,11 @@ public abstract class AbstractEditorScreen extends Screen {
                 drawMaxY = drawMinY + selectionTransformH - 1;
                 for (int x = 0; x < selectionTransformW; x++) {
                     int tx = drawMinX + x;
-                    if (tx < 0 || tx >= w) continue;
+                    if (tx < 0 || tx >= canvas.getWidth()) continue;
                     for (int y = 0; y < selectionTransformH; y++) {
                         if (!selectionTransformMask[x][y]) continue;
                         int ty = drawMinY + y;
-                        if (ty < 0 || ty >= h) continue;
+                        if (ty < 0 || ty >= canvas.getHeight()) continue;
                         int c = selectionTransformPixels[x][y];
                         int a = (c >>> 24) & 0xFF;
                         if (a == 0) continue;
@@ -2137,6 +2504,18 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mx, double my, double ha, double va) {
         if (selectionMenuOpen) return true;
+        if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) {
+            ProfileMenuMetrics m = computeProfileMenuMetrics();
+            if (mx >= m.x() && mx < m.x() + m.w() && my >= m.y() && my < m.y() + m.h()) {
+                List<String> names = ModSettings.getInstance().getPaletteProfileNames();
+                int rowH = 14;
+                int visibleRows = Math.max(1, m.listH() / rowH);
+                int maxScroll = Math.max(0, names.size() - visibleRows);
+                if (va > 0) profileMenuScroll = Math.max(0, profileMenuScroll - 1);
+                else if (va < 0) profileMenuScroll = Math.min(maxScroll, profileMenuScroll + 1);
+                return true;
+            }
+        }
         try {
             long handle = MinecraftClient.getInstance().getWindow().getHandle();
             boolean ctrl = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
@@ -2178,38 +2557,30 @@ public abstract class AbstractEditorScreen extends Screen {
             int pickerAvail = Math.max(0, pickerInnerW - PICKER_SV_W - 8);
             int pickerHueW = Math.max(HUE_W, pickerAvail / 2);
             int pickerAlphaW = Math.max(ALPHA_W, pickerAvail - pickerHueW);
-            int pickerSvX = pickerInnerX, pickerSvY = pickerPy;
-            int pickerHueX = pickerSvX + PICKER_SV_W + 4;
-            int pickerAlphaX = pickerHueX + pickerHueW + 4;
+            int svX = pickerInnerX, svY = pickerPy;
+            int hueX = svX + PICKER_SV_W + 4;
+            int alphaX = hueX + pickerHueW + 4;
             // color tab region
             if (rightTab == RightTab.COLOR) {
-                int innerX = getPanelInnerX(rpx), innerW = panelW - 8;
-                int palTop = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + getToolButtonHeight() + 4 + getToolButtonHeight() + 8;
-                int cols = 5;
-                int cs = (innerW - (cols - 1)) / cols;
-                int totalPaletteRows = (PALETTE.length + cols - 1) / cols;
-                int paletteHeight = totalPaletteRows * (cs + 1) + 4;
-                int histSize = ColorHistory.getInstance().size();
-                int histRows = (Math.min(histSize, 10) + cols - 1) / cols;
-                int historyHeight = histRows * (Math.max(8, cs - 2) + 1) + 14;
-                int contentHeight = paletteHeight + historyHeight;
-                int visibleH = this.height - palTop - 20;
+                ColorTabMetrics metrics = computeColorTabMetrics(this.width - panelW, getToolButtonHeight() + TAB_H + 4, panelW);
+                int palTop = metrics.visibleTop();
+                int visibleH = metrics.visibleHeight();
                 if (mx >= rpx && mx < rpx + panelW && my >= palTop && my < palTop + visibleH) {
                     if (va > 0) paletteScrollY = Math.max(0, paletteScrollY - SCROLL_STEP);
-                    else if (va < 0) paletteScrollY = Math.min(Math.max(0, contentHeight - visibleH), paletteScrollY + SCROLL_STEP);
+                    else if (va < 0) paletteScrollY = Math.min(metrics.maxScroll(), paletteScrollY + SCROLL_STEP);
                     return true;
                 }
             }
             // If hovering over hue or alpha bars, use scroll to adjust them instead of zooming
             if (rightTab == RightTab.COLOR) {
-                if (mx >= pickerHueX && mx < pickerHueX + pickerHueW && my >= pickerSvY && my < pickerSvY + PICKER_SV_H) {
+                if (mx >= hueX && mx < hueX + pickerHueW && my >= svY && my < svY + PICKER_SV_H) {
                     // adjust hue
                     if (va > 0) pickerHue = Math.max(0f, pickerHue - 1f / (PICKER_SV_H - 1));
                     else if (va < 0) pickerHue = Math.min(1f, pickerHue + 1f / (PICKER_SV_H - 1));
                     setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
                     return true;
                 }
-                if (mx >= pickerAlphaX && mx < pickerAlphaX + pickerAlphaW && my >= pickerSvY && my < pickerSvY + PICKER_SV_H) {
+                if (mx >= alphaX && mx < alphaX + pickerAlphaW && my >= svY && my < svY + PICKER_SV_H) {
                     // adjust alpha
                     if (va > 0) pickerAlpha = Math.min(1f, pickerAlpha + 1f / (PICKER_SV_H - 1));
                     else if (va < 0) pickerAlpha = Math.max(0f, pickerAlpha - 1f / (PICKER_SV_H - 1));
@@ -2220,11 +2591,11 @@ public abstract class AbstractEditorScreen extends Screen {
             }
             // layers tab region
             if (rightTab == RightTab.LAYERS) {
-                int listTop = getToolButtonHeight() + TAB_H + 4 + 12;
-                int innerW = panelW - 8;
+                int bh = getToolButtonHeight();
+                int listTop = getToolButtonHeight() + TAB_H + 4 + 12 + bh + 2 + bh + 4;
                 int rowH = 18;
                 int listHeight = canvas != null ? canvas.getLayerStack().getLayerCount() * (rowH + 1) : 0;
-                int visibleH = this.height - listTop - 60;
+                int visibleH = Math.max(10, this.height - listTop - 20);
                 if (mx >= rpx && mx < rpx + panelW && my >= listTop && my < listTop + visibleH) {
                     if (va > 0) layerScrollY = Math.max(0, layerScrollY - SCROLL_STEP);
                     else if (va < 0) layerScrollY = Math.min(Math.max(0, listHeight - visibleH), layerScrollY + SCROLL_STEP);
@@ -2289,6 +2660,11 @@ public abstract class AbstractEditorScreen extends Screen {
             contextMenuItems = List.of();
             contextMenuHoverPath = List.of();
             return true;
+        }
+        if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) {
+            if (handleProfileMenuClick(mx, my, btn)) return true;
+            // While menu is open, block interactions behind it.
+            if (!isInUIRegion(mx, my)) return true;
         }
         // On press record down state so we can tell click vs drag on release
         if (btn == 0) {
@@ -2397,6 +2773,99 @@ public abstract class AbstractEditorScreen extends Screen {
             }
         }
         return false;
+    }
+
+    private boolean handleProfileMenuClick(double mx, double my, int btn) {
+        if (btn != 0) return false;
+        ProfileMenuMetrics m = computeProfileMenuMetrics();
+        if (mx < m.x() || mx >= m.x() + m.w() || my < m.y() || my >= m.y() + m.h()) {
+            closeProfileMenu();
+            return true;
+        }
+
+        List<String> names = ModSettings.getInstance().getPaletteProfileNames();
+        int rowH = 14;
+        if (mx >= m.listX() && mx < m.listX() + m.listW() && my >= m.listY() && my < m.listY() + m.listH()) {
+            int row = (int) ((my - m.listY()) / rowH);
+            int idx = profileMenuScroll + row;
+            if (idx >= 0 && idx < names.size()) {
+                ModSettings settings = ModSettings.getInstance();
+                profileMenuSelectedIndex = idx;
+                profileNameDraft = names.get(idx);
+                settings.setActivePaletteProfile(profileNameDraft);
+                paletteReplaceMode = false;
+                profileNameEditing = false;
+            }
+            return true;
+        }
+
+        if (mx >= m.nameX() && mx < m.nameX() + m.nameW() && my >= m.nameY() && my < m.nameY() + m.nameH()) {
+            profileNameEditing = true;
+            return true;
+        }
+
+        if (my >= m.buttonY() && my < m.buttonY() + m.buttonH()) {
+            int slot = (int) ((mx - m.nameX()) / (m.buttonW() + 1));
+            if (slot < 0 || slot > 3) return true;
+            ModSettings settings = ModSettings.getInstance();
+            String nameInput = profileNameDraft != null ? profileNameDraft.trim() : "";
+            if (nameInput.isEmpty()) nameInput = profileNameDraft;
+            if (slot == 0) {
+                if (profileMenuSelectedIndex >= 0 && profileMenuSelectedIndex < names.size()) {
+                    String selectedName = names.get(profileMenuSelectedIndex);
+                    settings.setActivePaletteProfile(selectedName);
+                    paletteReplaceMode = false;
+                    profileNameDraft = selectedName;
+                }
+            } else if (slot == 1) {
+                settings.createPaletteProfile(nameInput, settings.getActivePaletteColors());
+                names = settings.getPaletteProfileNames();
+                profileMenuSelectedIndex = Math.max(0, names.indexOf(settings.getActivePaletteProfileName()));
+                profileNameDraft = settings.getActivePaletteProfileName();
+            } else if (slot == 2) {
+                settings.deleteActivePaletteProfile();
+                names = settings.getPaletteProfileNames();
+                profileMenuSelectedIndex = Math.max(0, names.indexOf(settings.getActivePaletteProfileName()));
+                profileNameDraft = settings.getActivePaletteProfileName();
+            } else if (slot == 3) {
+                if (settings.renameActivePaletteProfile(nameInput)) {
+                    profileNameDraft = settings.getActivePaletteProfileName();
+                    names = settings.getPaletteProfileNames();
+                    profileMenuSelectedIndex = Math.max(0, names.indexOf(settings.getActivePaletteProfileName()));
+                }
+            }
+            return true;
+        }
+
+        int secondRowY = m.buttonY() + m.buttonH() + 1;
+        if (my >= secondRowY && my < secondRowY + m.buttonH()) {
+            int slot = (int) ((mx - m.nameX()) / (m.buttonW() + 1));
+            if (slot < 0 || slot > 3) return true;
+            ModSettings settings = ModSettings.getInstance();
+            if (slot == 0) {
+                String payload = buildPaletteExportPayload(settings.getActivePaletteProfileName(), settings.getActivePaletteColors());
+                MinecraftClient.getInstance().keyboard.setClipboard(payload);
+            } else if (slot == 1) {
+                String clip = MinecraftClient.getInstance().keyboard.getClipboard();
+                List<Integer> imported = parsePaletteImportPayload(clip);
+                String importName = parsePaletteImportName(clip);
+                if (imported != null && !imported.isEmpty()) {
+                    settings.createPaletteProfile(importName, imported);
+                    names = settings.getPaletteProfileNames();
+                    profileMenuSelectedIndex = Math.max(0, names.indexOf(settings.getActivePaletteProfileName()));
+                    profileNameDraft = settings.getActivePaletteProfileName();
+                }
+            } else if (slot == 2) {
+                settings.resetActivePaletteToDefault();
+            } else if (slot == 3) {
+                List<Integer> extracted = extractDominantColors(DEFAULT_PALETTE.length);
+                if (!extracted.isEmpty()) settings.setActivePaletteColors(extracted);
+            }
+            return true;
+        }
+
+        profileNameEditing = false;
+        return true;
     }
 
     @Override
@@ -2560,6 +3029,7 @@ public abstract class AbstractEditorScreen extends Screen {
         double mx = click.x(), my = click.y(); int btn = click.button();
         if (suppressMenuClickThroughUntilRelease) return true;
         if (selectionMenuOpen) return true;
+        if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) return true;
         if (quickSelectWheel.isVisible()) return true;
         if (btn == 1 && rightDown) {
             if (!isPanning) {
@@ -2651,6 +3121,9 @@ public abstract class AbstractEditorScreen extends Screen {
                     }
                     else if (currentTool == EditorTool.ERASER) { if (toolSize > 1) canvas.erasePixelArea(ix, iy, toolSize); else canvas.erasePixel(ix, iy); }
                 }
+                if (currentTool == EditorTool.PENCIL) {
+                    setColor(currentColor, true);
+                }
                 lastDrawX = px; lastDrawY = py;
                 return true;
             }
@@ -2661,7 +3134,33 @@ public abstract class AbstractEditorScreen extends Screen {
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
         int kc = keyInput.key();
-        if (hexInput != null && hexInput.isFocused()) return super.keyPressed(keyInput);
+        if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) {
+            if (kc == GLFW.GLFW_KEY_ESCAPE) {
+                closeProfileMenu();
+                return true;
+            }
+            if (profileNameEditing) {
+                if (kc == GLFW.GLFW_KEY_BACKSPACE) {
+                    if (profileNameDraft != null && !profileNameDraft.isEmpty()) {
+                        profileNameDraft = profileNameDraft.substring(0, profileNameDraft.length() - 1);
+                    }
+                    return true;
+                }
+                if (kc == GLFW.GLFW_KEY_ENTER || kc == GLFW.GLFW_KEY_KP_ENTER) {
+                    ModSettings.getInstance().renameActivePaletteProfile(profileNameDraft);
+                    profileNameDraft = ModSettings.getInstance().getActivePaletteProfileName();
+                    profileNameEditing = false;
+                    return true;
+                }
+                // While typing a profile name, block global editor keybinds completely.
+                return true;
+            }
+        }
+        if (hexInput != null && hexInput.isFocused()) {
+            super.keyPressed(keyInput);
+            // Keep tool/browse keybinds from firing while the hex input is focused.
+            return true;
+        }
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
         if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = true; return true; }
         ModSettings s = ModSettings.getInstance();
@@ -2758,6 +3257,20 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     @Override
+    public boolean charTyped(net.minecraft.client.input.CharInput charInput) {
+        if (profileMenuOpen && profileNameEditing) {
+            int cp = charInput.codepoint();
+            if (!charInput.isValidChar() || Character.isISOControl(cp)) return true;
+            if (profileNameDraft == null) profileNameDraft = "";
+            if (profileNameDraft.length() < 32) {
+                profileNameDraft += Character.toString(cp);
+            }
+            return true;
+        }
+        return super.charTyped(charInput);
+    }
+
+    @Override
     public boolean keyReleased(net.minecraft.client.input.KeyInput keyInput) {
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
         if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = false; return true; }
@@ -2771,7 +3284,6 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean handleColorPickerClick(double mx, double my) {
         int rpx = this.width - PANEL_W;
         int innerX = rpx + 4;
-        int bh = getToolButtonHeight();
         int py = getToolButtonHeight() + TAB_H + 4;
         int innerW = PANEL_W - 8;
         int avail = Math.max(0, innerW - PICKER_SV_W - 8);
@@ -2788,7 +3300,7 @@ public abstract class AbstractEditorScreen extends Screen {
             return true;
         }
         if (mx >= hueX && mx < hueX + hueW && my >= svY && my < svY + PICKER_SV_H) {
-                        int rel = (int)Math.round(my - svY);
+            int rel = (int)Math.round(my - svY);
             rel = Math.max(0, Math.min(PICKER_SV_H - 2, rel)); // cap to one before the final pixel to avoid wrap
             pickerHue = rel / (float)(PICKER_SV_H - 1);
             setColor(hsvToArgb(pickerHue, pickerSat, pickerVal, pickerAlpha), false);
@@ -2808,18 +3320,26 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean handlePaletteClick(double mx, double my) {
         int panelW = getPanelWidth();
         int rpx = this.width - panelW;
-        int innerX = getPanelInnerX(rpx), innerW = panelW - 8;
-        int bh = getToolButtonHeight();
-        int py = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + bh + 4 + bh + 8;
-        int cols = 5, cs = (innerW - (cols - 1)) / cols;
-        int startY = py - paletteScrollY;
-        int centerOffsetX = (innerW - (cols * cs + (cols - 1))) / 2;
-        for (int i = 0; i < PALETTE.length; i++) {
+        ColorTabMetrics metrics = computeColorTabMetrics(rpx, getToolButtonHeight() + TAB_H + 4, panelW);
+
+        if (handleColorActionButtonClick(mx, my, metrics)) return true;
+
+        int cols = metrics.paletteCols(), cs = metrics.paletteCell();
+        int startY = metrics.paletteStartY() - paletteScrollY;
+        int centerOffsetX = (metrics.innerW() - (cols * cs + (cols - 1))) / 2;
+        List<Integer> paletteColors = getActivePaletteColors();
+        for (int i = 0; i < paletteColors.size(); i++) {
             int col = i % cols, row = i / cols;
-            int px2 = innerX + col * (cs + 1) + centerOffsetX;
+            int px2 = metrics.innerX() + col * (cs + 1) + centerOffsetX;
             int py2 = startY + row * (cs + 1);
             if (mx >= px2 && mx < px2 + cs && my >= py2 && my < py2 + cs) {
-                setColor(PALETTE[i], false);
+                if (paletteReplaceMode) {
+                    paletteColors.set(i, currentColor);
+                    setActivePaletteColors(paletteColors);
+                    paletteReplaceMode = false;
+                } else {
+                    setColor(paletteColors.get(i), false);
+                }
                 return true;
             }
         }
@@ -2831,24 +3351,76 @@ public abstract class AbstractEditorScreen extends Screen {
         if (hist.size() == 0) return false;
         int panelW = getPanelWidth();
         int rpx = this.width - panelW;
-        int innerX = getPanelInnerX(rpx), innerW = panelW - 8;
-        int bh = getToolButtonHeight();
-        int cols = 5, cs = (innerW - (cols - 1)) / cols;
-        int palRows = (PALETTE.length + cols - 1) / cols;
-        int py = getToolButtonHeight() + TAB_H + 4 + PICKER_SV_H + 6 + bh + 4 + bh + 8 + palRows * (cs + 1) + 4 + 10;
-        int hcs = Math.max(8, cs - 2);
-        int startY = py - paletteScrollY;
-        int centerOffsetX = (innerW - (cols * hcs + (cols - 1))) / 2;
+        ColorTabMetrics metrics = computeColorTabMetrics(rpx, getToolButtonHeight() + TAB_H + 4, panelW);
+        int cols = metrics.paletteCols();
+        int hcs = metrics.historyCell();
+        int startY = metrics.historyStartY() - paletteScrollY;
+        int centerOffsetX = (metrics.innerW() - (cols * hcs + (cols - 1))) / 2;
         List<Integer> colors = hist.getColors();
-        for (int i = 0; i < Math.min(colors.size(), 10); i++) {
+        for (int i = 0; i < colors.size(); i++) {
             int col = i % cols, row = i / cols;
-            int px2 = innerX + col * (hcs + 1) + centerOffsetX, py2 = startY + row * (hcs + 1);
+            int px2 = metrics.innerX() + col * (hcs + 1) + centerOffsetX, py2 = startY + row * (hcs + 1);
             if (mx >= px2 && mx < px2 + hcs && my >= py2 && my < py2 + hcs) {
                 setColor(colors.get(i), false);
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean handleColorActionButtonClick(double mx, double my, ColorTabMetrics metrics) {
+        int actionStartY = metrics.contentStartY() - paletteScrollY;
+        int actionH = metrics.actionButtonH();
+        int smallW = Math.max(14, (metrics.innerW() - 2 - 1) / 4);
+        int profilesX = metrics.innerX();
+        int profilesY = actionStartY;
+        int profilesW = metrics.innerW();
+        int row2Y = profilesY + actionH + 1;
+        int addX = metrics.innerX();
+        int removeX = addX + smallW + 1;
+        int replaceX = removeX + smallW + 1;
+        int replaceW = metrics.innerW() - (smallW * 2 + 2);
+
+        if (mx >= profilesX && mx < profilesX + profilesW && my >= profilesY && my < profilesY + actionH) {
+            executeColorAction(COLOR_ACTION_PROFILES);
+            return true;
+        }
+        if (mx >= addX && mx < addX + smallW && my >= row2Y && my < row2Y + actionH) {
+            executeColorAction(COLOR_ACTION_ADD);
+            return true;
+        }
+        if (mx >= removeX && mx < removeX + smallW && my >= row2Y && my < row2Y + actionH) {
+            executeColorAction(COLOR_ACTION_REMOVE);
+            return true;
+        }
+        if (mx >= replaceX && mx < replaceX + replaceW && my >= row2Y && my < row2Y + actionH) {
+            executeColorAction(COLOR_ACTION_REPLACE);
+            return true;
+        }
+        return false;
+    }
+
+    private void executeColorAction(int actionIndex) {
+        ModSettings settings = ModSettings.getInstance();
+        List<Integer> palette = new ArrayList<>(getActivePaletteColors());
+        switch (actionIndex) {
+            case COLOR_ACTION_PROFILES -> { if (profileMenuOpen) closeProfileMenu(); else openProfileMenu(); }
+            case COLOR_ACTION_ADD -> {
+                if (!palette.contains(currentColor)) {
+                    palette.add(0, currentColor);
+                    settings.setActivePaletteColors(palette);
+                }
+            }
+            case COLOR_ACTION_REMOVE -> {
+                if (palette.size() > 1) {
+                    palette.remove(Integer.valueOf(currentColor));
+                    settings.setActivePaletteColors(palette);
+                }
+            }
+            case COLOR_ACTION_REPLACE -> paletteReplaceMode = !paletteReplaceMode;
+            default -> {
+            }
+        }
     }
 
     private boolean handleLayerClick(double mx, double my) {
@@ -2878,8 +3450,8 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Layer rows (account for scroll) - these are drawn below the actions and scroll under them
         int listStartY = secondActionTop + bh + 4;
-        int rowH = 18;
         int contentY = listStartY - layerScrollY;
+        int rowH = 18;
         for (int i = stack.getLayerCount() - 1; i >= 0; i--) {
             int rowY = contentY + (stack.getLayerCount() - 1 - i) * (rowH + 1);
             if (my >= rowY && my < rowY + rowH && mx >= innerX && mx < innerX + innerW) {

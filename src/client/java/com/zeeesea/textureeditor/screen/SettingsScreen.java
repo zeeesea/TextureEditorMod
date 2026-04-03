@@ -1,6 +1,7 @@
 package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
+import com.zeeesea.textureeditor.editor.ColorHistory;
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import net.minecraft.client.toast.SystemToast;
 import net.minecraft.client.gui.DrawContext;
@@ -90,6 +91,7 @@ public class SettingsScreen extends Screen {
                 case 15 -> 20;
                 default -> 5;
             };
+            ColorHistory.setMaxHistory(s.colorHistorySize);
             s.save();
             this.clearChildren();
             this.init();

@@ -33,6 +33,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
     private final List<int[][]> frames = new ArrayList<>();
     private int activeFrame = 0;
     private int fps = 10;
+    private boolean pingPong = false;
 
     private int controlsX;
     private int controlsY;
@@ -42,6 +43,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
     private int removeBtnX;
     private int fpsMinusX;
     private int fpsPlusX;
+    private int reverseBtnX;
     private int stripStartX;
     private int stripY;
     private int stripW;
@@ -125,6 +127,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
                 frames.add(copyPixels(frame, anim.width(), anim.height()));
             }
             fps = frameTimeToFps(anim.frameTimeTicks());
+            pingPong = anim.pingPong();
         } else if (initialFrames != null && !initialFrames.isEmpty()) {
             frames.clear();
             frames.addAll(copyFrameList(initialFrames));
@@ -193,7 +196,8 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         drawButton(context, removeBtnX, controlsY + 4, "-F");
         drawButton(context, fpsMinusX, controlsY + 4, "-");
         drawButton(context, fpsPlusX, controlsY + 4, "+");
-        context.drawText(textRenderer, "FPS " + fps, fpsPlusX + BTN_W + 6, controlsY + 8, pal.STATUS_TEXT, false);
+        drawButton(context, reverseBtnX, controlsY + 4, pingPong ? "<>" : ">>");
+        context.drawText(textRenderer, "FPS " + fps, reverseBtnX + BTN_W + 6, controlsY + 8, pal.STATUS_TEXT, false);
 
         for (int i = 0; i < visibleFrameCount; i++) {
             int frameIndex = frameStripOffset + i;
@@ -214,6 +218,10 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
             int usableW = Math.max(1, scrollTrackW - thumbW);
             int thumbX = scrollTrackX + Math.round((frameStripOffset / (float) maxOffset) * usableW);
             context.fill(thumbX, scrollTrackY, thumbX + thumbW, scrollTrackY + 3, 0xFFDDDD88);
+        }
+
+        if (inRect(mouseX, mouseY, reverseBtnX, controlsY + 4, BTN_W, BTN_H)) {
+            drawReverseTooltip(context, mouseX, mouseY);
         }
     }
 
@@ -236,6 +244,10 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         }
         if (inRect(mx, my, fpsPlusX, controlsY + 4, BTN_W, BTN_H)) {
             fps = Math.min(60, fps + 1);
+            return true;
+        }
+        if (inRect(mx, my, reverseBtnX, controlsY + 4, BTN_W, BTN_H)) {
+            pingPong = !pingPong;
             return true;
         }
 
@@ -281,7 +293,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         }
 
         int frameTime = fpsToFrameTime(fps);
-        tm.startItemAnimationLive(textureId, spriteId, copyFrameList(frames), canvas.getWidth(), canvas.getHeight(), frameTime, originalPixels);
+        tm.startItemAnimationLive(textureId, spriteId, copyFrameList(frames), canvas.getWidth(), canvas.getHeight(), frameTime, pingPong, originalPixels);
     }
 
     @Override
@@ -305,6 +317,29 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         TextureManager.getInstance().removeItemAnimation(textureId);
         TextureManager.getInstance().removeTexture(textureId);
         TextureManager.getInstance().removeOriginal(textureId);
+        applyLive();
+    }
+
+    @Override
+    protected void doResetAll() {
+        super.doResetAll();
+        if (textureId == null || canvas == null || originalPixels == null) return;
+
+        int w = canvas.getWidth();
+        int h = canvas.getHeight();
+        frames.clear();
+        frames.add(copyPixels(originalPixels, w, h));
+        activeFrame = 0;
+        pingPong = false;
+        fps = Math.max(1, fps);
+
+        TextureManager tm = TextureManager.getInstance();
+        tm.stopItemAnimationLive(textureId);
+        tm.removeItemAnimation(textureId);
+
+        canvas.saveSnapshot();
+        canvas.setLayerStack(new LayerStack(w, h, frames.getFirst()));
+        canvas.invalidateCache();
         applyLive();
     }
 
@@ -378,8 +413,9 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         removeBtnX = addBtnX + BTN_W + 2;
         fpsMinusX = removeBtnX + BTN_W + 10;
         fpsPlusX = fpsMinusX + BTN_W + 2;
+        reverseBtnX = fpsPlusX + BTN_W + 10;
 
-        stripStartX = fpsPlusX + BTN_W + 54;
+        stripStartX = reverseBtnX + BTN_W + 54;
         stripY = controlsY + 5;
         stripW = Math.max(0, controlsX + controlsW - stripStartX - 10);
         visibleFrameCount = Math.max(1, stripW / (THUMB_SIZE + THUMB_GAP));
@@ -416,6 +452,17 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         context.fill(x, y, x + BTN_W, y + BTN_H, 0xFF2B2B2B);
         drawRectOutline(context, x, y, x + BTN_W, y + BTN_H, 0xFF888888);
         context.drawCenteredTextWithShadow(textRenderer, Text.literal(label), x + BTN_W / 2, y + 4, 0xFFFFFFFF);
+    }
+
+    private void drawReverseTooltip(DrawContext context, int mouseX, int mouseY) {
+        var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
+        String mode = pingPong ? "Reverse: ON (Ping-Pong)" : "Reverse: OFF (Loop)";
+        int tw = textRenderer.getWidth(mode) + 8;
+        int tx = Math.min(mouseX + 10, this.width - tw - 4);
+        int ty = Math.max(4, mouseY - 16);
+        context.fill(tx, ty, tx + tw, ty + 12, pal.PANEL_BG);
+        drawRectOutline(context, tx, ty, tx + tw, ty + 12, pal.PANEL_SEPARATOR);
+        context.drawText(textRenderer, mode, tx + 4, ty + 2, pal.TEXT_NORMAL, false);
     }
 
     private void drawFrameThumb(DrawContext context, int[][] frame, int x, int y) {
