@@ -1728,17 +1728,13 @@ public abstract class AbstractEditorScreen extends Screen {
                 MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_SV_ID, pickerSvTexture);
             }
         }
-        if (!pickerHueBarBuilt || pickerHueTexture == null || pickerHueTexture.getGlTexture().getWidth(0) != hueW) {
+        if (!pickerHueBarBuilt || pickerHueTexture == null || isTextureSizeMismatch(pickerHueTexture, hueW, PICKER_SV_H)) {
             var himg = new net.minecraft.client.texture.NativeImage(hueW, PICKER_SV_H, false);
             for (int y = 0; y < PICKER_SV_H; y++) {
                 int c = hsvToArgb(y / (float)(PICKER_SV_H - 1), 1f, 1f, 1f);
                 for (int x = 0; x < hueW; x++) himg.setColorArgb(x, y, c);
             }
-            if (pickerHueTexture != null) { pickerHueTexture.setImage(himg); pickerHueTexture.upload(); }
-            else {
-                pickerHueTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_hue", himg);
-                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_HUE_ID, pickerHueTexture);
-            }
+            pickerHueTexture = replacePickerTexture(PICKER_HUE_ID, pickerHueTexture, () -> "picker_hue", himg);
             pickerHueBarBuilt = true;
         }
         if (!pickerAlphaBarBuilt || pickerAlphaTexture == null || pickerAlphaTexture.getGlTexture().getWidth(0) != alphaW) rebuildAlphaBar(alphaW);
@@ -1993,12 +1989,34 @@ public abstract class AbstractEditorScreen extends Screen {
             int argb = ((int)(a * 255) << 24) | (r << 16) | (g << 8) | b;
             for (int x = 0; x < Math.max(1, width); x++) img.setColorArgb(x, y, argb);
         }
-        if (pickerAlphaTexture != null) { pickerAlphaTexture.setImage(img); pickerAlphaTexture.upload(); }
-        else {
-            pickerAlphaTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_alpha", img);
-            MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_ALPHA_ID, pickerAlphaTexture);
-        }
+        pickerAlphaTexture = replacePickerTexture(PICKER_ALPHA_ID, pickerAlphaTexture, () -> "picker_alpha", img);
         pickerAlphaBarBuilt = true;
+    }
+
+    private static boolean isTextureSizeMismatch(net.minecraft.client.texture.NativeImageBackedTexture texture, int expectedW, int expectedH) {
+        if (texture == null || texture.getGlTexture() == null) return true;
+        return texture.getGlTexture().getWidth(0) != expectedW || texture.getGlTexture().getHeight(0) != expectedH;
+    }
+
+    private static net.minecraft.client.texture.NativeImageBackedTexture replacePickerTexture(
+            Identifier id,
+            net.minecraft.client.texture.NativeImageBackedTexture existing,
+            java.util.function.Supplier<String> name,
+            net.minecraft.client.texture.NativeImage image
+    ) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return existing;
+        try {
+            client.getTextureManager().destroyTexture(id);
+        } catch (Exception ignored) {}
+        if (existing != null) {
+            try {
+                existing.close();
+            } catch (Exception ignored) {}
+        }
+        net.minecraft.client.texture.NativeImageBackedTexture texture = new net.minecraft.client.texture.NativeImageBackedTexture(name, image);
+        client.getTextureManager().registerTexture(id, texture);
+        return texture;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
