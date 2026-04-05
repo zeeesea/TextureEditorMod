@@ -17,7 +17,7 @@ import java.util.List;
  */
 public final class ItemAnimationResourceLoader {
 
-    public record LoadedAnimation(List<int[][]> frames, int width, int height, int frameTimeTicks) {}
+    public record LoadedAnimation(List<int[][]> frames, int width, int height, int frameTimeTicks, boolean interpolate) {}
 
     private ItemAnimationResourceLoader() {}
 
@@ -69,7 +69,11 @@ public final class ItemAnimationResourceLoader {
                 frameTimeTicks = Math.max(1, animation.get("frametime").getAsInt());
             }
 
-            return new LoadedAnimation(frames, width, frameHeight, frameTimeTicks);
+            boolean interpolate = animation.has("interpolate")
+                    && animation.get("interpolate").isJsonPrimitive()
+                    && animation.get("interpolate").getAsBoolean();
+
+            return new LoadedAnimation(frames, width, frameHeight, frameTimeTicks, interpolate);
         } catch (Exception ignored) {
             return null;
         }

@@ -30,6 +30,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     private boolean redirectToAnimationEditor = false;
     private List<int[][]> redirectFrames = null;
     private int redirectFrameTimeTicks = 1;
+    private boolean redirectInterpolate = false;
 
     public ItemEditorScreen(ItemStack itemStack, Screen parent) {
         super(Text.translatable("textureeditor.screen.item.title"));
@@ -84,7 +85,8 @@ public class ItemEditorScreen extends AbstractEditorScreen {
                 orig,
                 current,
                 redirectFrames,
-                redirectFrameTimeTicks
+                redirectFrameTimeTicks,
+                redirectInterpolate
         ));
     }
 
@@ -204,6 +206,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
             redirectToAnimationEditor = true;
             redirectFrames = data.frames();
             redirectFrameTimeTicks = Math.max(1, data.frameTimeTicks());
+            redirectInterpolate = data.interpolate();
             return;
         }
 
@@ -215,6 +218,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
             redirectToAnimationEditor = true;
             redirectFrames = loaded.frames();
             redirectFrameTimeTicks = Math.max(1, loaded.frameTimeTicks());
+            redirectInterpolate = loaded.interpolate();
         }
     }
 }

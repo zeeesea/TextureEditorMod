@@ -47,7 +47,7 @@ public class TextureManager {
     private boolean previewingOriginals = false;
     private volatile boolean itemGuiAtlasDirty = false;
 
-    public record ItemAnimationData(Identifier textureId, Identifier spriteId, List<int[][]> frames, int width, int height, int frameTimeTicks, boolean pingPong) {}
+    public record ItemAnimationData(Identifier textureId, Identifier spriteId, List<int[][]> frames, int width, int height, int frameTimeTicks, boolean pingPong, boolean interpolate) {}
 
     private static final class LiveItemAnimation {
         private final Identifier textureId;
@@ -57,13 +57,14 @@ public class TextureManager {
         private final int height;
         private final int frameTimeTicks;
         private final boolean pingPong;
+        private final boolean interpolate;
         private int tickCounter = 0;
         private int frameIndex = 0;
         private int direction = 1;
         private int lastGeometryHash;
 
         private LiveItemAnimation(Identifier textureId, Identifier spriteId, List<int[][]> frames,
-                                  int width, int height, int frameTimeTicks, boolean pingPong) {
+                                  int width, int height, int frameTimeTicks, boolean pingPong, boolean interpolate) {
             this.textureId = textureId;
             this.spriteId = spriteId;
             this.frames = frames;
@@ -71,6 +72,7 @@ public class TextureManager {
             this.height = height;
             this.frameTimeTicks = Math.max(1, frameTimeTicks);
             this.pingPong = pingPong;
+            this.interpolate = interpolate;
             this.lastGeometryHash = frames.isEmpty() ? 0 : computeOpaqueMaskHash(frames.getFirst(), width, height);
         }
     }
@@ -227,7 +229,8 @@ public class TextureManager {
     }
 
     public void setItemAnimation(Identifier textureId, Identifier spriteId, List<int[][]> frames,
-                                 int width, int height, int frameTimeTicks, boolean pingPong) {
+                                 int width, int height, int frameTimeTicks, boolean pingPong,
+                                 boolean interpolate) {
         if (textureId == null || spriteId == null || frames == null || frames.isEmpty() || width <= 0 || height <= 0) return;
         List<int[][]> frameCopies = new ArrayList<>(frames.size());
         for (int[][] frame : frames) {
@@ -235,7 +238,7 @@ public class TextureManager {
             frameCopies.add(copyFrame(frame, width, height));
         }
         if (frameCopies.isEmpty()) return;
-        itemAnimations.put(textureId, new ItemAnimationData(textureId, spriteId, frameCopies, width, height, Math.max(1, frameTimeTicks), pingPong));
+        itemAnimations.put(textureId, new ItemAnimationData(textureId, spriteId, frameCopies, width, height, Math.max(1, frameTimeTicks), pingPong, interpolate));
     }
 
     public void removeItemAnimation(Identifier textureId) {
@@ -245,13 +248,14 @@ public class TextureManager {
     }
 
     public void startItemAnimationLive(Identifier textureId, Identifier spriteId, List<int[][]> frames,
-                                       int width, int height, int frameTimeTicks, boolean pingPong, int[][] origPixels) {
+                                       int width, int height, int frameTimeTicks, boolean pingPong,
+                                       boolean interpolate, int[][] origPixels) {
         if (textureId == null || spriteId == null || frames == null || frames.isEmpty()) return;
-        setItemAnimation(textureId, spriteId, frames, width, height, frameTimeTicks, pingPong);
+        setItemAnimation(textureId, spriteId, frames, width, height, frameTimeTicks, pingPong, interpolate);
         ItemAnimationData data = itemAnimations.get(textureId);
         if (data == null) return;
 
-        LiveItemAnimation live = new LiveItemAnimation(textureId, spriteId, data.frames(), data.width(), data.height(), data.frameTimeTicks(), data.pingPong());
+        LiveItemAnimation live = new LiveItemAnimation(textureId, spriteId, data.frames(), data.width(), data.height(), data.frameTimeTicks(), data.pingPong(), data.interpolate());
         liveItemAnimations.put(textureId, live);
 
         if (origPixels != null) {
@@ -276,28 +280,85 @@ public class TextureManager {
                 continue;
             }
 
+            if (live.interpolate && live.frames.size() > 1 && live.frameTimeTicks > 1) {
+                int[][] current = live.frames.get(live.frameIndex);
+                int[][] next = live.frames.get(getNextFrameIndex(live));
+                float t = live.tickCounter / (float) live.frameTimeTicks;
+                applyLive(live.spriteId, blendFrames(current, next, live.width, live.height, t), live.width, live.height, null, false);
+
+                live.tickCounter++;
+                if (live.tickCounter >= live.frameTimeTicks) {
+                    live.tickCounter = 0;
+                    advanceFrame(live);
+                    int[][] frame = live.frames.get(live.frameIndex);
+                    live.lastGeometryHash = computeOpaqueMaskHash(frame, live.width, live.height);
+                }
+                continue;
+            }
+
             live.tickCounter++;
             if (live.tickCounter < live.frameTimeTicks) continue;
             live.tickCounter = 0;
-            if (live.pingPong && live.frames.size() > 1) {
-                int next = live.frameIndex + live.direction;
-                if (next >= live.frames.size()) {
-                    live.direction = -1;
-                    next = Math.max(0, live.frames.size() - 2);
-                } else if (next < 0) {
-                    live.direction = 1;
-                    next = Math.min(live.frames.size() - 1, 1);
-                }
-                live.frameIndex = next;
-            } else {
-                live.frameIndex = (live.frameIndex + 1) % live.frames.size();
-            }
+            advanceFrame(live);
             int[][] frame = live.frames.get(live.frameIndex);
             int geometryHash = computeOpaqueMaskHash(frame, live.width, live.height);
             boolean rebake = geometryHash != live.lastGeometryHash;
             live.lastGeometryHash = geometryHash;
             applyLive(live.spriteId, frame, live.width, live.height, null, rebake);
         }
+    }
+
+    private static int getNextFrameIndex(LiveItemAnimation live) {
+        if (!live.pingPong || live.frames.size() <= 1) {
+            return (live.frameIndex + 1) % live.frames.size();
+        }
+        int next = live.frameIndex + live.direction;
+        if (next >= live.frames.size()) return Math.max(0, live.frames.size() - 2);
+        if (next < 0) return Math.min(live.frames.size() - 1, 1);
+        return next;
+    }
+
+    private static void advanceFrame(LiveItemAnimation live) {
+        if (live.pingPong && live.frames.size() > 1) {
+            int next = live.frameIndex + live.direction;
+            if (next >= live.frames.size()) {
+                live.direction = -1;
+                next = Math.max(0, live.frames.size() - 2);
+            } else if (next < 0) {
+                live.direction = 1;
+                next = Math.min(live.frames.size() - 1, 1);
+            }
+            live.frameIndex = next;
+        } else {
+            live.frameIndex = (live.frameIndex + 1) % live.frames.size();
+        }
+    }
+
+    private static int[][] blendFrames(int[][] a, int[][] b, int width, int height, float t) {
+        int[][] out = new int[width][height];
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                out[x][y] = blendColor(a[x][y], b[x][y], t);
+            }
+        }
+        return out;
+    }
+
+    private static int blendColor(int c1, int c2, float t) {
+        int a1 = (c1 >>> 24) & 0xFF;
+        int r1 = (c1 >>> 16) & 0xFF;
+        int g1 = (c1 >>> 8) & 0xFF;
+        int b1 = c1 & 0xFF;
+        int a2 = (c2 >>> 24) & 0xFF;
+        int r2 = (c2 >>> 16) & 0xFF;
+        int g2 = (c2 >>> 8) & 0xFF;
+        int b2 = c2 & 0xFF;
+
+        int a = (int) (a1 + (a2 - a1) * t);
+        int r = (int) (r1 + (r2 - r1) * t);
+        int g = (int) (g1 + (g2 - g1) * t);
+        int b = (int) (b1 + (b2 - b1) * t);
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     private static int computeOpaqueMaskHash(int[][] frame, int width, int height) {

@@ -64,7 +64,7 @@ public class ResourcePackExporter {
             // Write pack.mcmeta
             JsonObject packMcmeta = new JsonObject();
             JsonObject pack = new JsonObject();
-            pack.addProperty("pack_format", 75); // 1.21.11
+            pack.addProperty("pack_format", 55);
             // For pack_format > 64, Minecraft requires min_format and max_format as
             // top-level fields in the pack object (not inside supported_formats)
             pack.addProperty("min_format", 1);
@@ -136,6 +136,7 @@ public class ResourcePackExporter {
                 JsonObject animationMcmeta = new JsonObject();
                 JsonObject animation = new JsonObject();
                 animation.addProperty("frametime", Math.max(1, anim.frameTimeTicks()));
+                animation.addProperty("interpolate", anim.interpolate());
                 if (anim.pingPong() && frameCount > 1) {
                     JsonArray frames = new JsonArray();
                     for (int i = 0; i < frameCount; i++) frames.add(i);
