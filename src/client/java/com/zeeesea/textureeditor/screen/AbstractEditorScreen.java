@@ -7,14 +7,14 @@ import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.ColorPalette;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.toast.SystemToast;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -28,17 +28,17 @@ import java.util.List;
  */
 public abstract class AbstractEditorScreen extends Screen {
 
-    // ── Texture data ──────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Texture data Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     protected Identifier spriteId;
     protected Identifier textureId;
     protected PixelCanvas canvas;
     protected int[][] originalPixels;
 
-    // ── Tint ──────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Tint Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     protected int blockTint = -1;
     protected boolean isTinted = false;
 
-    // ── Editor state ─────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Editor state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     protected EditorTool currentTool = EditorTool.PENCIL;
     protected int currentColor = 0xFFFF0000;
     protected int zoom = 12;
@@ -46,7 +46,7 @@ public abstract class AbstractEditorScreen extends Screen {
     protected int toolSize = 1;
     protected boolean previewingOriginal = false;
 
-    // ── Canvas position ───────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Canvas position Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     protected int canvasBaseX, canvasBaseY;
     protected int panOffsetX = 0, panOffsetY = 0;
     protected int canvasScreenX, canvasScreenY;
@@ -59,10 +59,10 @@ public abstract class AbstractEditorScreen extends Screen {
     private boolean rightMovedPastThreshold = false;
     private static final double RIGHT_DRAG_THRESHOLD_SQ = 36.0; // 6px tolerance before panning
 
-    // ── Line tool ─────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Line tool Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     private int lineStartX = -1, lineStartY = -1;
     private boolean lineFirstClick = false;
-    // ── Rectangle tool ─────────────────────────────────────────────────-------
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Rectangle tool Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬-------
     private int rectStartX = -1, rectStartY = -1;
     private boolean rectFirstClick = false;
     // Preview coordinates for live previewing of line/rectangle tools
@@ -78,7 +78,7 @@ public abstract class AbstractEditorScreen extends Screen {
     // Whether the current shape start was created on press (so drag should behave immediately)
     private boolean startCreatedOnPress = false;
 
-    // ── Selection tool ────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Selection tool Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     private enum SelectionMode { RECT, LASSO }
     private SelectionMode selectionMode = SelectionMode.RECT;
     private int selMinX = -1, selMinY = -1, selMaxX = -1, selMaxY = -1;
@@ -134,7 +134,7 @@ public abstract class AbstractEditorScreen extends Screen {
     // Color picker drag-capture flags (keep interaction captured while dragging inside picker)
     private boolean pickingSv = false, pickingHue = false, pickingAlpha = false;
 
-    // ── Panel system ──────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Panel system Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Left panel tabs
     protected enum LeftTab { GENERAL, TOOLS }
     protected LeftTab leftTab = LeftTab.TOOLS;
@@ -175,16 +175,16 @@ public abstract class AbstractEditorScreen extends Screen {
         return Math.max(getMaxZoom(), fitZoom);
     }
 
-    // ── Color picker state ────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Color picker state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     private float pickerHue = 0f, pickerSat = 1f, pickerVal = 1f;
     private float pickerAlpha = 1f;
     private float cachedPickerHue = -1f;
     // Shrink the picker widths so the controls fit inside the panel width
     private static final int PICKER_SV_W = 64, PICKER_SV_H = 80;
     private static final int HUE_W = 8, ALPHA_W = 8;
-    private net.minecraft.client.texture.NativeImageBackedTexture pickerSvTexture = null;
-    private net.minecraft.client.texture.NativeImageBackedTexture pickerHueTexture = null;
-    private net.minecraft.client.texture.NativeImageBackedTexture pickerAlphaTexture = null;
+    private net.minecraft.client.renderer.texture.DynamicTexture pickerSvTexture = null;
+    private net.minecraft.client.renderer.texture.DynamicTexture pickerHueTexture = null;
+    private net.minecraft.client.renderer.texture.DynamicTexture pickerAlphaTexture = null;
     private int pickerHueTexW = -1;
     private int pickerHueTexH = -1;
     private int pickerAlphaTexW = -1;
@@ -202,18 +202,18 @@ public abstract class AbstractEditorScreen extends Screen {
     private static final Identifier PICKER_HUE_ID  = Identifier.of("textureeditor", "picker_hue");
     private static final Identifier PICKER_ALPHA_ID = Identifier.of("textureeditor", "picker_alpha");
 
-    // ── Hex input ─────────────────────────────────────────────────────────────
-    protected TextFieldWidget hexInput;
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Hex input Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    protected EditBox hexInput;
     // When programmatically updating the hex input we suppress its change callback
     private boolean suppressHexCallback = false;
     // Size slider reference so we can programmatically update it when toolSize changes
-    private net.minecraft.client.gui.widget.SliderWidget sizeSlider = null;
+    private net.minecraft.client.gui.components.AbstractSliderButton sizeSlider = null;
     // When programmatically updating the size slider, suppress its applyValue callback
     private boolean suppressSizeSliderCallback = false;
-    // (No separate alpha slider widget — the alpha bar at the right of the picker
+    // (No separate alpha slider widget Ã¢â‚¬â€ the alpha bar at the right of the picker
     // is the single alpha control used.)
 
-    // ── Palette ───────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Palette Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     protected static final int[] DEFAULT_PALETTE = {
             0xFF000000, 0xFF404040, 0xFF808080, 0xFFC0C0C0, 0xFFFFFFFF,
             0xFFFF0000, 0xFFFF8000, 0xFFFFFF00, 0xFF80FF00,
@@ -241,29 +241,29 @@ public abstract class AbstractEditorScreen extends Screen {
     private String profileNameDraft = "";
     private boolean profileNameEditing = false;
 
-    // ── Canvas texture cache ──────────────────────────────────────────────────
-    private net.minecraft.client.texture.NativeImageBackedTexture canvasTexture = null;
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Canvas texture cache Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    private net.minecraft.client.renderer.texture.DynamicTexture canvasTexture = null;
     private static final Identifier CANVAS_TEX_ID = Identifier.of("textureeditor", "canvas_preview");
     private long lastCanvasHash = 0;
     private boolean canvasTextureDirty = true;
 
-    // ── Drawing interpolation ─────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Drawing interpolation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     private int lastDrawX = -1, lastDrawY = -1;
 
-    // ── Quick select wheel ────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Quick select wheel Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     protected QuickSelectWheel quickSelectWheel = new QuickSelectWheel(50);
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Constructor
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     protected AbstractEditorScreen(Text title) {
         super(title);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Abstract / overrideable
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     protected abstract void loadTexture();
     protected abstract void applyLive();
@@ -273,7 +273,7 @@ public abstract class AbstractEditorScreen extends Screen {
     protected Screen getBackScreen()                                           { return null; }
     protected int    addExtraLeftGeneralButtons(int y, int x, int w, int bh)  { return y; }
     protected int    addExtraToolButtons(int y, int x, int w, int bh)         { return y; }
-    protected void   renderExtra(DrawContext ctx, int mx, int my)             {}
+    protected void   renderExtra(GuiGraphics ctx, int mx, int my)             {}
     protected boolean handleExtraClick(double mx, double my, int btn)         { return false; }
     protected boolean handleExtraRelease(double mx, double my, int btn)       { return false; }
     protected boolean handleExtraDrag(double mx, double my, int btn, double dx, double dy) { return false; }
@@ -286,12 +286,12 @@ public abstract class AbstractEditorScreen extends Screen {
     protected int  getZoomStep()        { return 1; }
     protected boolean usesTint()        { return isTinted; }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     protected int getGuiScale() {
-        return (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Minecraft.getInstance().getWindow().getScaleFactor();
     }
 
     protected int getToolButtonHeight() {
@@ -1066,7 +1066,7 @@ public abstract class AbstractEditorScreen extends Screen {
         commitSelectionMove();
     }
 
-    private void renderContextMenuLevel(DrawContext ctx, List<ContextMenuItem> items, int x, int y, List<ContextMenuItem> hoverPath, int depth) {
+    private void renderContextMenuLevel(GuiGraphics ctx, List<ContextMenuItem> items, int x, int y, List<ContextMenuItem> hoverPath, int depth) {
         if (items == null || items.isEmpty()) return;
         int menuW = measureContextMenuWidth(items);
         int menuH = measureContextMenuHeight(items);
@@ -1094,7 +1094,7 @@ public abstract class AbstractEditorScreen extends Screen {
         }
     }
 
-    private void renderSelectionContextMenu(DrawContext ctx, int mx, int my) {
+    private void renderSelectionContextMenu(GuiGraphics ctx, int mx, int my) {
         if (!selectionMenuOpen || contextMenuItems.isEmpty()) return;
         List<ContextMenuItem> hoverPath = getContextMenuHoverPath(mx, my);
         if (!hoverPath.isEmpty()) contextMenuHoverPath = hoverPath;
@@ -1113,9 +1113,9 @@ public abstract class AbstractEditorScreen extends Screen {
     /** Effective right panel width (0 if closed) */
     private int rightW() { return rightOpen ? getPanelWidth() : TOGGLE_BTN_W; }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Tint
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     protected int applyTint(int pixel) {
         if (!isTinted) return pixel;
@@ -1139,9 +1139,9 @@ public abstract class AbstractEditorScreen extends Screen {
         this.isTinted = true;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Init
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     @Override
     public void removed() {
@@ -1186,18 +1186,18 @@ public abstract class AbstractEditorScreen extends Screen {
         // reset computed left-panel content height before constructing
         leftPanelContentHeight = 0;
 
-        // ── LEFT panel toggle button ──────────────────────────────────────────
-        addDrawableChild(ButtonWidget.builder(
-                Text.literal(leftOpen ? "<" : ">"),
+        // Ã¢â€â‚¬Ã¢â€â‚¬ LEFT panel toggle button Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+        addDrawableChild(Button.builder(
+                Component.literal(leftOpen ? "<" : ">"),
                 btn -> { leftOpen = !leftOpen; sessionLeftOpen = leftOpen; clearChildren(); recalcCanvasPos(); buildWidgets(); }
         ).position(leftOpen ? getPanelWidth() : 0, 0).size(TOGGLE_BTN_W, bh).build());
 
         if (leftOpen) {
             // Tab buttons
-            addDrawableChild(ButtonWidget.builder(Text.literal("General"),
+            addDrawableChild(Button.builder(Component.literal("General"),
                             btn -> { leftTab = LeftTab.GENERAL; sessionLeftTab = leftTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
                     .position(0, bh).size(getPanelWidth() / 2, TAB_H).build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Tools"),
+            addDrawableChild(Button.builder(Component.literal("Tools"),
                             btn -> { leftTab = LeftTab.TOOLS; sessionLeftTab = leftTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
                     .position(getPanelWidth() / 2, bh).size(getPanelWidth() / 2, TAB_H).build());
 
@@ -1215,10 +1215,10 @@ public abstract class AbstractEditorScreen extends Screen {
             }
         }
 
-        // ── RIGHT panel toggle button ─────────────────────────────────────────
+        // Ã¢â€â‚¬Ã¢â€â‚¬ RIGHT panel toggle button Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
         int rtx = this.width - rightW();
-        addDrawableChild(ButtonWidget.builder(
-                Text.literal(rightOpen ? ">" : "<"),
+        addDrawableChild(Button.builder(
+                Component.literal(rightOpen ? ">" : "<"),
                 btn -> {
                     rightOpen = !rightOpen;
                     if (!rightOpen) closeProfileMenu();
@@ -1230,10 +1230,10 @@ public abstract class AbstractEditorScreen extends Screen {
         if (rightOpen) {
             int rpx = this.width - getPanelWidth();
             // Tab buttons
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.picker"),
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.picker"),
                             btn -> { rightTab = RightTab.COLOR; sessionRightTab = rightTab; clearChildren(); recalcCanvasPos(); buildWidgets(); })
                     .position(rpx, bh).size(getPanelWidth() / 2, TAB_H).build());
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.layers"),
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.layers"),
                             btn -> {
                                 rightTab = RightTab.LAYERS;
                                 closeProfileMenu();
@@ -1248,50 +1248,50 @@ public abstract class AbstractEditorScreen extends Screen {
             // Layers tab has no persistent buttons (all drawn manually)
         }
 
-        // ── Top bar: title + close ────────────────────────────────────────────
-        addDrawableChild(ButtonWidget.builder(Text.literal("X"),
+        // Ã¢â€â‚¬Ã¢â€â‚¬ Top bar: title + close Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+        addDrawableChild(Button.builder(Component.literal("X"),
                         btn -> { if (s.autoApplyLive) applyLive(); this.close(); })
                 .position(this.width - rightW() - 24, 0).size(22, bh).build());
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // General tab
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     private int buildGeneralTab(int py, int px, int w, int bh, ModSettings s) {
-        addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.apply_live").styled(st -> st.withColor(ColorPalette.INSTANCE.STATUS_OK)),
+        addDrawableChild(Button.builder(
+                        Component.translatable("textureeditor.button.apply_live").styled(st -> st.withColor(ColorPalette.INSTANCE.STATUS_OK)),
                         btn -> applyLive())
                 .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
-        addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.export_pack").styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
-                        btn -> MinecraftClient.getInstance().setScreen(new ExportScreen(this)))
+        addDrawableChild(Button.builder(
+                        Component.translatable("textureeditor.button.export_pack").styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
+                        btn -> Minecraft.getInstance().setScreen(new ExportScreen(this)))
                 .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
-        addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.browse").styled(st -> st.withColor(ColorPalette.INSTANCE.TEXT_NORMAL)),
+        addDrawableChild(Button.builder(
+                        Component.translatable("textureeditor.button.browse").styled(st -> st.withColor(ColorPalette.INSTANCE.TEXT_NORMAL)),
                         btn -> {
                             if (s.autoApplyLive) applyLive();
                             Screen bs = getBackScreen();
-                            MinecraftClient.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
+                            Minecraft.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
                         })
                 .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 8;
 
         // Separator
         py += 2;
-        addDrawableChild(ButtonWidget.builder(
-                                Text.literal(getResetCurrentLabel()).styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
+        addDrawableChild(Button.builder(
+                                Component.literal(getResetCurrentLabel()).styled(st -> st.withColor(ColorPalette.INSTANCE.TAB_UNDERLINE)),
                         btn -> resetCurrent())
                 .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
-        addDrawableChild(ButtonWidget.builder(
-                        Text.translatable("textureeditor.button.reset_all").styled(st -> st.withColor(ColorPalette.INSTANCE.TEXT_ALERT)),
-                        btn -> MinecraftClient.getInstance().setScreen(new ConfirmResetAllScreen(this)))
+        addDrawableChild(Button.builder(
+                        Component.translatable("textureeditor.button.reset_all").styled(st -> st.withColor(ColorPalette.INSTANCE.TEXT_ALERT)),
+                        btn -> Minecraft.getInstance().setScreen(new ConfirmResetAllScreen(this)))
                 .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 8;
 
@@ -1301,9 +1301,9 @@ public abstract class AbstractEditorScreen extends Screen {
         return py;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Tools tab
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     private int buildToolsTab(int py, int px, int w, int bh, ModSettings s) {
         // Tool buttons (2 per row to save space)
@@ -1313,13 +1313,13 @@ public abstract class AbstractEditorScreen extends Screen {
             final EditorTool t1 = tools[i];
             String h1 = s.showToolHints ? s.getKeyName(t1.name().toLowerCase()) : "";
             String l1 = t1.getDisplayName() + (h1.isEmpty() ? "" : " (" + h1 + ")");
-            addDrawableChild(ButtonWidget.builder(Text.literal(l1), btn -> onToolButtonPressed(t1))
+            addDrawableChild(Button.builder(Component.literal(l1), btn -> onToolButtonPressed(t1))
                     .position(px, py - leftPanelScrollY).size(hw, bh).build());
             if (i + 1 < tools.length) {
                 final EditorTool t2 = tools[i + 1];
                 String h2 = s.showToolHints ? s.getKeyName(t2.name().toLowerCase()) : "";
                 String l2 = t2.getDisplayName() + (h2.isEmpty() ? "" : " (" + h2 + ")");
-                addDrawableChild(ButtonWidget.builder(Text.literal(l2), btn -> onToolButtonPressed(t2))
+                addDrawableChild(Button.builder(Component.literal(l2), btn -> onToolButtonPressed(t2))
                         .position(px + hw + 2, py - leftPanelScrollY).size(hw, bh).build());
             }
             py += bh + 2;
@@ -1328,22 +1328,22 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Undo / Redo
         int hw = (w - 2) / 2;
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.undo"), btn -> canvas.undo())
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.undo"), btn -> canvas.undo())
                 .position(px, py - leftPanelScrollY).size(hw, bh).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.redo"), btn -> canvas.redo())
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.redo"), btn -> canvas.redo())
                 .position(px + hw + 2, py - leftPanelScrollY).size(hw, bh).build());
         py += bh + 4;
 
         // Grid toggle
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.grid"), btn -> showGrid = !showGrid)
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.grid"), btn -> showGrid = !showGrid)
                 .position(px, py - leftPanelScrollY).size(w, bh).build());
         py += bh + 2;
 
 
         // Tool size slider
-        sizeSlider = new net.minecraft.client.gui.widget.SliderWidget(
-                px, py, w, bh, Text.literal("Size: " + toolSize + "px"), (toolSize - 1) / 9.0) {
-            @Override protected void updateMessage() { setMessage(Text.literal("Size: " + toolSize + "px")); }
+        sizeSlider = new net.minecraft.client.gui.components.AbstractSliderButton(
+                px, py, w, bh, Component.literal("Size: " + toolSize + "px"), (toolSize - 1) / 9.0) {
+            @Override protected void updateMessage() { setMessage(Component.literal("Size: " + toolSize + "px")); }
             @Override protected void applyValue() {
                 if (suppressSizeSliderCallback) return;
                 toolSize = (int)(value * 9) + 1;
@@ -1353,8 +1353,8 @@ public abstract class AbstractEditorScreen extends Screen {
         py += bh + 4;
 
         // Variation percent slider (0..100). When value == 0 show "OFF" instead of "0%".
-        net.minecraft.client.gui.widget.SliderWidget varSlider = new net.minecraft.client.gui.widget.SliderWidget(px, py, w, bh, Text.literal(getVarLabel()), ModSettings.getInstance().variationPercent) {
-            @Override protected void updateMessage() { setMessage(Text.literal(getVarLabel())); }
+        net.minecraft.client.gui.components.AbstractSliderButton varSlider = new net.minecraft.client.gui.components.AbstractSliderButton(px, py, w, bh, Component.literal(getVarLabel()), ModSettings.getInstance().variationPercent) {
+            @Override protected void updateMessage() { setMessage(Component.literal(getVarLabel())); }
             @Override protected void applyValue() { ModSettings.getInstance().variationPercent = (float)this.value; ModSettings.getInstance().save(); }
         };
         varSlider.setX(px); varSlider.setY(py - leftPanelScrollY); addDrawableChild(varSlider);
@@ -1377,9 +1377,9 @@ public abstract class AbstractEditorScreen extends Screen {
         currentTool = tool;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Color tab — builds persistent widgets (hex input)
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // Color tab Ã¢â‚¬â€ builds persistent widgets (hex input)
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     private void buildColorTab(int rpx, int py, int pw, int bh) {
         // Position the hex input so it sits next to the current color swatch
@@ -1391,7 +1391,7 @@ public abstract class AbstractEditorScreen extends Screen {
         int hexX = innerX + swatchW + 6;
         int hexW = Math.max(40, innerW - swatchW - 10);
 
-        hexInput = new TextFieldWidget(this.textRenderer, hexX, swatchY, hexW, bh, Text.literal("Hex"));
+        hexInput = new EditBox(this.textRenderer, hexX, swatchY, hexW, bh, Component.literal("Hex"));
         hexInput.setMaxLength(9);
         hexInput.setText(colorToHex(currentColor));
         hexInput.setChangedListener(text -> {
@@ -1400,11 +1400,11 @@ public abstract class AbstractEditorScreen extends Screen {
             // Run parser on the client executor to break direct re-entrant
             // setText() -> onChanged() -> setText() recursion that can
             // otherwise cause a StackOverflowError in some environments.
-            MinecraftClient.getInstance().execute(() -> {
+            Minecraft.getInstance().execute(() -> {
                 if (hexInput == null) return;
                 if (suppressHexCallback) return;
                 try {
-                    String hex = text.startsWith("#") ? text.substring(1) : text;
+                    String hex = Component.startsWith("#") ? Component.substring(1) : text;
                     if (hex.length() == 6 || hex.length() == 8) {
                         int parsed = (int) Long.parseLong(hex.length() == 6 ? "FF" + hex : hex, 16);
                         // Only update when the parsed color differs to avoid needless updates
@@ -1527,8 +1527,8 @@ public abstract class AbstractEditorScreen extends Screen {
     private List<Integer> parsePaletteImportPayload(String payload) {
         if (payload == null) return null;
         String text = payload.trim();
-        if (!text.startsWith("TEPAL1|")) return null;
-        String[] parts = text.split("\\|", 3);
+        if (!Component.startsWith("TEPAL1|")) return null;
+        String[] parts = Component.split("\\|", 3);
         if (parts.length < 3) return null;
         String[] colorParts = parts[2].split(",");
         List<Integer> out = new ArrayList<>();
@@ -1547,8 +1547,8 @@ public abstract class AbstractEditorScreen extends Screen {
     private String parsePaletteImportName(String payload) {
         if (payload == null) return null;
         String text = payload.trim();
-        if (!text.startsWith("TEPAL1|")) return null;
-        String[] parts = text.split("\\|", 3);
+        if (!Component.startsWith("TEPAL1|")) return null;
+        String[] parts = Component.split("\\|", 3);
         if (parts.length < 2) return null;
         String name = parts[1].trim();
         return name.isEmpty() ? "Imported" : name;
@@ -1579,13 +1579,13 @@ public abstract class AbstractEditorScreen extends Screen {
         return out;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Canvas texture cache
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Canvas position
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     protected void recalcCanvasPos() {
         int lw = leftW() + TOGGLE_BTN_W;
@@ -1610,15 +1610,15 @@ public abstract class AbstractEditorScreen extends Screen {
         canvasTextureDirty = true;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Render
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
+    public void renderBackground(GuiGraphics ctx, int mx, int my, float d) {}
 
     @Override
-    public void render(DrawContext ctx, int mx, int my, float delta) {
+    public void render(GuiGraphics ctx, int mx, int my, float delta) {
         int bg = getBackgroundColor();
         ctx.fill(0, 0, this.width, this.height, bg);
 
@@ -1663,7 +1663,7 @@ public abstract class AbstractEditorScreen extends Screen {
         int statusY = this.height - 14;
         ctx.fill(leftW() + TOGGLE_BTN_W, statusY, this.width - rightW() - TOGGLE_BTN_W, this.height, pal.STATUS_BAR_BG);
         String status = "Tool: " + currentTool.getDisplayName() + " | Size: " + toolSize + "px"
-                + (canvas != null ? " | " + canvas.getWidth() + "×" + canvas.getHeight() : "");
+                + (canvas != null ? " | " + canvas.getWidth() + "Ãƒâ€”" + canvas.getHeight() : "");
         if (currentTool == EditorTool.SELECT) {
             status += " | Mode: " + selectionMode.name();
         }
@@ -1688,11 +1688,11 @@ public abstract class AbstractEditorScreen extends Screen {
         renderExtra(ctx, mx, my);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Color tab content (drawn every frame)
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-    private void drawColorTabContent(DrawContext ctx, int mx, int my, int rpx, int py, int pw) {
+    private void drawColorTabContent(GuiGraphics ctx, int mx, int my, int rpx, int py, int pw) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         int bh = getToolButtonHeight();
         int innerX = getPanelInnerX(rpx);
@@ -1702,7 +1702,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (paletteScrollY > initialMetrics.maxScroll()) paletteScrollY = initialMetrics.maxScroll();
         if (paletteScrollY < 0) paletteScrollY = 0;
 
-        // ── SV square
+        // Ã¢â€â‚¬Ã¢â€â‚¬ SV square
         int svX = innerX;
         int svY = py;
 
@@ -1719,7 +1719,7 @@ public abstract class AbstractEditorScreen extends Screen {
         // Prepare textures (build/update)
         if (cachedPickerHue != pickerHue || pickerSvTexture == null) {
             cachedPickerHue = pickerHue;
-            var img = new net.minecraft.client.texture.NativeImage(PICKER_SV_W, PICKER_SV_H, false);
+            var img = new com.mojang.blaze3d.platform.NativeImage(PICKER_SV_W, PICKER_SV_H, false);
             for (int y = 0; y < PICKER_SV_H; y++) {
                 float v = 1f - y / (float)(PICKER_SV_H - 1);
                 for (int x = 0; x < PICKER_SV_W; x++) {
@@ -1729,12 +1729,12 @@ public abstract class AbstractEditorScreen extends Screen {
             }
             if (pickerSvTexture != null) { pickerSvTexture.setImage(img); pickerSvTexture.upload(); }
             else {
-                pickerSvTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "picker_sv", img);
-                MinecraftClient.getInstance().getTextureManager().registerTexture(PICKER_SV_ID, pickerSvTexture);
+                pickerSvTexture = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "picker_sv", img);
+                Minecraft.getInstance().getTextureManager().register(PICKER_SV_ID, pickerSvTexture);
             }
         }
         if (!pickerHueBarBuilt || pickerHueTexture == null || pickerHueTexW != hueW || pickerHueTexH != PICKER_SV_H) {
-            var himg = new net.minecraft.client.texture.NativeImage(hueW, PICKER_SV_H, false);
+            var himg = new com.mojang.blaze3d.platform.NativeImage(hueW, PICKER_SV_H, false);
             for (int y = 0; y < PICKER_SV_H; y++) {
                 int c = hsvToArgb(y / (float)(PICKER_SV_H - 1), 1f, 1f, 1f);
                 for (int x = 0; x < hueW; x++) himg.setColorArgb(x, y, c);
@@ -1755,7 +1755,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ColorTabMetrics metrics = computeColorTabMetrics(rpx, py, pw);
         List<Integer> paletteColors = getActivePaletteColors();
 
-        // ── Action rows + palette (centered, scrollable)
+        // Ã¢â€â‚¬Ã¢â€â‚¬ Action rows + palette (centered, scrollable)
         int cols = 5;
         int cs = metrics.paletteCell();
         int centerOffsetX = (innerW - (cols * cs + (cols - 1))) / 2;
@@ -1836,7 +1836,7 @@ public abstract class AbstractEditorScreen extends Screen {
 
         int afterPaletteY = metrics.historyLabelY() - paletteScrollY;
 
-        // ── Color history (centered)
+        // Ã¢â€â‚¬Ã¢â€â‚¬ Color history (centered)
         ColorHistory hist = ColorHistory.getInstance();
         ctx.drawText(textRenderer, "History", innerX + (innerW - textRenderer.getWidth("History")) / 2, afterPaletteY, pal.STATUS_TEXT, false);
         int hy = afterPaletteY + 10;
@@ -1860,7 +1860,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(innerX, maskTop, innerX + innerW, maskBottom, pal.PANEL_DARK);
 
         // Draw the picker and controls on top of the mask so it remains visible
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
+        ctx.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, PICKER_SV_ID, svX, svY, 0, 0, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H, PICKER_SV_W, PICKER_SV_H);
         drawRectOutline(ctx, svX - 1, svY - 1, svX + PICKER_SV_W + 1, svY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         // Cursor on SV
         int scx = svX + (int)(pickerSat * (PICKER_SV_W - 1));
@@ -1869,7 +1869,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.fill(scx, scy - 2, scx + 1, scy + 3, pal.TEXT_NORMAL);
 
         // Draw hue and alpha bars on top as well
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_HUE_ID, hueX, hueY, 0, 0, hueW, PICKER_SV_H, hueW, PICKER_SV_H, hueW, PICKER_SV_H);
+        ctx.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, PICKER_HUE_ID, hueX, hueY, 0, 0, hueW, PICKER_SV_H, hueW, PICKER_SV_H, hueW, PICKER_SV_H);
         drawRectOutline(ctx, hueX - 1, hueY - 1, hueX + hueW + 1, hueY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int hcy = hueY + (int)(pickerHue * (PICKER_SV_H - 1));
         ctx.fill(hueX - 1, hcy, hueX + hueW + 1, hcy + 1, 0xFFFFFFFF);
@@ -1882,7 +1882,7 @@ public abstract class AbstractEditorScreen extends Screen {
             int parity = ((absX / 4) + (absY / 4)) & 1;
             ctx.fill(absX, absY, absX + 4, absY + 4, (parity == 0) ? pal.CHECKER_DARK : pal.CHECKER_LIGHT);
         }
-        ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
+        ctx.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, PICKER_ALPHA_ID, alphaX, alphaY, 0, 0, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H, alphaW, PICKER_SV_H);
         drawRectOutline(ctx, alphaX - 1, alphaY - 1, alphaX + alphaW + 1, alphaY + PICKER_SV_H + 1, pal.PICKER_BORDER);
         int acy = alphaY + (int)((1f - pickerAlpha) * (PICKER_SV_H - 1));
         ctx.fill(alphaX - 1, acy, alphaX + alphaW + 1, acy + 1, pal.TEXT_NORMAL);
@@ -1911,8 +1911,8 @@ public abstract class AbstractEditorScreen extends Screen {
         }
     }
 
-    private void drawSimpleTooltip(DrawContext ctx, int mouseX, int mouseY, String text) {
-        if (text == null || text.isEmpty()) return;
+    private void drawSimpleTooltip(GuiGraphics ctx, int mouseX, int mouseY, String text) {
+        if (text == null || Component.isEmpty()) return;
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         int tw = textRenderer.getWidth(text) + 8;
         int tx = Math.min(mouseX + 8, this.width - tw - 4);
@@ -1922,7 +1922,7 @@ public abstract class AbstractEditorScreen extends Screen {
         ctx.drawText(textRenderer, text, tx + 4, ty + 2, pal.TEXT_NORMAL, false);
     }
 
-    private void drawProfileMenu(DrawContext ctx, int mx, int my) {
+    private void drawProfileMenu(GuiGraphics ctx, int mx, int my) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         ProfileMenuMetrics m = computeProfileMenuMetrics();
         List<String> names = ModSettings.getInstance().getPaletteProfileNames();
@@ -1991,7 +1991,7 @@ public abstract class AbstractEditorScreen extends Screen {
     private void rebuildAlphaBar(int width) {
         int r = (currentColor >> 16) & 0xFF, g = (currentColor >> 8) & 0xFF, b = currentColor & 0xFF;
         int safeW = Math.max(1, width);
-        var img = new net.minecraft.client.texture.NativeImage(safeW, PICKER_SV_H, false);
+        var img = new com.mojang.blaze3d.platform.NativeImage(safeW, PICKER_SV_H, false);
         for (int y = 0; y < PICKER_SV_H; y++) {
             float a = 1f - y / (float)(PICKER_SV_H - 1);
             int argb = ((int)(a * 255) << 24) | (r << 16) | (g << 8) | b;
@@ -2003,13 +2003,13 @@ public abstract class AbstractEditorScreen extends Screen {
         pickerAlphaBarBuilt = true;
     }
 
-    private net.minecraft.client.texture.NativeImageBackedTexture replacePickerTexture(
+    private net.minecraft.client.renderer.texture.DynamicTexture replacePickerTexture(
             Identifier id,
-            net.minecraft.client.texture.NativeImageBackedTexture existing,
+            net.minecraft.client.renderer.texture.DynamicTexture existing,
             java.util.function.Supplier<String> nameSupplier,
-            net.minecraft.client.texture.NativeImage image
+            com.mojang.blaze3d.platform.NativeImage image
     ) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client == null) return existing;
         try {
             client.getTextureManager().destroyTexture(id);
@@ -2019,16 +2019,16 @@ public abstract class AbstractEditorScreen extends Screen {
                 existing.close();
             } catch (Exception ignored) {}
         }
-        net.minecraft.client.texture.NativeImageBackedTexture texture = new net.minecraft.client.texture.NativeImageBackedTexture(nameSupplier, image);
-        client.getTextureManager().registerTexture(id, texture);
+        net.minecraft.client.renderer.texture.DynamicTexture texture = new net.minecraft.client.renderer.texture.DynamicTexture(nameSupplier, image);
+        client.getTextureManager().register(id, texture);
         return texture;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Layer tab content
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-    private void drawLayerTabContent(DrawContext ctx, int mx, int my, int rpx, int py, int pw) {
+    private void drawLayerTabContent(GuiGraphics ctx, int mx, int my, int rpx, int py, int pw) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         if (canvas == null) return;
         var stack = canvas.getLayerStack();
@@ -2067,7 +2067,7 @@ public abstract class AbstractEditorScreen extends Screen {
             boolean active = i == stack.getActiveIndex();
             ctx.fill(innerX, rowY, innerX + innerW, rowY + rowH, active ? pal.CELL_BG_HOVER : pal.CELL_BG);
             if (active) drawRectOutline(ctx, innerX, rowY, innerX + innerW, rowY + rowH, pal.ACTIVE_LAYER_BORDER);
-            String eye = layer.isVisible() ? "●" : "○";
+            String eye = layer.isVisible() ? "Ã¢â€”Â" : "Ã¢â€”â€¹";
             ctx.drawText(textRenderer, eye, innerX + 2, rowY + 5, layer.isVisible() ? pal.STATUS_OK : pal.TEXT_SUBTLE, false);
             String name = layer.getName().length() > 10 ? layer.getName().substring(0, 10) + ".." : layer.getName();
             ctx.drawText(textRenderer, name, innerX + 14, rowY + 5, pal.TEXT_NORMAL, false);
@@ -2079,9 +2079,9 @@ public abstract class AbstractEditorScreen extends Screen {
         // Row 1: Add, Del, Up
         ctx.fill(innerX, actionY, innerX + btnW, actionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "+ Add", innerX + 2, actionY + 4, pal.TEXT_NORMAL, false);
         ctx.fill(innerX + btnW + 2, actionY, innerX + 2 * btnW + 2, actionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "- Del", innerX + btnW + 4, actionY + 4, pal.TEXT_SUBTLE, false);
-        ctx.fill(innerX + 2 * btnW + 4, actionY, innerX + innerW, actionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▲ Up", innerX + 2 * btnW + 6, actionY + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX + 2 * btnW + 4, actionY, innerX + innerW, actionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Ã¢â€“Â² Up", innerX + 2 * btnW + 6, actionY + 4, pal.TEXT_NORMAL, false);
         // Row 2: Down, Merge, Duplicate
-        ctx.fill(innerX, secondActionY, innerX + btnW, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "▼ Dn", innerX + 2, secondActionY + 4, pal.TEXT_NORMAL, false);
+        ctx.fill(innerX, secondActionY, innerX + btnW, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Ã¢â€“Â¼ Dn", innerX + 2, secondActionY + 4, pal.TEXT_NORMAL, false);
         ctx.fill(innerX + btnW + 2, secondActionY, innerX + 2 * btnW + 2, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Merge", innerX + btnW + 4, secondActionY + 4, pal.TEXT_NORMAL, false);
         ctx.fill(innerX + 2 * btnW + 4, secondActionY, innerX + innerW, secondActionY + bh, pal.CELL_BG); ctx.drawText(textRenderer, "Dup", innerX + 2 * btnW + 6, secondActionY + 4, pal.TEXT_NORMAL, false);
         // No fixed bottom buttons anymore; actions are at top and the layer list scrolls underneath
@@ -2108,11 +2108,11 @@ public abstract class AbstractEditorScreen extends Screen {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Canvas drawing
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-    private void drawCanvas(DrawContext ctx, int mx, int my) {
+    private void drawCanvas(GuiGraphics ctx, int mx, int my) {
         if (canvas == null) return;
         int w = canvas.getWidth(), h = canvas.getHeight();
         // Use a safe effective zoom for divisions (zoom should always be >= 1)
@@ -2127,7 +2127,7 @@ public abstract class AbstractEditorScreen extends Screen {
             if (hash != lastCanvasHash || canvasTextureDirty || canvasTexture == null) {
                 lastCanvasHash = hash; canvasTextureDirty = false;
                 if (w > 0 && h > 0) {
-                    var img = new net.minecraft.client.texture.NativeImage(w, h, false);
+                    var img = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
                     for (int x = 0; x < w; x++) for (int y = 0; y < h; y++) {
                         int c = previewingOriginal && originalPixels != null ? originalPixels[x][y] : canvas.getPixel(x, y);
                         img.setColorArgb(x, y, renderPixel(c, x, y));
@@ -2138,13 +2138,13 @@ public abstract class AbstractEditorScreen extends Screen {
                         else { canvasTexture.setImage(img); canvasTexture.upload(); }
                     }
                     if (canvasTexture == null) {
-                        canvasTexture = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "canvas_preview", img);
-                        MinecraftClient.getInstance().getTextureManager().registerTexture(CANVAS_TEX_ID, canvasTexture);
+                        canvasTexture = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "canvas_preview", img);
+                        Minecraft.getInstance().getTextureManager().register(CANVAS_TEX_ID, canvasTexture);
                     }
                 }
             }
             if (w * zoom > 0 && h * zoom > 0)
-                ctx.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, CANVAS_TEX_ID, canvasScreenX, canvasScreenY, 0, 0, w * zoom, h * zoom, w, h, w, h);
+                ctx.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, CANVAS_TEX_ID, canvasScreenX, canvasScreenY, 0, 0, w * zoom, h * zoom, w, h, w, h);
         } else {
             for (int x = visMinX; x < visMaxX; x++) for (int y = visMinY; y < visMaxY; y++) {
                 int c = previewingOriginal && originalPixels != null ? originalPixels[x][y] : canvas.getPixel(x, y);
@@ -2300,12 +2300,12 @@ public abstract class AbstractEditorScreen extends Screen {
         }
 
         if (previewingOriginal)
-            ctx.drawCenteredTextWithShadow(textRenderer, "§e§lPREVIEW", canvasScreenX + (w * zoom) / 2, canvasScreenY - 12, 0xFFFFFF00);
+            ctx.drawCenteredTextWithShadow(textRenderer, "Ã‚Â§eÃ‚Â§lPREVIEW", canvasScreenX + (w * zoom) / 2, canvasScreenY - 12, 0xFFFFFF00);
 
         // If a line/rectangle start is active and it was confirmed via click, show helpful overlay above the canvas
         if ((lineFirstClick || rectFirstClick) && shapeStartConfirmed && !draggingShape) {
             String msg = "Click another point to finish";
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(msg), canvasScreenX + (w * zoom) / 2, canvasScreenY - 26, 0xFFFFFF00);
+            ctx.drawCenteredTextWithShadow(textRenderer, Component.literal(msg), canvasScreenX + (w * zoom) / 2, canvasScreenY - 26, 0xFFFFFF00);
         }
 
         if (currentTool == EditorTool.SELECT && selectionDraggingCreate && selectionMode == SelectionMode.LASSO && selectionLassoPoints.size() > 1) {
@@ -2517,9 +2517,9 @@ public abstract class AbstractEditorScreen extends Screen {
         return usesTint() ? applyTint(c) : c;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Input handling
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     private boolean isInUIRegion(double mx, double my) {
         return mx < leftW() + TOGGLE_BTN_W || mx > this.width - rightW() - TOGGLE_BTN_W || my < getToolButtonHeight() || my > this.height - 14;
@@ -2541,7 +2541,7 @@ public abstract class AbstractEditorScreen extends Screen {
             }
         }
         try {
-            long handle = MinecraftClient.getInstance().getWindow().getHandle();
+            long handle = Minecraft.getInstance().getWindow().getHandle();
             boolean ctrl = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
                     || GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
             if (ctrl) {
@@ -2657,8 +2657,8 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
-        double mx = click.x(), my = click.y(); int btn = click.button();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        double mx = mouseX, my = mouseY; int btn = button;
         if (selectionMenuOpen) {
             suppressMenuClickThroughUntilRelease = true;
             if (btn == 0) {
@@ -2701,7 +2701,7 @@ public abstract class AbstractEditorScreen extends Screen {
                 downPx = downPy = -1; movedSinceDown = false;
             }
         }
-        if (super.mouseClicked(click, bl)) return true;
+        if (super.mouseClicked(mouseX, mouseY, button)) return true;
         if (handleExtraClick(mx, my, btn)) return true;
 
         // Middle click = quick wheel
@@ -2868,9 +2868,9 @@ public abstract class AbstractEditorScreen extends Screen {
             ModSettings settings = ModSettings.getInstance();
             if (slot == 0) {
                 String payload = buildPaletteExportPayload(settings.getActivePaletteProfileName(), settings.getActivePaletteColors());
-                MinecraftClient.getInstance().keyboard.setClipboard(payload);
+                Minecraft.getInstance().keyboard.setClipboard(payload);
             } else if (slot == 1) {
-                String clip = MinecraftClient.getInstance().keyboard.getClipboard();
+                String clip = Minecraft.getInstance().keyboard.getClipboard();
                 List<Integer> imported = parsePaletteImportPayload(clip);
                 String importName = parsePaletteImportName(clip);
                 if (imported != null && !imported.isEmpty()) {
@@ -2893,8 +2893,8 @@ public abstract class AbstractEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
-        double mx = click.x(), my = click.y(); int btn = click.button();
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        double mx = mouseX, my = mouseY; int btn = button;
         boolean hadLeftDown = leftDown;
         if (suppressMenuClickThroughUntilRelease) {
             if (btn == 0) {
@@ -3045,12 +3045,12 @@ public abstract class AbstractEditorScreen extends Screen {
             return true;
         }
         lastDrawX = -1; lastDrawY = -1;
-        return super.mouseReleased(click);
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
-        double mx = click.x(), my = click.y(); int btn = click.button();
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        double mx = mouseX, my = mouseY; int btn = button;
         if (suppressMenuClickThroughUntilRelease) return true;
         if (selectionMenuOpen) return true;
         if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) return true;
@@ -3085,7 +3085,7 @@ public abstract class AbstractEditorScreen extends Screen {
         // If left button is down and we're in the color panel, begin a drag-capture (prevents jump when entering slider)
         if (btn == 0 && rightOpen && rightTab == RightTab.COLOR && startColorPickerDrag(mx, my)) return true;
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
-        if (isInUIRegion(mx, my)) return super.mouseDragged(click, dx, dy);
+        if (isInUIRegion(mx, my)) return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
         if (canvas != null && btn == 0 && currentTool == EditorTool.SELECT
                 && (selectionDraggingCreate || selectionDraggingMove || selectionTransformingResize || selectionTransformingRotate)) {
             int px = screenToCanvasX(mx), py = screenToCanvasY(my);
@@ -3152,12 +3152,12 @@ public abstract class AbstractEditorScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseDragged(click, dx, dy);
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        int kc = keyInput.key();
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        int kc = keyCode;
         if (profileMenuOpen && rightOpen && rightTab == RightTab.COLOR) {
             if (kc == GLFW.GLFW_KEY_ESCAPE) {
                 closeProfileMenu();
@@ -3181,7 +3181,7 @@ public abstract class AbstractEditorScreen extends Screen {
             }
         }
         if (hexInput != null && hexInput.isFocused()) {
-            super.keyPressed(keyInput);
+            super.keyPressed(keyCode, scanCode, modifiers);
             // Keep tool/browse keybinds from firing while the hex input is focused.
             return true;
         }
@@ -3200,7 +3200,7 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("select"))     { currentTool = EditorTool.SELECT; return true; }
 
         if (currentTool == EditorTool.SELECT) {
-            long handle = MinecraftClient.getInstance().getWindow().getHandle();
+            long handle = Minecraft.getInstance().getWindow().getHandle();
             boolean ctrl = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
                     || GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
             if (kc == GLFW.GLFW_KEY_1) { selectionMode = SelectionMode.RECT; return true; }
@@ -3273,15 +3273,15 @@ public abstract class AbstractEditorScreen extends Screen {
         if (kc == s.getKeybind("browse")) {
             if (ModSettings.getInstance().autoApplyLive) applyLive();
             Screen bs = getBackScreen();
-            MinecraftClient.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
+            Minecraft.getInstance().setScreen(bs != null ? bs : new BrowseScreen());
             return true;
         }
         if (kc == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) { if (s.autoApplyLive) applyLive(); this.close(); return true; }
-        return super.keyPressed(keyInput);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean charTyped(net.minecraft.client.input.CharInput charInput) {
+    public boolean charTyped(char chr, int modifiers) {
         if (profileMenuOpen && profileNameEditing) {
             int cp = charInput.codepoint();
             if (!charInput.isValidChar() || Character.isISOControl(cp)) return true;
@@ -3291,19 +3291,19 @@ public abstract class AbstractEditorScreen extends Screen {
             }
             return true;
         }
-        return super.charTyped(charInput);
+        return super.charTyped(chr, modifiers);
     }
 
     @Override
-    public boolean keyReleased(net.minecraft.client.input.KeyInput keyInput) {
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
         var previewKey = com.zeeesea.textureeditor.TextureEditorClient.getPreviewOriginalKey();
         if (previewKey != null && previewKey.matchesKey(keyInput)) { previewingOriginal = false; return true; }
-        return super.keyReleased(keyInput);
+        return super.keyReleased(keyCode, scanCode, modifiers);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Click handlers
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     private boolean handleColorPickerClick(double mx, double my) {
         int rpx = this.width - PANEL_W;
@@ -3562,7 +3562,7 @@ public abstract class AbstractEditorScreen extends Screen {
             case FILL     -> { canvas.saveSnapshot(); float v = ModSettings.getInstance().variationPercent; if (v > 0f) canvas.floodFill(px, py, currentColor, v); else canvas.floodFill(px, py, currentColor); setColor(currentColor, true); }
             case EYEDROPPER -> {
                 int raw = canvas.pickColorComposited(px, py);
-                if (raw == 0) { NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE, "Layer is empty!"); return; }
+                if (raw == 0) { NotificationHelper.addToast(SystemToast.SystemToastId.PACK_LOAD_FAILURE, "Layer is empty!"); return; }
                 setColor(usesTint() ? applyTint(raw) : raw, false);
             }
             case LINE -> {
@@ -3591,9 +3591,9 @@ public abstract class AbstractEditorScreen extends Screen {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Color helpers
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     protected void setColor(int c, boolean addToHistory) {
         currentColor = c;
@@ -3668,13 +3668,13 @@ public abstract class AbstractEditorScreen extends Screen {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
     // Misc
-    // ─────────────────────────────────────────────────────────────────────────
+    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
     protected void doResetAll() {
         TextureManager.getInstance().clear();
-        MinecraftClient.getInstance().reloadResources();
+        Minecraft.getInstance().reloadResources();
         if (originalPixels != null && canvas != null) {
             canvas.saveSnapshot();
             for (int x = 0; x < canvas.getWidth(); x++)
@@ -3689,7 +3689,7 @@ public abstract class AbstractEditorScreen extends Screen {
     private static class ConfirmResetAllScreen extends Screen {
         private final AbstractEditorScreen parentScreen;
         protected ConfirmResetAllScreen(AbstractEditorScreen parent) {
-            super(Text.translatable("textureeditor.confirm.reset_all.title"));
+            super(Component.translatable("textureeditor.confirm.reset_all.title"));
             this.parentScreen = parent;
         }
 
@@ -3698,19 +3698,19 @@ public abstract class AbstractEditorScreen extends Screen {
             int w = 300, h = 80;
             int cx = this.width / 2 - w / 2;
             int cy = this.height / 2 - h / 2;
-            addDrawableChild(ButtonWidget.builder(Text.literal("Confirm"), btn -> { parentScreen.doResetAll(); MinecraftClient.getInstance().setScreen(parentScreen); }).position(cx + 20, cy + 40).size(100, 20).build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Cancel"), btn -> MinecraftClient.getInstance().setScreen(parentScreen)).position(cx + 140, cy + 40).size(100, 20).build());
+            addDrawableChild(Button.builder(Component.literal("Confirm"), btn -> { parentScreen.doResetAll(); Minecraft.getInstance().setScreen(parentScreen); }).position(cx + 20, cy + 40).size(100, 20).build());
+            addDrawableChild(Button.builder(Component.literal("Cancel"), btn -> Minecraft.getInstance().setScreen(parentScreen)).position(cx + 140, cy + 40).size(100, 20).build());
         }
 
         @Override
-        public void render(DrawContext ctx, int mx, int my, float delta) {
+        public void render(GuiGraphics ctx, int mx, int my, float delta) {
             ctx.fill(0, 0, this.width, this.height, 0x88000000);
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("Are you sure? All your changes will be lost."), this.width / 2, this.height / 2 - 10, 0xFFFFFF00);
+            ctx.drawCenteredTextWithShadow(textRenderer, Component.literal("Are you sure? All your changes will be lost."), this.width / 2, this.height / 2 - 10, 0xFFFFFF00);
             super.render(ctx, mx, my, delta);
         }
     }
 
-    protected void drawRectOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int c) {
+    protected void drawRectOutline(GuiGraphics ctx, int x1, int y1, int x2, int y2, int c) {
         ctx.fill(x1, y1, x2, y1 + 1, c);
         ctx.fill(x1, y2 - 1, x2, y2, c);
         ctx.fill(x1, y1, x1 + 1, y2, c);
@@ -3749,7 +3749,9 @@ public abstract class AbstractEditorScreen extends Screen {
     protected int addExtraButtons(int toolY) { return toolY; }
 
     /** Legacy hook to allow subclasses to change the reset button label. Return a translated string. */
-    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset").getString(); }
+    protected String getResetCurrentLabel() { return Component.translatable("textureeditor.button.reset").getString(); }
 }
+
+
 
 

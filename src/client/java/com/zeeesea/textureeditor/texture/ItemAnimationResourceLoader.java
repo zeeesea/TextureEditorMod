@@ -4,9 +4,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.resources.Identifier;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -24,7 +24,7 @@ public final class ItemAnimationResourceLoader {
     public static LoadedAnimation load(Identifier textureId) {
         if (textureId == null) return null;
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client == null || client.getResourceManager() == null) return null;
 
         Identifier mcmetaId = Identifier.of(textureId.getNamespace(), textureId.getPath() + ".mcmeta");
@@ -75,7 +75,7 @@ public final class ItemAnimationResourceLoader {
         }
     }
 
-    private static JsonObject readAnimationObject(MinecraftClient client, Identifier mcmetaId) {
+    private static JsonObject readAnimationObject(Minecraft client, Identifier mcmetaId) {
         try (InputStream mcmetaStream = client.getResourceManager().getResource(mcmetaId).orElseThrow().getInputStream()) {
             JsonElement root = JsonParser.parseReader(new java.io.InputStreamReader(mcmetaStream));
             if (!root.isJsonObject()) return null;
@@ -109,4 +109,5 @@ public final class ItemAnimationResourceLoader {
         return out;
     }
 }
+
 

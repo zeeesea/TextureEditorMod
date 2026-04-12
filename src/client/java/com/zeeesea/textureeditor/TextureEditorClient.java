@@ -17,17 +17,17 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
 import org.lwjgl.glfw.GLFW;
@@ -80,19 +80,19 @@ public class TextureEditorClient implements ClientModInitializer {
                 s.modEnabled = !s.modEnabled;
                 s.save();
                 if (client.player != null) {
-                    Text prefix = Text.translatable("textureeditor.status.prefix")
+                    Text prefix = Component.translatable("textureeditor.status.prefix")
                             .formatted(net.minecraft.util.Formatting.GOLD);
 
                     Text status = ModSettings.getInstance().modEnabled
-                            ? Text.translatable("textureeditor.status.enabled").formatted(net.minecraft.util.Formatting.GREEN)
-                            : Text.translatable("textureeditor.status.disabled").formatted(net.minecraft.util.Formatting.RED);
+                            ? Component.translatable("textureeditor.status.enabled").formatted(net.minecraft.util.Formatting.GREEN)
+                            : Component.translatable("textureeditor.status.disabled").formatted(net.minecraft.util.Formatting.RED);
 
-                    Text fullMessage = Text.empty()
+                    Text fullMessage = Component.empty()
                             .append(prefix)
-                            .append(Text.literal(" "))
+                            .append(Component.literal(" "))
                             .append(status);
 
-                    client.player.sendMessage(fullMessage, true); // true = Action Bar (über dem Inventar)
+                    client.player.sendMessage(fullMessage, true); // true = Action Bar (ÃƒÂ¼ber dem Inventar)
                 }
                 if (ModSettings.getInstance().modEnabled) {
                     while (openEditorKey.wasPressed()) { /* discard stale presses */ }
@@ -110,7 +110,7 @@ public class TextureEditorClient implements ClientModInitializer {
                     return;
                 }
 
-                // Preview original texture (hold key) — world-level preview
+                // Preview original texture (hold key) Ã¢â‚¬â€ world-level preview
                 boolean previewKeyHeld = InputUtil.isKeyPressed(
                         client.getWindow(),
                         KeyBindingHelper.getBoundKeyOf(previewOriginalKey).getCode()
@@ -217,11 +217,11 @@ public class TextureEditorClient implements ClientModInitializer {
                 int h = payload.height();
                 context.client().execute(() -> {
                     if (payload.spriteId() != null) {
-                        // GUI/Sky — use sprite-based apply
+                        // GUI/Sky Ã¢â‚¬â€ use sprite-based apply
                         TextureManager.getInstance().applyLive(
                                 payload.spriteId(), payload.pixels(), payload.originalPixels(), w, h);
                     } else {
-                        // Mob/Entity — use entity apply
+                        // Mob/Entity Ã¢â‚¬â€ use entity apply
                         TextureManager.getInstance().applyLiveEntity(
                                 payload.textureId(), payload.pixels(), payload.originalPixels(), w, h);
                     }
@@ -233,14 +233,14 @@ public class TextureEditorClient implements ClientModInitializer {
 
     // --- External editor helpers ---
 
-    private static void openExternalForBlock(net.minecraft.block.Block block) {
-        openExternalForBlockFace(block, net.minecraft.util.math.Direction.UP);
+    private static void openExternalForBlock(net.minecraft.world.level.block.Block block) {
+        openExternalForBlockFace(block, net.minecraft.core.Direction.UP);
     }
 
-    private static void openExternalForBlockFace(net.minecraft.block.Block block, net.minecraft.util.math.Direction face) {
+    private static void openExternalForBlockFace(net.minecraft.world.level.block.Block block, net.minecraft.core.Direction face) {
         TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), face);
         if (tex == null) {
-            for (net.minecraft.util.math.Direction dir : net.minecraft.util.math.Direction.values()) {
+            for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
                 tex = TextureExtractor.extract(block.getDefaultState(), dir);
                 if (tex != null) break;
             }

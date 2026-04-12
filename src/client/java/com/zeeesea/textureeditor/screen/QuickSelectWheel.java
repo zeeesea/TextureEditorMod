@@ -1,10 +1,10 @@
 package com.zeeesea.textureeditor.screen;
 
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.*;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.*;
 import com.mojang.blaze3d.vertex.*;
-import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.renderer.RenderPipelines;
 import com.zeeesea.textureeditor.editor.EditorTool;
 
 public class QuickSelectWheel {
@@ -18,7 +18,7 @@ public class QuickSelectWheel {
 
     Slice highlightedSlice;
 
-    private static final RenderLayer PIE_SLICE_LAYER = RenderLayer.of(
+    private static final RenderType PIE_SLICE_LAYER = RenderType.of(
             "pie_slice",
             RenderSetup.builder(RenderPipelines.GUI).translucent().build()
     );
@@ -68,7 +68,7 @@ public class QuickSelectWheel {
 
     public void tick() {}
 
-    public void render(DrawContext context, TextRenderer textRenderer, int mouseX, int mouseY) {
+    public void render(GuiGraphics context, TextRenderer textRenderer, int mouseX, int mouseY) {
         if (!visible) return;
 
         Slice[] slices = Slice.values();
@@ -127,7 +127,7 @@ public class QuickSelectWheel {
     }
 
     /** Draws a pie slice using triangle fans via scanline fill */
-    public void drawPieSlice(DrawContext context, float cx, float cy, float radius, float startAngle, float endAngle, int color) {
+    public void drawPieSlice(GuiGraphics context, float cx, float cy, float radius, float startAngle, float endAngle, int color) {
         int segments = 2; // segments per slice for smoother edges
         float step = (endAngle - startAngle) / segments;
 
@@ -145,7 +145,7 @@ public class QuickSelectWheel {
     }
 
     /** Fills a triangle using a scanline algorithm */
-    public void fillTriangle(DrawContext context, int x0, int y0, int x1, int y1, int x2, int y2, int color) {
+    public void fillTriangle(GuiGraphics context, int x0, int y0, int x1, int y1, int x2, int y2, int color) {
         // Sort vertices by Y (top to bottom)
         if (y1 < y0) { int tx=x0,ty=y0; x0=x1;y0=y1;x1=tx;y1=ty; }
         if (y2 < y0) { int tx=x0,ty=y0; x0=x2;y0=y2;x2=tx;y2=ty; }

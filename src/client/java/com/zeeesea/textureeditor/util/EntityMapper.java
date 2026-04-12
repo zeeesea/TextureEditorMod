@@ -1,8 +1,8 @@
 package com.zeeesea.textureeditor.util;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.decoration.ItemFrameEntity;
 import net.minecraft.entity.decoration.painting.PaintingEntity;
@@ -10,9 +10,9 @@ import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.entity.vehicle.ChestBoatEntity;
 import net.minecraft.entity.vehicle.MinecartEntity;
 import net.minecraft.entity.SpawnReason;
-import net.minecraft.item.*;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.*;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.World;
 
 public class EntityMapper {
@@ -22,12 +22,12 @@ public class EntityMapper {
         Item item = stack.getItem();
 
         if (item instanceof SpawnEggItem) {
-            Identifier id = Registries.ITEM.getId(item);
+            Identifier id = BuiltInRegistries.ITEM.getId(item);
             String path = id.getPath();
             if (path.endsWith("_spawn_egg")) {
                 String entityName = path.substring(0, path.length() - "_spawn_egg".length());
                 Identifier entityId = Identifier.of(id.getNamespace(), entityName);
-                EntityType<?> type = Registries.ENTITY_TYPE.get(entityId);
+                EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(entityId);
 
                 // Pig is default if not found, so check if name matches
                 if (type != EntityType.PIG || entityName.equals("pig")) {
@@ -65,7 +65,7 @@ public class EntityMapper {
 
     public static boolean hasEntityMode(ItemStack stack) {
         try {
-            return getEntityFromItem(stack, MinecraftClient.getInstance().world) != null;
+            return getEntityFromItem(stack, Minecraft.getInstance().world) != null;
         } catch (Exception e) {
             return false;
         }
@@ -90,9 +90,9 @@ public class EntityMapper {
         }
         // For spawn egg mobs, try to find the spawn egg
         EntityType<?> type = entity.getType();
-        Identifier entityId = Registries.ENTITY_TYPE.getId(type);
+        Identifier entityId = BuiltInRegistries.ENTITY_TYPE.getId(type);
         Identifier eggId = Identifier.of(entityId.getNamespace(), entityId.getPath() + "_spawn_egg");
-        Item eggItem = Registries.ITEM.get(eggId);
+        Item eggItem = BuiltInRegistries.ITEM.get(eggId);
         if (eggItem != Items.AIR) {
             return new ItemStack(eggItem);
         }
@@ -106,3 +106,4 @@ public class EntityMapper {
         return getItemFromEntity(entity) != null;
     }
 }
+

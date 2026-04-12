@@ -9,14 +9,14 @@ import com.zeeesea.textureeditor.texture.MobTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.EntityMapper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 /**
  * Mob/Entity texture editor with optional parent screen and 3D preview.
@@ -30,7 +30,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
     private boolean mobPreviewActive = false;
 
     public MobEditorScreen(Entity entity, Screen parent) {
-        super(Text.translatable("textureeditor.screen.mob.title"));
+        super(Component.translatable("textureeditor.screen.mob.title"));
         this.entity = entity;
         this.entityName = entity.getType().getName().getString();
         this.parent = parent;
@@ -71,10 +71,10 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected String getEditorTitle() { return Text.translatable("textureeditor.screen.mob.editor_title", entityName).getString(); }
+    protected String getEditorTitle() { return Component.translatable("textureeditor.screen.mob.editor_title", entityName).getString(); }
 
     @Override
-    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_mob").getString(); }
+    protected String getResetCurrentLabel() { return Component.translatable("textureeditor.button.reset_mob").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -93,7 +93,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
     protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
         int px = x;
         // 3D Preview toggle in general tab
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.preview_3d"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.preview_3d"), btn -> {
             if (mobPreview == null) {
                 mobPreview = new MobPreviewWidget(entity);
                 mobPreview.setPosition(115, 30, 140, 160);
@@ -105,9 +105,9 @@ public class MobEditorScreen extends AbstractEditorScreen {
 
         // Edit Item button if this entity maps to an item
         if (EntityMapper.hasItemMode(entity)) {
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_item"), btn -> {
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.edit_item"), btn -> {
                 ItemStack itemStack = EntityMapper.getItemFromEntity(entity);
-                if (itemStack != null) MinecraftClient.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
+                if (itemStack != null) Minecraft.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
             }).position(px, y).size(w, bh).build());
             y += bh + 4;
         }
@@ -115,17 +115,17 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
+    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
         if (mobPreview != null) {
             // Compute dynamic position: if the left panel is collapsed, move preview to the left side;
             // otherwise keep it near the right area so it doesn't overlap the panels.
             int pw = 140, ph = 160;
             int px;
             if (!leftOpen) {
-                // left panel is collapsed — place preview near left edge (after the toggle)
+                // left panel is collapsed Ã¢â‚¬â€ place preview near left edge (after the toggle)
                 px = 18; // small offset to avoid the toggle button at x=0
             } else {
-                // left panel open — place preview on the right side, avoiding the right sidebar
+                // left panel open Ã¢â‚¬â€ place preview on the right side, avoiding the right sidebar
                 px = this.width - getRightSidebarWidth() - pw - 12;
             }
             // Clamp to screen
@@ -162,8 +162,8 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double dx, double dy) {
-        boolean b = super.mouseDragged(click, dx, dy);
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        boolean b = super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
         if (mobPreviewActive) applyLive();
         return b;
     }
@@ -171,7 +171,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
     @Override
     protected void applyLive() {
         if (textureId == null || canvas == null) return;
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         // Store original for preview support
         if (originalPixels != null) {
             TextureManager.getInstance().storeOriginal(textureId, originalPixels, canvas.getWidth(), canvas.getHeight());
@@ -183,7 +183,7 @@ public class MobEditorScreen extends AbstractEditorScreen {
         final Identifier texId = textureId;
         client.execute(() -> {
             // Create NativeImage from canvas
-            var img = new net.minecraft.client.texture.NativeImage(w, h, false);
+            var img = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h; y++)
                     img.setColorArgb(x, y, pixelsCopy[x][y]);
@@ -210,13 +210,13 @@ public class MobEditorScreen extends AbstractEditorScreen {
                 }
             }
 
-            // Fallback: create new NativeImageBackedTexture
+            // Fallback: create new DynamicTexture
             try {
                 if (existing != null) {
                     existing.close();
                 }
             } catch (Exception ignored) {}
-            var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_mob", img);
+            var dynamicTex = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "textureeditor_mob", img);
             client.getTextureManager().registerTexture(texId, dynamicTex);
             dynamicTex.upload();
         });
@@ -265,3 +265,4 @@ public class MobEditorScreen extends AbstractEditorScreen {
         applyLive();
     }
 }
+

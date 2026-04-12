@@ -2,10 +2,11 @@ package com.zeeesea.textureeditor.editor;
 
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.texture.TextureManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.toast.SystemToast;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -69,8 +70,8 @@ public class ExternalEditorSession {
         startWatcher();
 
         System.out.println("[TextureEditor] External editor session started for: " + textureId);
-        MinecraftClient.getInstance().execute(() ->
-            NotificationHelper.addToast(SystemToast.Type.PERIODIC_NOTIFICATION,
+        Minecraft.getInstance().execute(() ->
+            NotificationHelper.addToast(SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
                     "External Editor", "Opened in external editor. Save to apply changes live.")
         );
     }
@@ -83,7 +84,7 @@ public class ExternalEditorSession {
     }
 
     public static File getTempDir() {
-        return new File(MinecraftClient.getInstance().runDirectory, "textureeditor_temp");
+        return new File(Minecraft.getInstance().gameDirectory, "textureeditor_temp");
     }
 
     private void exportPixels(int[][] pixels) {
@@ -134,8 +135,8 @@ public class ExternalEditorSession {
             System.out.println("[TextureEditor] Launched external editor: " + editorPath);
         } catch (IOException e) {
             System.out.println("[TextureEditor] Failed to launch editor: " + e.getMessage());
-            MinecraftClient.getInstance().execute(() ->
-                NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE,
+            Minecraft.getInstance().execute(() ->
+                NotificationHelper.addToast(SystemToast.SystemToastId.PACK_LOAD_FAILURE,
                         "Editor Failed", "Could not launch: " + editorPath)
             );
         }
@@ -179,9 +180,9 @@ public class ExternalEditorSession {
 
                     System.out.println("[TextureEditor] Detected external change, applying live: " + textureId);
 
-                    MinecraftClient.getInstance().execute(() -> {
+                    Minecraft.getInstance().execute(() -> {
                         applyChanges(newPixels);
-                        NotificationHelper.addToast(SystemToast.Type.PERIODIC_NOTIFICATION,
+                        NotificationHelper.addToast(SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
                                 "Texture Updated", "External changes applied live!");
                     });
                 }
@@ -233,7 +234,7 @@ public class ExternalEditorSession {
      * Upload entity texture using 1.21.11 GpuTexture API.
      */
     private void uploadEntityTexture(Identifier texId, int[][] pixels, int w, int h) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         try {
             NativeImage img = new NativeImage(w, h, false);
             for (int x = 0; x < w; x++)
@@ -257,12 +258,12 @@ public class ExternalEditorSession {
                 }
             }
 
-            // Fallback: create new NativeImageBackedTexture
+            // Fallback: create a new dynamic texture
             try {
                 if (existing != null) existing.close();
             } catch (Exception ignored) {}
-            var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_ext", img);
-            client.getTextureManager().registerTexture(texId, dynamicTex);
+            var dynamicTex = new DynamicTexture(() -> "textureeditor_ext", img);
+            client.getTextureManager().register(texId, dynamicTex);
             dynamicTex.upload();
             System.out.println("[TextureEditor] Fallback entity upload OK: " + texId);
         } catch (Exception e) {

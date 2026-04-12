@@ -2,10 +2,10 @@ package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.editor.ColorHistory;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -21,7 +21,7 @@ public class SettingsScreen extends Screen {
     private final java.util.List<Integer> baseYs = new java.util.ArrayList<>();
 
     public SettingsScreen(Screen parent) {
-        super(Text.translatable("textureeditor.screen.settings.title"));
+        super(Component.translatable("textureeditor.screen.settings.title"));
         this.parent = parent;
     }
 
@@ -33,11 +33,11 @@ public class SettingsScreen extends Screen {
         int startY = 40;
         int y = startY;
 
-        Text textOn = Text.translatable("textureeditor.label.on");
-        Text textOff = Text.translatable("textureeditor.label.off");
+        Text textOn = Component.translatable("textureeditor.label.on");
+        Text textOff = Component.translatable("textureeditor.label.off");
 
         // Auto Apply live
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.auto_apply_live", s.autoApplyLive ? textOn : textOff), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.auto_apply_live", s.autoApplyLive ? textOn : textOff), btn -> {
             s.autoApplyLive = !s.autoApplyLive;
             s.save();
             this.clearChildren();
@@ -46,7 +46,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Grid On By Default
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.grid_default", s.gridOnByDefault ? textOn : textOff), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.grid_default", s.gridOnByDefault ? textOn : textOff), btn -> {
             s.gridOnByDefault = !s.gridOnByDefault;
             s.save();
             this.clearChildren();
@@ -55,7 +55,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Show Tool Hints
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.tool_keybind_hints", s.showToolHints ? textOn : textOff), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.tool_keybind_hints", s.showToolHints ? textOn : textOff), btn -> {
             s.showToolHints = !s.showToolHints;
             s.save();
             this.clearChildren();
@@ -64,7 +64,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Max Undo Steps
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.max_undo_steps", String.valueOf(s.maxUndoSteps)), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.max_undo_steps", String.valueOf(s.maxUndoSteps)), btn -> {
             s.maxUndoSteps = switch (s.maxUndoSteps) {
                 case 10 -> 25;
                 case 25 -> 50;
@@ -79,7 +79,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Color History Size
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.color_hist_size", String.valueOf(s.colorHistorySize)), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.color_hist_size", String.valueOf(s.colorHistorySize)), btn -> {
             s.colorHistorySize = switch (s.colorHistorySize) {
                 case 5 -> 10;
                 case 10 -> 15;
@@ -94,7 +94,7 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Default Tool
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.default_tool", s.defaultTool), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.default_tool", s.defaultTool), btn -> {
             s.defaultTool = switch (s.defaultTool) {
                 case "Pencil" -> "Brush";
                 case "Brush" -> "Eraser";
@@ -110,14 +110,14 @@ public class SettingsScreen extends Screen {
         y += 28;
 
         // Default layers preference: One layer (only Base) vs Two layers (Base + Layer 0)
-        addDrawableChild(ButtonWidget.builder(
-                Text.translatable("textureeditor.label.default_layers", s.oneLayerByDefault ? Text.translatable("textureeditor.label.one_layer") : Text.translatable("textureeditor.label.two_layers")),
+        addDrawableChild(Button.builder(
+                Component.translatable("textureeditor.label.default_layers", s.oneLayerByDefault ? Component.translatable("textureeditor.label.one_layer") : Component.translatable("textureeditor.label.two_layers")),
                 btn -> {
                     s.oneLayerByDefault = !s.oneLayerByDefault;
                     s.save();
                     // Immediately update this button's visible message so the user gets instant feedback
-                    btn.setMessage(Text.translatable("textureeditor.label.default_layers",
-                            s.oneLayerByDefault ? Text.translatable("textureeditor.label.one_layer") : Text.translatable("textureeditor.label.two_layers")
+                    btn.setMessage(Component.translatable("textureeditor.label.default_layers",
+                            s.oneLayerByDefault ? Component.translatable("textureeditor.label.one_layer") : Component.translatable("textureeditor.label.two_layers")
                     ));
                     // Debug output for log-based verification
                     System.out.println("[TextureEditor] oneLayerByDefault toggled -> " + s.oneLayerByDefault);
@@ -128,7 +128,7 @@ public class SettingsScreen extends Screen {
 
         /* DEFAULT: OFF, feature alr implemented, but too unstable to publish
         // Multiplayer Sync
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.multiplayer_sync", s.multiplayerSync ? textOn : textOff), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.multiplayer_sync", s.multiplayerSync ? textOn : textOff), btn -> {
             s.multiplayerSync = !s.multiplayerSync;
             s.save();
             this.clearChildren();
@@ -138,20 +138,20 @@ public class SettingsScreen extends Screen {
          */
 
         // External Editor Settings
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.externalEditor"), btn ->
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.externalEditor"), btn ->
                         client.setScreen(new ExternalEditorSettingsScreen(this)))
                 .position(centerX - 100, y).size(200, 20).build());
         y += 28;
 
         // Keybind Settings
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.editor_keybinds"), btn ->
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.editor_keybinds"), btn ->
                         client.setScreen(new KeybindSettingsScreen(this)))
                 .position(centerX - 100, y).size(200, 20).build());
         y += 40;
 
         // Color Preset / Profile switcher
         String currentPreset = ModSettings.getInstance().colorPreset;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.color_preset", currentPreset), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.color_preset", currentPreset), btn -> {
             // Cycle through presets
             com.zeeesea.textureeditor.util.ColorPalette.Preset[] vals = com.zeeesea.textureeditor.util.ColorPalette.Preset.values();
             int idx = 0;
@@ -166,7 +166,7 @@ public class SettingsScreen extends Screen {
         y += 40;
 
         // Done
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.label.done"), btn -> this.close())
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.label.done"), btn -> this.close())
                 .position(centerX - 50, y).size(100, 20).build());
 
         // record total content height for scrolling calculations
@@ -189,7 +189,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
 
         // Draw centered title with custom shadow color when the text is very light (white)
@@ -236,7 +236,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float d) {
+    public void renderBackground(GuiGraphics ctx, int mx, int my, float d) {
 
     }
 
@@ -256,7 +256,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Apply widget Y offset used for rendering so hitboxes match visual positions
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
@@ -266,7 +266,7 @@ public class SettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseClicked(click, doubled);
+        boolean res = super.mouseClicked(mouseX, mouseY, button);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -279,7 +279,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -288,7 +288,7 @@ public class SettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseReleased(click);
+        boolean res = super.mouseReleased(mouseX, mouseY, button);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -301,7 +301,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -310,7 +310,7 @@ public class SettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseDragged(click, offsetX, offsetY);
+        boolean res = super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -349,11 +349,12 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
-        return super.keyPressed(keyInput);
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
     public boolean shouldPause() { return false; }
 }
+

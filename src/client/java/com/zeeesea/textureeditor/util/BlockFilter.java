@@ -1,8 +1,8 @@
 package com.zeeesea.textureeditor.util;
 
-import net.minecraft.block.*;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.block.*;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 
 /**
  * Filters blocks to only allow editing of full-cube blocks and simple flat 2D-texture blocks
@@ -102,7 +102,8 @@ public class BlockFilter {
      * Same as isEditableBlock but also checks the item stack.
      */
     public static boolean isEditableBlockId(Identifier blockId) {
-        Block block = Registries.BLOCK.get(blockId);
+        Block block = BuiltInRegistries.BLOCK.get(blockId);
         return isEditableBlock(block.getDefaultState());
     }
 }
+

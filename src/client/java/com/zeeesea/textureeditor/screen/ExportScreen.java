@@ -2,15 +2,15 @@ package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ResourcePackExporter;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
@@ -23,9 +23,9 @@ import java.sql.SQLOutput;
 public class ExportScreen extends Screen {
 
     private final Screen parent;
-    private TextFieldWidget packNameInput;
-    private TextFieldWidget descriptionInput;
-    private TextFieldWidget authorInput;
+    private EditBox packNameInput;
+    private EditBox descriptionInput;
+    private EditBox authorInput;
     private PixelCanvas iconCanvas;
     private String statusMessage = "";
     private int statusColor = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.STATUS_OK;
@@ -40,7 +40,7 @@ public class ExportScreen extends Screen {
     private boolean showGrid = true;
 
     // Cached icon texture for performance (avoids 4096 fill() calls per frame)
-    private NativeImageBackedTexture iconTexture = null;
+    private DynamicTexture iconTexture = null;
     private static final Identifier ICON_TEX_ID = Identifier.of("textureeditor", "export_icon");
     private long lastIconVersion = -1;
 
@@ -54,7 +54,7 @@ public class ExportScreen extends Screen {
     };
 
     public ExportScreen(Screen parent) {
-        super(Text.translatable("textureeditor.screen.export.title"));
+        super(Component.translatable("textureeditor.screen.export.title"));
         this.parent = parent;
         this.iconCanvas = new PixelCanvas(ICON_SIZE, ICON_SIZE);
         for (int x = 0; x < ICON_SIZE; x++) {
@@ -70,31 +70,31 @@ public class ExportScreen extends Screen {
         int fieldWidth = 200;
 
         // Pack name
-        packNameInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 40, fieldWidth, 18, Text.translatable("textureeditor.field.pack_name"));
+        packNameInput = new EditBox(this.textRenderer, centerX - fieldWidth / 2, 40, fieldWidth, 18, Component.translatable("textureeditor.field.pack_name"));
         packNameInput.setMaxLength(64);
-        packNameInput.setText(Text.translatable("textureeditor.default.pack_name").getString());
+        packNameInput.setText(Component.translatable("textureeditor.default.pack_name").getString());
         addDrawableChild(packNameInput);
 
         // Description
-        descriptionInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 75, fieldWidth, 18, Text.translatable("textureeditor.field.description"));
+        descriptionInput = new EditBox(this.textRenderer, centerX - fieldWidth / 2, 75, fieldWidth, 18, Component.translatable("textureeditor.field.description"));
         descriptionInput.setMaxLength(128);
-        descriptionInput.setText(Text.translatable("textureeditor.default.pack_description").getString());
+        descriptionInput.setText(Component.translatable("textureeditor.default.pack_description").getString());
         addDrawableChild(descriptionInput);
 
         // Author
-        authorInput = new TextFieldWidget(this.textRenderer, centerX - fieldWidth / 2, 110, fieldWidth, 18, Text.translatable("textureeditor.field.author"));
+        authorInput = new EditBox(this.textRenderer, centerX - fieldWidth / 2, 110, fieldWidth, 18, Component.translatable("textureeditor.field.author"));
         authorInput.setMaxLength(64);
         authorInput.setText("");
         addDrawableChild(authorInput);
 
-        // Icon canvas position — scale-aware zoom
-        int guiScale = (int) net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaleFactor();
+        // Icon canvas position Ã¢â‚¬â€ scale-aware zoom
+        int guiScale = (int) net.minecraft.client.Minecraft.getInstance().getWindow().getScaleFactor();
         iconZoom = guiScale >= 4 ? 2 : (guiScale >= 3 ? 3 : 4);
         iconScreenX = centerX - (ICON_SIZE * iconZoom) / 2;
         iconScreenY = 145;
 
         // Grid toggle
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.grid"), btn -> showGrid = !showGrid)
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.grid"), btn -> showGrid = !showGrid)
                 .position(iconScreenX + ICON_SIZE * iconZoom + 10, iconScreenY).size(50, 20).build());
 
         int exportBackPosX = centerX - 60;
@@ -105,36 +105,36 @@ public class ExportScreen extends Screen {
             exportBackPosY = 40;
         }
             // Export button
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.export"), btn -> doExport())
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.export"), btn -> doExport())
                     .position(exportBackPosX, exportBackPosY).size(120, 20).build());
 
             // Back button
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.back"), btn -> client.setScreen(parent))
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.back"), btn -> client.setScreen(parent))
                     .position(exportBackPosX, exportBackPosY + 24).size(120, 20).build());
 
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void renderBackground(GuiGraphics context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("textureeditor.screen.export.title"), this.width / 2, 10, pal.TEXT_NORMAL);
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_name"), this.width / 2 - 100, 30, pal.TEXT_LIGHT, false);
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.description"), this.width / 2 - 100, 65, pal.TEXT_LIGHT, false);
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.author"), this.width / 2 - 100, 100, pal.TEXT_LIGHT, false);
+        context.drawCenteredTextWithShadow(textRenderer, Component.translatable("textureeditor.screen.export.title"), this.width / 2, 10, pal.TEXT_NORMAL);
+        context.drawText(textRenderer, Component.translatable("textureeditor.label.pack_name"), this.width / 2 - 100, 30, pal.TEXT_LIGHT, false);
+        context.drawText(textRenderer, Component.translatable("textureeditor.label.description"), this.width / 2 - 100, 65, pal.TEXT_LIGHT, false);
+        context.drawText(textRenderer, Component.translatable("textureeditor.label.author"), this.width / 2 - 100, 100, pal.TEXT_LIGHT, false);
 
         System.out.println(this.height);
 
 
 
         // Draw "Pack Icon (optional):" label
-        context.drawText(textRenderer, Text.translatable("textureeditor.label.pack_icon"), iconScreenX, 135, pal.TEXT_LIGHT, false);
+        context.drawText(textRenderer, Component.translatable("textureeditor.label.pack_icon"), iconScreenX, 135, pal.TEXT_LIGHT, false);
 
         // Draw icon canvas
         drawIconCanvas(context, mouseX, mouseY);
@@ -156,12 +156,12 @@ public class ExportScreen extends Screen {
 
         // Status message
         if (!statusMessage.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.literal(statusMessage), this.width / 2, this.height - 50, statusColor);
+            context.drawCenteredTextWithShadow(textRenderer, Component.literal(statusMessage), this.width / 2, this.height - 50, statusColor);
         }
 
     }
 
-    private void drawIconCanvas(DrawContext context, int mouseX, int mouseY) {
+    private void drawIconCanvas(GuiGraphics context, int mouseX, int mouseY) {
         // Use cached texture rendering (1 draw call instead of 4096 fill calls)
         long version = iconCanvas.getVersion();
         if (version != lastIconVersion || iconTexture == null) {
@@ -182,14 +182,14 @@ public class ExportScreen extends Screen {
                 iconTexture.setImage(img);
                 iconTexture.upload();
             } else {
-                iconTexture = new NativeImageBackedTexture(() -> "export_icon", img);
-                MinecraftClient.getInstance().getTextureManager().registerTexture(ICON_TEX_ID, iconTexture);
+                iconTexture = new DynamicTexture(() -> "export_icon", img);
+                Minecraft.getInstance().getTextureManager().registerTexture(ICON_TEX_ID, iconTexture);
             }
         }
 
         int drawW = ICON_SIZE * iconZoom;
         int drawH = ICON_SIZE * iconZoom;
-        context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, ICON_TEX_ID,
+        context.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, ICON_TEX_ID,
             iconScreenX, iconScreenY, 0, 0, drawW, drawH, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 
         if (showGrid) {
@@ -213,8 +213,8 @@ public class ExportScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean bl) {
-        double mouseX = click.x(); double mouseY = click.y();
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        double mouseX = mouseX; double mouseY = mouseY;
         // Reset line interpolation on new click
         lastDrawX = -1;
         lastDrawY = -1;
@@ -231,14 +231,14 @@ public class ExportScreen extends Screen {
         }
 
         if (handleIconCanvasClick(mouseX, mouseY)) return true;
-        return super.mouseClicked(click, bl);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double deltaX, double deltaY) {
-        double mouseX = click.x(); double mouseY = click.y();
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        double mouseX = mouseX; double mouseY = mouseY;
         if (handleIconCanvasClick(mouseX, mouseY)) return true;
-        return super.mouseDragged(click, deltaX, deltaY);
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     private boolean handleIconCanvasClick(double mouseX, double mouseY) {
@@ -273,7 +273,7 @@ public class ExportScreen extends Screen {
     private void doExport() {
         String name = packNameInput.getText().trim();
         if (name.isEmpty()) {
-            statusMessage = Text.translatable("textureeditor.status.enter_pack_name").getString();
+            statusMessage = Component.translatable("textureeditor.status.enter_pack_name").getString();
             statusColor = 0xFFFF5555;
             return;
         }
@@ -287,29 +287,29 @@ public class ExportScreen extends Screen {
                 iconCanvas.getPixels(), ICON_SIZE, ICON_SIZE);
 
         if (result != null) {
-            statusMessage = Text.translatable("textureeditor.status.exported_to", result.getName()).getString();
+            statusMessage = Component.translatable("textureeditor.status.exported_to", result.getName()).getString();
             statusColor = 0xFF00FF00;
         } else {
-            statusMessage = Text.translatable("textureeditor.status.export_failed").getString();
+            statusMessage = Component.translatable("textureeditor.status.export_failed").getString();
             statusColor = 0xFFFF0000;
         }
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        if (keyInput.key() == GLFW.GLFW_KEY_ESCAPE) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             client.setScreen(parent);
             return true;
         }
-        return super.keyPressed(keyInput);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private int getWindowHeight() {
-        return MinecraftClient.getInstance().getWindow().getHeight();
+        return Minecraft.getInstance().getWindow().getHeight();
     }
 
     protected int getGuiScale() {
-        return (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return (int) Minecraft.getInstance().getWindow().getScaleFactor();
     }
 
     @Override
@@ -317,3 +317,4 @@ public class ExportScreen extends Screen {
         return false;
     }
 }
+

@@ -2,7 +2,7 @@ package com.zeeesea.textureeditor.settings;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.*;
@@ -126,7 +126,7 @@ public class ModSettings {
     }
 
     private static File getConfigFile() {
-        File configDir = new File(MinecraftClient.getInstance().runDirectory, "config");
+        File configDir = new File(Minecraft.getInstance().gameDirectory, "config");
         if (!configDir.exists()) configDir.mkdirs();
         return new File(configDir, "textureeditor.json");
     }

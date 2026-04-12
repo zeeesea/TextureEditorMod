@@ -6,13 +6,13 @@ import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.io.InputStream;
 
@@ -60,7 +60,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
     private SkyTexture currentSkyTexture = SkyTexture.SUN;
 
     public SkyEditorScreen(Screen parent) {
-        super(Text.translatable("textureeditor.screen.sky.title"));
+        super(Component.translatable("textureeditor.screen.sky.title"));
         this.parent = parent;
         this.zoom = 4;
     }
@@ -83,19 +83,19 @@ public class SkyEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected String getEditorTitle() {
-        return Text.translatable("textureeditor.screen.sky.editor_title", Text.translatable("textureeditor.sky." + currentSkyTexture.key)).getString();
+        return Component.translatable("textureeditor.screen.sky.editor_title", Component.translatable("textureeditor.sky." + currentSkyTexture.key)).getString();
     }
 
     @Override
     protected String getResetCurrentLabel() {
-        return Text.translatable("textureeditor.button.reset").getString();
+        return Component.translatable("textureeditor.button.reset").getString();
     }
 
     @Override
     protected void loadTexture() {
         textureId = currentSkyTexture.getTextureId();
         System.out.println("[TextureEditor] Loading sky texture: " + textureId);
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
         int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
 
@@ -144,11 +144,11 @@ public class SkyEditorScreen extends AbstractEditorScreen {
         // Sky texture cycle button (many moon phases now)
         SkyTexture[] textures = SkyTexture.values();
         int skyBtnX = this.width / 2 - 120;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.prev"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.prev"), btn -> {
             int idx = (currentSkyTexture.ordinal() - 1 + textures.length) % textures.length;
             switchTexture(textures[idx]);
         }).position(skyBtnX, 5).size(60, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.next"), btn -> {
             int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
             switchTexture(textures[idx]);
         }).position(skyBtnX + 178, 5).size(60, 20).build());
@@ -161,11 +161,11 @@ public class SkyEditorScreen extends AbstractEditorScreen {
         SkyTexture[] textures = SkyTexture.values();
         int btnW = Math.max(48, (w - 4) / 3);
         int px = x;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.prev"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.prev"), btn -> {
             int idx = (currentSkyTexture.ordinal() - 1 + textures.length) % textures.length;
             switchTexture(textures[idx]);
         }).position(px, y).size(btnW, bh).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.next"), btn -> {
             int idx = (currentSkyTexture.ordinal() + 1) % textures.length;
             switchTexture(textures[idx]);
         }).position(px + btnW + 4, y).size(btnW, bh).build());
@@ -173,7 +173,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
+    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
         // Active texture indicator
         int skyBtnX = this.width / 2 - 120;
         context.fill(skyBtnX + 64, 25, skyBtnX + 174, 27, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.HEADER_UNDERLINE);
@@ -191,18 +191,18 @@ public class SkyEditorScreen extends AbstractEditorScreen {
     @Override
     protected void applyLive() {
         if (textureId == null || canvas == null) return;
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
 
         Identifier spriteId = currentSkyTexture.getSpriteId();
         if (spriteId != null) {
-            // Sun/moon: sprite in celestials atlas — use the atlas blit approach
+            // Sun/moon: sprite in celestials atlas Ã¢â‚¬â€ use the atlas blit approach
             client.execute(() -> {
                 try {
                     // Find the sprite in the celestials atlas
                     Identifier celestialsAtlasId = Identifier.ofVanilla("textures/atlas/celestials.png");
                     var tex = client.getTextureManager().getTexture(celestialsAtlasId);
-                    if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture celestialsAtlas) {
+                    if (tex instanceof net.minecraft.client.renderer.texture.TextureAtlas celestialsAtlas) {
                         var sprite = celestialsAtlas.getSprite(spriteId);
                         if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
                             // Use TextureManager's writeSpritePixels (RenderPass blit) to update the atlas
@@ -219,18 +219,18 @@ public class SkyEditorScreen extends AbstractEditorScreen {
                 }
             });
         } else {
-            // End sky: standalone texture — replace via NativeImageBackedTexture
+            // End sky: standalone texture Ã¢â‚¬â€ replace via DynamicTexture
             client.execute(() -> {
                 NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
                 for (int x = 0; x < canvas.getWidth(); x++)
                     for (int y = 0; y < canvas.getHeight(); y++)
                         img.setColorArgb(x, y, canvas.getPixels()[x][y]);
                 var existing = client.getTextureManager().getTexture(textureId);
-                if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                if (existing instanceof net.minecraft.client.renderer.texture.DynamicTexture nibt) {
                     nibt.setImage(img);
                     nibt.upload();
                 } else {
-                    var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_sky", img);
+                    var dynamicTex = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "textureeditor_sky", img);
                     client.getTextureManager().registerTexture(textureId, dynamicTex);
                     dynamicTex.upload();
                 }
@@ -274,3 +274,4 @@ public class SkyEditorScreen extends AbstractEditorScreen {
         applyLive();
     }
 }
+

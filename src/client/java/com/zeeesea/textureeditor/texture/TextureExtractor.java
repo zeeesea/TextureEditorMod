@@ -1,16 +1,16 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.model.BakedQuad;
-import net.minecraft.client.render.model.BlockModelPart;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteContents;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.block.model.BlockModelPart;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.SpriteContents;
+import net.minecraft.resources.Identifier;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ public class TextureExtractor {
      * Extract the texture for a given block state and face direction.
      */
     public static BlockFaceTexture extract(BlockState state, Direction face) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         var model = client.getBlockRenderManager().getModel(state);
 
         // In 1.21.11, BlockStateModel.getParts() returns List<BlockModelPart>
@@ -83,3 +83,4 @@ public class TextureExtractor {
         return new BlockFaceTexture(textureId, pixels, w, h);
     }
 }
+

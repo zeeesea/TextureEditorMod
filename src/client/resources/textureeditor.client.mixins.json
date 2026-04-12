@@ -3,12 +3,9 @@
 	"package": "com.zeeesea.textureeditor.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"ExampleClientMixin",
 		"GuiRendererMixin",
 		"SpriteAccessor",
-		"SpriteContentsAccessor",
-		"BasicItemModelAccessor",
-		"BakedModelManagerAccessor"
+		"SpriteContentsAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

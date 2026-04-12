@@ -1,12 +1,10 @@
 package com.zeeesea.textureeditor.helper;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.toast.SystemToast;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.network.chat.Component;
 
-import java.util.Dictionary;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.Map;
 
 public class NotificationHelper {
@@ -14,7 +12,7 @@ public class NotificationHelper {
     private static final Map<String, Long> lastToast = new HashMap<>();
 
 
-    public static boolean addToast(SystemToast.Type type, String title, String description) {
+    public static boolean addToast(SystemToast.SystemToastId type, String title, String description) {
         long now = System.currentTimeMillis();
 
         Long last = lastToast.get(title);
@@ -25,13 +23,13 @@ public class NotificationHelper {
         }
         return false;
     }
-    public static boolean addToast(SystemToast.Type type, String title) {
+    public static boolean addToast(SystemToast.SystemToastId type, String title) {
         return addToast(type, title, "");
     }
-    private static void showToast(SystemToast.Type type, String title, String description) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    private static void showToast(SystemToast.SystemToastId type, String title, String description) {
+        Minecraft client = Minecraft.getInstance();
         client.getToastManager().add(
-                SystemToast.create(client, type, Text.literal(title), Text.literal(description))
+                new SystemToast(type, Component.literal(title), Component.literal(description))
         );
     }
 

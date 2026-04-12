@@ -1,19 +1,19 @@
 package com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.model.BakedQuad;
-import net.minecraft.client.render.model.BlockModelPart;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteAtlasTexture;
-import net.minecraft.client.texture.SpriteContents;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.block.model.BlockModelPart;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.SpriteContents;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
 
 import java.util.List;
 
@@ -29,11 +29,11 @@ public class ItemTextureExtractor {
      * Extract the texture for a given item stack.
      */
     public static ItemTexture extract(ItemStack stack) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        Identifier itemId = Registries.ITEM.getId(stack.getItem());
+        Minecraft client = Minecraft.getInstance();
+        Identifier itemId = BuiltInRegistries.ITEM.getId(stack.getItem());
         System.out.println("[TextureEditor] Extracting item texture for: " + itemId);
 
-        // Strategy 1: Handle spawn eggs specially — they share the 'item/spawn_egg' sprite with tints
+        // Strategy 1: Handle spawn eggs specially Ã¢â‚¬â€ they share the 'item/spawn_egg' sprite with tints
         if (stack.getItem() instanceof SpawnEggItem) {
             System.out.println("[TextureEditor] Spawn egg detected: " + itemId);
             // Try items atlas first, then block atlas
@@ -77,8 +77,8 @@ public class ItemTextureExtractor {
         // Strategy 3: Try via block model quads (for block items etc.)
         System.out.println("[TextureEditor] Direct sprite not found in either atlas, trying BakedModel approach...");
 
-        net.minecraft.block.Block block = net.minecraft.block.Block.getBlockFromItem(stack.getItem());
-        if (block != net.minecraft.block.Blocks.AIR) {
+        net.minecraft.world.level.block.Block block = net.minecraft.world.level.block.Block.getBlockFromItem(stack.getItem());
+        if (block != net.minecraft.world.level.block.Blocks.AIR) {
             var model = client.getBlockRenderManager().getModel(block.getDefaultState());
             if (model != null) {
                 List<BlockModelPart> parts = model.getParts(Random.create());
@@ -98,7 +98,7 @@ public class ItemTextureExtractor {
         }
 
         // Strategy 4: Fallback to Particle Sprite
-        if (block != net.minecraft.block.Blocks.AIR) {
+        if (block != net.minecraft.world.level.block.Blocks.AIR) {
             var blockModel = client.getBlockRenderManager().getModel(block.getDefaultState());
             if (blockModel != null) {
                 Sprite particle = blockModel.particleSprite();
@@ -135,7 +135,7 @@ public class ItemTextureExtractor {
     /**
      * Try to load a texture from the resource manager at the given path.
      */
-    private static ItemTexture tryLoadFromResource(MinecraftClient client, Identifier textureId, Identifier spriteId) {
+    private static ItemTexture tryLoadFromResource(Minecraft client, Identifier textureId, Identifier spriteId) {
         try {
             var optResource = client.getResourceManager().getResource(textureId);
             if (optResource.isPresent()) {
@@ -221,7 +221,7 @@ public class ItemTextureExtractor {
     /**
      * Find a sprite in either the ITEMS or BLOCK atlas.
      */
-    private static Sprite findSpriteInAnyAtlas(MinecraftClient client, Identifier spriteId) {
+    private static Sprite findSpriteInAnyAtlas(Minecraft client, Identifier spriteId) {
         // Try items atlas
         try {
             var tex = client.getTextureManager().getTexture(SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
@@ -259,3 +259,4 @@ public class ItemTextureExtractor {
         return new ItemTexture(textureId, spriteId, pixels, w, h);
     }
 }
+

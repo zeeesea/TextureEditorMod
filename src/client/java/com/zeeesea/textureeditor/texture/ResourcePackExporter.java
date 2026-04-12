@@ -3,10 +3,10 @@ package com.zeeesea.textureeditor.texture;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import net.minecraft.SharedConstants;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.resources.Identifier;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -41,7 +41,7 @@ public class ResourcePackExporter {
         if (!manager.hasModifiedTextures()) return null;
 
         // Determine output directory
-        File resourcePacksDir = new File(MinecraftClient.getInstance().runDirectory, "resourcepacks");
+        File resourcePacksDir = new File(Minecraft.getInstance().runDirectory, "resourcepacks");
         if (!resourcePacksDir.exists()) {
             resourcePacksDir.mkdirs();
         }
@@ -204,3 +204,4 @@ public class ResourcePackExporter {
         }
     }
 }
+

@@ -3,10 +3,11 @@ package com.zeeesea.textureeditor.editor;
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.toast.SystemToast;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -133,8 +134,8 @@ public class ExternalEditorManager {
     }
 
     private void syncTempFile(ExternalEditorSession session, int[][] pixels) {
-        MinecraftClient.getInstance().execute(() ->
-            NotificationHelper.addToast(SystemToast.Type.PERIODIC_NOTIFICATION,
+        Minecraft.getInstance().execute(() ->
+            NotificationHelper.addToast(SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
                     "Already Open", "Texture is already open in external editor.")
         );
     }
@@ -178,8 +179,8 @@ public class ExternalEditorManager {
             }
         }
 
-        MinecraftClient.getInstance().execute(() ->
-            NotificationHelper.addToast(SystemToast.Type.PERIODIC_NOTIFICATION,
+        Minecraft.getInstance().execute(() ->
+            NotificationHelper.addToast(SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
                     "Texture Reset", "Texture reset to default.")
         );
     }
@@ -201,8 +202,8 @@ public class ExternalEditorManager {
 
         INSTANCE.sessions.remove(textureId.toString());
 
-        MinecraftClient.getInstance().execute(() ->
-            NotificationHelper.addToast(SystemToast.Type.PERIODIC_NOTIFICATION,
+        Minecraft.getInstance().execute(() ->
+            NotificationHelper.addToast(SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
                     "Texture Reset", "Texture reset to default.")
         );
     }
@@ -211,7 +212,7 @@ public class ExternalEditorManager {
      * Upload entity texture using 1.21.11 GpuTexture API.
      */
     private void uploadEntityTexture(Identifier textureId, int[][] pixels, int w, int h) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         try {
             NativeImage img = new NativeImage(w, h, false);
             for (int x = 0; x < w; x++)
@@ -235,8 +236,8 @@ public class ExternalEditorManager {
             }
 
             try { if (existing != null) existing.close(); } catch (Exception ignored) {}
-            var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_ext", img);
-            client.getTextureManager().registerTexture(textureId, dynamicTex);
+            var dynamicTex = new DynamicTexture(() -> "textureeditor_ext", img);
+            client.getTextureManager().register(textureId, dynamicTex);
             dynamicTex.upload();
         } catch (Exception e) {
             System.out.println("[TextureEditor] Entity upload error: " + e.getMessage());
@@ -284,8 +285,8 @@ public class ExternalEditorManager {
 
     private void warnNoEditor() {
         System.out.println("[TextureEditor] No external editor configured!");
-        MinecraftClient.getInstance().execute(() ->
-            NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE,
+        Minecraft.getInstance().execute(() ->
+            NotificationHelper.addToast(SystemToast.SystemToastId.PACK_LOAD_FAILURE,
                     "No Editor", "Configure an external editor in settings first.")
         );
     }

@@ -1,11 +1,11 @@
 package com.zeeesea.textureeditor.texture;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,9 +25,9 @@ public class MobTextureExtractor {
      * Extract texture data from an entity.
      */
     public static MobTexture extract(Entity entity) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         EntityType<?> type = entity.getType();
-        Identifier entityId = Registries.ENTITY_TYPE.getId(type);
+        Identifier entityId = BuiltInRegistries.ENTITY_TYPE.getId(type);
         String name = type.getName().getString();
 
         System.out.println("[TextureEditor] Extracting mob texture for: " + entityId);
@@ -151,7 +151,7 @@ public class MobTextureExtractor {
         return null;
     }
 
-    private static MobTexture tryLoadTexture(MinecraftClient client, Identifier textureId, String name) {
+    private static MobTexture tryLoadTexture(Minecraft client, Identifier textureId, String name) {
         var optResource = client.getResourceManager().getResource(textureId);
         if (optResource.isPresent()) {
             try {
@@ -311,3 +311,4 @@ public class MobTextureExtractor {
         return paths;
     }
 }
+

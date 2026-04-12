@@ -14,15 +14,15 @@ public class TextureEditor implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Live Texture Editor Server initializing...");
 
-		PayloadTypeRegistry.playC2S().register(TextureSyncPayload.ID, TextureSyncPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(TextureSyncPayload.ID, TextureSyncPayload.CODEC);
-		PayloadTypeRegistry.playC2S().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
-		PayloadTypeRegistry.playS2C().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(TextureSyncPayload.ID, TextureSyncPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(TextureSyncPayload.ID, TextureSyncPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(EntityTextureSyncPayload.ID, EntityTextureSyncPayload.CODEC);
 
 		// Standard Texture Sync
 		ServerPlayNetworking.registerGlobalReceiver(TextureSyncPayload.ID, (payload, context) -> {
 			context.server().execute(() -> {
-				context.server().getPlayerManager().getPlayerList().forEach(p -> {
+				context.server().getPlayerList().getPlayers().forEach(p -> {
 					if (p != context.player()) {
 						ServerPlayNetworking.send(p, payload);
 					}
@@ -33,7 +33,7 @@ public class TextureEditor implements ModInitializer {
 		// Entity/Mob Texture Sync
 		ServerPlayNetworking.registerGlobalReceiver(EntityTextureSyncPayload.ID, (payload, context) -> {
 			context.server().execute(() -> {
-				context.server().getPlayerManager().getPlayerList().forEach(p -> {
+				context.server().getPlayerList().getPlayers().forEach(p -> {
 					if (p != context.player()) {
 						ServerPlayNetworking.send(p, payload);
 					}

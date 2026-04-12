@@ -6,16 +6,16 @@ import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 /**
  * Block face texture editor. Opened when clicking a block in the world.
@@ -30,10 +30,10 @@ public class EditorScreen extends AbstractEditorScreen {
 
     // World block constructor
     public EditorScreen(BlockHitResult hitResult) {
-        super(Text.translatable("textureeditor.screen.block.title"));
+        super(Component.translatable("textureeditor.screen.block.title"));
         this.blockPos = hitResult.getBlockPos();
         this.face = hitResult.getSide();
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         this.blockState = client.world != null ? client.world.getBlockState(blockPos) : null;
         this.block = blockState != null ? blockState.getBlock() : null;
         this.parent = null;
@@ -42,7 +42,7 @@ public class EditorScreen extends AbstractEditorScreen {
 
     // Browse block constructor
     public EditorScreen(Block block, Screen parent) {
-        super(Text.translatable("textureeditor.screen.block.title"));
+        super(Component.translatable("textureeditor.screen.block.title"));
         this.block = block;
         this.blockState = block.getDefaultState();
         this.face = Direction.UP;
@@ -52,7 +52,7 @@ public class EditorScreen extends AbstractEditorScreen {
     }
 
     private void setTint() {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (blockState != null && client.world != null) {
             int color = client.getBlockColors().getColor(blockState, client.world,
                     blockPos != null ? blockPos : client.player != null ? client.player.getBlockPos() : null, 0);
@@ -93,12 +93,12 @@ public class EditorScreen extends AbstractEditorScreen {
     @Override
     protected String getEditorTitle() {
         String name = block != null ? block.getName().getString() : (blockState != null ? blockState.getBlock().getName().getString() : "Unknown");
-        String tintLabel = isTinted ? " \u00a7a" + Text.translatable("textureeditor.label.tinted").getString() : "";
-        return Text.translatable("textureeditor.screen.block.editor_title", name, Text.translatable("textureeditor.face." + face.asString().toLowerCase()), tintLabel).getString();
+        String tintLabel = isTinted ? " \u00a7a" + Component.translatable("textureeditor.label.tinted").getString() : "";
+        return Component.translatable("textureeditor.screen.block.editor_title", name, Component.translatable("textureeditor.face." + face.asString().toLowerCase()), tintLabel).getString();
     }
 
     @Override
-    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_face").getString(); }
+    protected String getResetCurrentLabel() { return Component.translatable("textureeditor.button.reset_face").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -107,24 +107,24 @@ public class EditorScreen extends AbstractEditorScreen {
     protected int addExtraButtons(int toolY) {
         int tbw = getToolButtonWidth();
         int tbh = getToolButtonHeight();
-        // Face cycle button — only at scale <= 4
+        // Face cycle button Ã¢â‚¬â€ only at scale <= 4
         if (showFaceButton()) {
-            addDrawableChild(ButtonWidget.builder(
-                    Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())),
+            addDrawableChild(Button.builder(
+                    Component.translatable("textureeditor.button.face", Component.translatable("textureeditor.face." + face.asString().toLowerCase())),
                     btn -> {
                         Direction[] dirs = Direction.values();
                         face = dirs[(face.ordinal() + 1) % dirs.length];
-                        btn.setMessage(Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())));
+                        btn.setMessage(Component.translatable("textureeditor.button.face", Component.translatable("textureeditor.face." + face.asString().toLowerCase())));
                         switchFace(face);
                     }
             ).position(5, toolY).size(tbw, tbh).build());
             toolY += tbh + 4;
         }
 
-        // Reset Block button — always shown
+        // Reset Block button Ã¢â‚¬â€ always shown
         int rsw = getRightSidebarWidth();
         int resetBtnW = rsw - 10;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.reset_block"), btn -> resetBlock())
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.reset_block"), btn -> resetBlock())
                 .position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
 
         return toolY;
@@ -135,22 +135,22 @@ public class EditorScreen extends AbstractEditorScreen {
         int tbw = Math.min(getToolButtonWidth(), w);
         int tbh = bh;
         int px = x;
-        // Face cycle button — only at scale <= 4
+        // Face cycle button Ã¢â‚¬â€ only at scale <= 4
         if (showFaceButton()) {
-            addDrawableChild(ButtonWidget.builder(
-                    Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())),
+            addDrawableChild(Button.builder(
+                    Component.translatable("textureeditor.button.face", Component.translatable("textureeditor.face." + face.asString().toLowerCase())),
                     btn -> {
                         Direction[] dirs = Direction.values();
                         face = dirs[(face.ordinal() + 1) % dirs.length];
-                        btn.setMessage(Text.translatable("textureeditor.button.face", Text.translatable("textureeditor.face." + face.asString().toLowerCase())));
+                        btn.setMessage(Component.translatable("textureeditor.button.face", Component.translatable("textureeditor.face." + face.asString().toLowerCase())));
                         switchFace(face);
                     }
             ).position(px, y).size(tbw, tbh).build());
             y += tbh + 4;
         }
 
-        // Reset Block button — always shown in General tab
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.reset_block"), btn -> resetBlock())
+        // Reset Block button Ã¢â‚¬â€ always shown in General tab
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.reset_block"), btn -> resetBlock())
                 .position(px, y).size(tbw, tbh).build());
         y += tbh + 4;
         return y;
@@ -175,7 +175,7 @@ public class EditorScreen extends AbstractEditorScreen {
         final int h = canvas.getHeight();
         final int[][] origCopy = originalPixels;
         System.out.println("[TextureEditor] EditorScreen.applyLive: spriteId=" + sid + " size=" + w + "x" + h);
-        MinecraftClient.getInstance().execute(() ->
+        Minecraft.getInstance().execute(() ->
                 TextureManager.getInstance().applyLive(sid, px, w, h, origCopy));
 
         // Send to other players if multiplayer sync enabled
@@ -228,7 +228,7 @@ public class EditorScreen extends AbstractEditorScreen {
         final int cw = canvas.getWidth();
         final int ch = canvas.getHeight();
         final int[][] origCopy = copyPixels(originalPixels, cw, ch);
-        MinecraftClient.getInstance().execute(() ->
+        Minecraft.getInstance().execute(() ->
                 TextureManager.getInstance().applyLive(sid, origCopy, cw, ch));
     }
 
@@ -247,10 +247,11 @@ public class EditorScreen extends AbstractEditorScreen {
             TextureManager.getInstance().removeTexture(tid);
             TextureManager.getInstance().removeOriginal(tid);
             final int[][] px = copyPixels(origPx, w, h);
-            MinecraftClient.getInstance().execute(() ->
+            Minecraft.getInstance().execute(() ->
                     TextureManager.getInstance().applyLive(sid, px, w, h));
         }
         // Reset the current face canvas
         resetCurrent();
     }
 }
+

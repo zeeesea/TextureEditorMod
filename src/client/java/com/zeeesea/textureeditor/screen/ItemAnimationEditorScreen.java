@@ -4,13 +4,13 @@ import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,7 +68,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
                                      Identifier textureId, Identifier spriteId,
                                      int[][] originalPixels, int[][] currentFramePixels,
                                      List<int[][]> preloadedFrames, int preloadedFrameTimeTicks) {
-        super(Text.translatable("textureeditor.screen.item.title"));
+        super(Component.translatable("textureeditor.screen.item.title"));
         this.itemStack = itemStack;
         this.itemName = itemStack.getName().getString();
         this.parent = parent;
@@ -170,19 +170,19 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected String getResetCurrentLabel() {
-        return Text.translatable("textureeditor.button.reset_item").getString();
+        return Component.translatable("textureeditor.button.reset_item").getString();
     }
 
     @Override
     protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.delete_animation"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.delete_animation"), btn -> {
             removeAnimationAndReturn();
         }).position(x, y).size(w, bh).build());
         return y + bh + 4;
     }
 
     @Override
-    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
+    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
         if (canvas == null) return;
         saveCurrentFrame();
         computeControlsLayout();
@@ -288,7 +288,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
             tm.stopItemAnimationLive(textureId);
             tm.removeItemAnimation(textureId);
             int[][] px = copyPixels(frames.getFirst(), canvas.getWidth(), canvas.getHeight());
-            MinecraftClient.getInstance().execute(() -> tm.applyLive(spriteId, px, canvas.getWidth(), canvas.getHeight(), originalPixels));
+            Minecraft.getInstance().execute(() -> tm.applyLive(spriteId, px, canvas.getWidth(), canvas.getHeight(), originalPixels));
             return;
         }
 
@@ -345,7 +345,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
 
     private void removeAnimationAndReturn() {
         if (textureId == null || spriteId == null || canvas == null) {
-            MinecraftClient.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
+            Minecraft.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
             return;
         }
 
@@ -359,7 +359,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         int[][] staticPixels = copyPixels(canvas.getPixels(), w, h);
         tm.applyLive(spriteId, staticPixels, w, h, originalPixels);
 
-        MinecraftClient.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
+        Minecraft.getInstance().setScreen(new ItemEditorScreen(itemStack, parent));
     }
 
     private void addFrame() {
@@ -448,13 +448,13 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         clampFrameStripOffset();
     }
 
-    private void drawButton(DrawContext context, int x, int y, String label) {
+    private void drawButton(GuiGraphics context, int x, int y, String label) {
         context.fill(x, y, x + BTN_W, y + BTN_H, 0xFF2B2B2B);
         drawRectOutline(context, x, y, x + BTN_W, y + BTN_H, 0xFF888888);
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(label), x + BTN_W / 2, y + 4, 0xFFFFFFFF);
+        context.drawCenteredTextWithShadow(textRenderer, Component.literal(label), x + BTN_W / 2, y + 4, 0xFFFFFFFF);
     }
 
-    private void drawReverseTooltip(DrawContext context, int mouseX, int mouseY) {
+    private void drawReverseTooltip(GuiGraphics context, int mouseX, int mouseY) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         String mode = pingPong ? "Reverse: ON (Ping-Pong)" : "Reverse: OFF (Loop)";
         int tw = textRenderer.getWidth(mode) + 8;
@@ -465,7 +465,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         context.drawText(textRenderer, mode, tx + 4, ty + 2, pal.TEXT_NORMAL, false);
     }
 
-    private void drawFrameThumb(DrawContext context, int[][] frame, int x, int y) {
+    private void drawFrameThumb(GuiGraphics context, int[][] frame, int x, int y) {
         if (frame == null || frame.length == 0 || frame[0].length == 0) return;
         int fw = frame.length;
         int fh = frame[0].length;
@@ -520,4 +520,5 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         return out;
     }
 }
+
 

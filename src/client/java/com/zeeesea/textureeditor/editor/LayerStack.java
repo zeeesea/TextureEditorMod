@@ -1,6 +1,6 @@
 package com.zeeesea.textureeditor.editor;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,7 +46,7 @@ public class LayerStack {
         this.width = width;
         this.height = height;
         layers.add(new Layer(width, height, "Base", basePixels));
-        layers.add(new Layer(width, height, Text.translatable("textureeditor.button.layer").getString() + "0"));
+        layers.add(new Layer(width, height, Component.translatable("textureeditor.button.layer").getString() + "0"));
     }
 
     /**
@@ -57,7 +57,7 @@ public class LayerStack {
         this.height = height;
         layers.add(new Layer(width, height, "Base", basePixels));
         if (!singleBaseOnly) {
-            layers.add(new Layer(width, height, Text.translatable("textureeditor.button.layer").getString() + "0"));
+            layers.add(new Layer(width, height, Component.translatable("textureeditor.button.layer").getString() + "0"));
             activeIndex = 1;
         } else {
             activeIndex = 0;

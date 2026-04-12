@@ -1,11 +1,11 @@
 package com.zeeesea.textureeditor.screen;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.network.chat.Component;
 import org.joml.Quaternionf;
 
 /**
@@ -40,7 +40,7 @@ public class MobPreviewWidget {
         this.height = height;
     }
 
-    public void render(DrawContext context, int mouseX, int mouseY) {
+    public void render(GuiGraphics context, int mouseX, int mouseY) {
         if (!visible || entity == null) return;
 
         // Panel background
@@ -53,8 +53,8 @@ public class MobPreviewWidget {
         context.fill(x + width + 1, y - 16, x + width + 2, y + height + 2, pal.TEXT_NORMAL);
 
         // Title
-        MinecraftClient client = MinecraftClient.getInstance();
-        context.drawText(client.textRenderer, Text.translatable("textureeditor.button.preview_3d"), x + 2, y - 13, pal.TEXT_NORMAL, false);
+        Minecraft client = Minecraft.getInstance();
+        context.drawText(client.textRenderer, Component.translatable("textureeditor.button.preview_3d"), x + 2, y - 13, pal.TEXT_NORMAL, false);
 
         // Render entity
         if (entity instanceof LivingEntity livingEntity) {
@@ -90,7 +90,7 @@ public class MobPreviewWidget {
                 context.drawText(client.textRenderer, "Preview N/A", x + 10, y + height / 2, pal.TEXT_ALERT, false);
             }
         } else {
-            MinecraftClient client2 = MinecraftClient.getInstance();
+            Minecraft client2 = Minecraft.getInstance();
             context.drawText(client2.textRenderer, "Non-living entity", x + 5, y + height / 2, pal.TEXT_SUBTLE, false);
         }
 
@@ -139,3 +139,4 @@ public class MobPreviewWidget {
         return false;
     }
 }
+

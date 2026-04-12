@@ -7,15 +7,15 @@ import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gl.GpuSampler;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteAtlasTexture;
-import net.minecraft.client.texture.SpriteContents;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.renderer.RenderPipelines;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.SpriteContents;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.systems.RenderPass;
@@ -364,10 +364,10 @@ public class TextureManager {
      * We must write to ALL so both world rendering and hotbar/inventory update immediately.
      */
     private void writeSpritePixels(Identifier spriteId, int[][] pixels, int width, int height) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         int hitCount = 0;
 
-        // Try each atlas — blit to ALL that contain this sprite
+        // Try each atlas Ã¢â‚¬â€ blit to ALL that contain this sprite
         hitCount += tryBlitToAtlas(client, spriteId, pixels, width, height,
                 SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE, "BLOCK");
         try {
@@ -400,7 +400,7 @@ public class TextureManager {
      * Try to find the sprite in the given atlas and blit pixels to it.
      * Returns 1 if found and blitted, 0 otherwise.
      */
-    private int tryBlitToAtlas(MinecraftClient client, Identifier spriteId, int[][] pixels,
+    private int tryBlitToAtlas(Minecraft client, Identifier spriteId, int[][] pixels,
                                 int width, int height, Identifier atlasId, String atlasName) {
         var tex = client.getTextureManager().getTexture(atlasId);
         if (!(tex instanceof SpriteAtlasTexture atlas)) return 0;
@@ -418,7 +418,7 @@ public class TextureManager {
      */
     private void blitSpriteToAtlas(SpriteAtlasTexture atlas, Sprite sprite, Identifier spriteId,
                                     int[][] pixels, int width, int height,
-                                    String atlasName, MinecraftClient client) {
+                                    String atlasName, Minecraft client) {
         SpriteContents contents = sprite.getContents();
         SpriteContentsAccessor contentsAccessor = (SpriteContentsAccessor) contents;
         NativeImage image = contentsAccessor.getImage();
@@ -593,7 +593,7 @@ public class TextureManager {
                     origPixels[x][y] = flatOriginals[y * width + x];
         }
 
-        // Check if local texture has different size — scale if needed
+        // Check if local texture has different size Ã¢â‚¬â€ scale if needed
         int[] localDims = getDimensions(textureId);
         if (localDims != null && (localDims[0] != width || localDims[1] != height)) {
             int lw = localDims[0], lh = localDims[1];
@@ -640,20 +640,20 @@ public class TextureManager {
             for (int y = 0; y < lh; y++)
                 pixels[x][y] = flatPixels[((int)(y * height / (float)lh)) * width + (int)(x * width / (float)lw)];
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         putTexture(textureId, pixels, lw, lh);
         final int fw = lw, fh = lh;
         client.execute(() -> {
-            var img = new net.minecraft.client.texture.NativeImage(fw, fh, false);
+            var img = new com.mojang.blaze3d.platform.NativeImage(fw, fh, false);
             for (int x = 0; x < fw; x++)
                 for (int y = 0; y < fh; y++)
                     img.setColorArgb(x, y, pixels[x][y]);
             var existing = client.getTextureManager().getTexture(textureId);
-            if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+            if (existing instanceof net.minecraft.client.renderer.texture.DynamicTexture nibt) {
                 nibt.setImage(img);
                 nibt.upload();
             } else {
-                var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(
+                var dynamicTex = new net.minecraft.client.renderer.texture.DynamicTexture(
                         () -> "textureeditor_sync", img);
                 client.getTextureManager().registerTexture(textureId, dynamicTex);
                 dynamicTex.upload();
@@ -676,10 +676,10 @@ public class TextureManager {
     private void ensureOriginalStored(Identifier textureId) {
         if (originalTextures.containsKey(textureId)) return;
         try {
-            var client = MinecraftClient.getInstance();
+            var client = Minecraft.getInstance();
             var resource = client.getResourceManager().getResource(textureId);
             if (resource.isPresent()) {
-                var img = net.minecraft.client.texture.NativeImage.read(
+                var img = com.mojang.blaze3d.platform.NativeImage.read(
                         resource.get().getInputStream());
                 int w = img.getWidth(), h = img.getHeight();
                 int[][] orig = new int[w][h];
@@ -713,3 +713,4 @@ public class TextureManager {
         ItemModelRebaker.invalidateCache();
     }
 }
+

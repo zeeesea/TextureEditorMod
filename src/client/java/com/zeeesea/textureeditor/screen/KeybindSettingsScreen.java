@@ -1,10 +1,10 @@
 package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -35,7 +35,7 @@ public class KeybindSettingsScreen extends Screen {
     };
 
     public KeybindSettingsScreen(Screen parent) {
-        super(Text.literal("Editor Keybinds"));
+        super(Component.literal("Editor Keybinds"));
         this.parent = parent;
     }
 
@@ -55,7 +55,7 @@ public class KeybindSettingsScreen extends Screen {
             String btnText = isWaiting ? "\u00a7e> Press a key <" : displayName + ": [\u00a7b" + keyName + "\u00a7r]";
 
             final String aid = actionId;
-            addDrawableChild(ButtonWidget.builder(Text.literal(btnText), btn -> {
+            addDrawableChild(Button.builder(Component.literal(btnText), btn -> {
                 waitingForKey = aid;
                 this.clearChildren();
                 this.init();
@@ -64,7 +64,7 @@ public class KeybindSettingsScreen extends Screen {
         }
 
         y += 10;
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cReset to Defaults"), btn -> {
+        addDrawableChild(Button.builder(Component.literal("\u00a7cReset to Defaults"), btn -> {
             s.resetKeybinds();
             s.save();
             this.clearChildren();
@@ -72,7 +72,7 @@ public class KeybindSettingsScreen extends Screen {
         }).position(centerX - 100, y).size(200, 20).build());
         y += 30;
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> this.close())
+        addDrawableChild(Button.builder(Component.literal("Done"), btn -> this.close())
                 .position(centerX - 50, y).size(100, 20).build());
 
         // record content height and clamp scroll
@@ -92,7 +92,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         context.fill(0, 0, this.width, this.height, pal.BROWSE_BACKGROUND);
         context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a7eEditor Keybinds", this.width / 2, 15, pal.TEXT_NORMAL);
@@ -127,7 +127,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
+    public void renderBackground(GuiGraphics ctx, int mx, int my, float d) {}
 
     @Override
     public boolean mouseScrolled(double mx, double my, double ha, double va) {
@@ -144,7 +144,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Apply the same widget Y offset used during rendering so hitboxes align with visual positions
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
@@ -154,7 +154,7 @@ public class KeybindSettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseClicked(click, doubled);
+        boolean res = super.mouseClicked(mouseX, mouseY, button);
         // restore positions
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
@@ -168,7 +168,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -177,7 +177,7 @@ public class KeybindSettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseReleased(click);
+        boolean res = super.mouseReleased(mouseX, mouseY, button);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -190,7 +190,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         var ch2 = this.children();
         for (int i = 0; i < ch2.size(); i++) {
             var d = ch2.get(i);
@@ -199,7 +199,7 @@ public class KeybindSettingsScreen extends Screen {
                 if (by >= 0) w.setY(by - scrollY);
             }
         }
-        boolean res = super.mouseDragged(click, offsetX, offsetY);
+        boolean res = super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
         var ch3 = this.children();
         for (int i = 0; i < ch3.size(); i++) {
             var d = ch3.get(i);
@@ -233,8 +233,8 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(net.minecraft.client.input.KeyInput keyInput) {
-        int keyCode = keyInput.key();
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        int keyCode = keyCode;
         if (waitingForKey != null) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 // Cancel rebind
@@ -248,7 +248,7 @@ public class KeybindSettingsScreen extends Screen {
             return true;
         }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) { this.close(); return true; }
-        return super.keyPressed(keyInput);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
@@ -259,3 +259,4 @@ public class KeybindSettingsScreen extends Screen {
     @Override
     public boolean shouldPause() { return false; }
 }
+

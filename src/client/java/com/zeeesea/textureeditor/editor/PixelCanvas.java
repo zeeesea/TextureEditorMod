@@ -2,9 +2,7 @@ package com.zeeesea.textureeditor.editor;
 
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.toast.SystemToast;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -216,7 +214,7 @@ public class PixelCanvas {
         Layer active = layerStack.getActiveLayer();
         if (active == null) return;
         if (active.isEmpty()) {
-            NotificationHelper.addToast(SystemToast.Type.PACK_LOAD_FAILURE, "Layer is already completely empty!");
+            NotificationHelper.addToast(SystemToast.SystemToastId.PACK_LOAD_FAILURE, "Layer is already completely empty!");
             return;
         }
         setPixel(x, y, 0x00000000);

@@ -8,13 +8,13 @@ import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.EntityMapper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.util.List;
 
@@ -32,7 +32,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     private int redirectFrameTimeTicks = 1;
 
     public ItemEditorScreen(ItemStack itemStack, Screen parent) {
-        super(Text.translatable("textureeditor.screen.item.title"));
+        super(Component.translatable("textureeditor.screen.item.title"));
         this.itemStack = itemStack;
         this.itemName = itemStack.getName().getString();
         this.parent = parent;
@@ -76,7 +76,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
             orig = copyPixels(originalPixels, originalPixels.length, originalPixels[0].length);
         }
 
-        MinecraftClient.getInstance().setScreen(new ItemAnimationEditorScreen(
+        Minecraft.getInstance().setScreen(new ItemAnimationEditorScreen(
                 itemStack,
                 parent,
                 textureId,
@@ -89,35 +89,35 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected String getEditorTitle() { return Text.translatable("textureeditor.screen.item.editor_title", itemName).getString(); }
+    protected String getEditorTitle() { return Component.translatable("textureeditor.screen.item.editor_title", itemName).getString(); }
 
 
     @Override
     protected Screen getBackScreen() { return parent; }
 
     @Override
-    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset_item").getString(); }
+    protected String getResetCurrentLabel() { return Component.translatable("textureeditor.button.reset_item").getString(); }
 
     @Override
     protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
         int px = x;
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.create_animation"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.create_animation"), btn -> {
             int[][] current = (canvas != null) ? copyPixels(canvas.getPixels(), canvas.getWidth(), canvas.getHeight()) : null;
             int[][] orig = null;
             if (originalPixels != null && originalPixels.length > 0 && originalPixels[0].length > 0) {
                 orig = copyPixels(originalPixels, originalPixels.length, originalPixels[0].length);
             }
-            MinecraftClient.getInstance().setScreen(new ItemAnimationEditorScreen(itemStack, this, textureId, spriteId, orig, current));
+            Minecraft.getInstance().setScreen(new ItemAnimationEditorScreen(itemStack, this, textureId, spriteId, orig, current));
         }).position(px, y).size(w, bh).build());
         y += bh + 4;
 
         // "Edit Mob/Entity" button for spawn eggs, boats, minecarts, etc.
         if (EntityMapper.hasEntityMode(itemStack)) {
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_mob_entity"), btn -> {
-                var entity = EntityMapper.getEntityFromItem(itemStack, MinecraftClient.getInstance().world);
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.edit_mob_entity"), btn -> {
+                var entity = EntityMapper.getEntityFromItem(itemStack, Minecraft.getInstance().world);
                 if (entity != null) {
-                    MinecraftClient.getInstance().setScreen(new MobEditorScreen(entity, parent));
+                    Minecraft.getInstance().setScreen(new MobEditorScreen(entity, parent));
                 }
             }).position(px, y).size(w, bh).build());
             y += bh + 4;
@@ -125,9 +125,9 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
         // "Edit Wing Texture" button for elytra -> opens the entity/elytra.png texture
         if (itemStack.getItem() == Items.ELYTRA) {
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_wing_tex"), btn -> {
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.edit_wing_tex"), btn -> {
                 Identifier elytraTexId = Identifier.of("minecraft", "textures/entity/elytra.png");
-                MinecraftClient.getInstance().setScreen(new GuiTextureEditorScreen(elytraTexId, Text.translatable("textureeditor.elytra.wings").getString(), parent != null ? parent : this));
+                Minecraft.getInstance().setScreen(new GuiTextureEditorScreen(elytraTexId, Component.translatable("textureeditor.elytra.wings").getString(), parent != null ? parent : this));
             }).position(px, y).size(w, bh).build());
             y += bh + 4;
         }
@@ -144,7 +144,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
         }
         System.out.println("[TextureEditor] ItemEditor.applyLive: spriteId=" + spriteId + " textureId=" + textureId + " canvas=" + canvas.getWidth() + "x" + canvas.getHeight());
         final int[][] origCopy = originalPixels;
-        MinecraftClient.getInstance().execute(() ->
+        Minecraft.getInstance().execute(() ->
                 TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));
 
         final int[][] px = canvas.getPixels();

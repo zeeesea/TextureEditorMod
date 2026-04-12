@@ -6,14 +6,14 @@ import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Button;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -45,7 +45,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
     );
 
     public GuiTextureEditorScreen(Identifier guiTextureId, String displayName, Screen parent) {
-        super(Text.translatable("textureeditor.screen.gui.title"));
+        super(Component.translatable("textureeditor.screen.gui.title"));
         this.guiTextureId = guiTextureId;
         this.displayName = displayName;
         this.parent = parent;
@@ -67,7 +67,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                     guiTextureId.getPath().replace("gui/sprites/", ""));
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         int[][] savedPixels = TextureManager.getInstance().getPixels(fullTextureId);
         int[] savedDims = TextureManager.getInstance().getDimensions(fullTextureId);
 
@@ -185,10 +185,10 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected String getEditorTitle() { return Text.translatable("textureeditor.screen.gui.editor_title", displayName).getString(); }
+    protected String getEditorTitle() { return Component.translatable("textureeditor.screen.gui.editor_title", displayName).getString(); }
 
     //@Override
-    protected String getResetCurrentLabel() { return Text.translatable("textureeditor.button.reset").getString(); }
+    protected String getResetCurrentLabel() { return Component.translatable("textureeditor.button.reset").getString(); }
 
     @Override
     protected Screen getBackScreen() { return parent; }
@@ -205,8 +205,8 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
             int rsw = getRightSidebarWidth();
             int resetBtnW = rsw - 10;
             int tbh = getToolButtonHeight();
-            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.edit_item"), btn -> {
-                MinecraftClient.getInstance().setScreen(new ItemEditorScreen(new ItemStack(Items.ELYTRA), parent));
+            addDrawableChild(Button.builder(Component.translatable("textureeditor.button.edit_item"), btn -> {
+                Minecraft.getInstance().setScreen(new ItemEditorScreen(new ItemStack(Items.ELYTRA), parent));
             }).position(this.width - rsw + 5, this.height - 124).size(resetBtnW, tbh).build());
         }
         return toolY;
@@ -215,7 +215,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
     @Override
     protected void applyLive() {
         if (fullTextureId == null || canvas == null) return;
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         TextureManager.getInstance().putTexture(fullTextureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
 
         var atlasAndSprite = findSpriteInAtlases(client, guiTextureId);
@@ -228,28 +228,28 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
                 if (atlasAndSprite != null) {
                     // Use the proper sprite ID that was found in the atlas
-                    net.minecraft.client.texture.Sprite sprite = atlasAndSprite.getRight();
+                    net.minecraft.client.renderer.texture.TextureAtlasSprite sprite = atlasAndSprite.getRight();
                     System.out.println("[TextureEditor] Updating sprite in atlas: " + foundSpriteId + " (atlas: " + atlasAndSprite.getLeft() + ")");
                     // Use TextureManager's proper RenderPass blit to write at correct atlas position
                     TextureManager.getInstance().applyLive(foundSpriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
                 } else {
                     System.out.println("[TextureEditor] No atlas sprite found, using dynamic texture for: " + fullTextureId);
-                    // Non-atlas texture: use NativeImageBackedTexture (for container textures etc.)
+                    // Non-atlas texture: use DynamicTexture (for container textures etc.)
                     NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
                     for (int x = 0; x < canvas.getWidth(); x++)
                         for (int y = 0; y < canvas.getHeight(); y++)
                             img.setColorArgb(x, y, canvas.getPixels()[x][y]);
                     var existing = client.getTextureManager().getTexture(fullTextureId);
                     System.out.println("[TextureEditor] Existing texture type: " + (existing != null ? existing.getClass().getSimpleName() : "null"));
-                    if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+                    if (existing instanceof net.minecraft.client.renderer.texture.DynamicTexture nibt) {
                         nibt.setImage(img);
                         nibt.upload();
-                        System.out.println("[TextureEditor] Updated existing NativeImageBackedTexture for: " + fullTextureId);
+                        System.out.println("[TextureEditor] Updated existing DynamicTexture for: " + fullTextureId);
                     } else {
-                        var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_gui", img);
+                        var dynamicTex = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "textureeditor_gui", img);
                         client.getTextureManager().registerTexture(fullTextureId, dynamicTex);
                         dynamicTex.upload();
-                        System.out.println("[TextureEditor] Registered new NativeImageBackedTexture for: " + fullTextureId);
+                        System.out.println("[TextureEditor] Registered new DynamicTexture for: " + fullTextureId);
                     }
                 }
             } catch (Throwable t) {
@@ -281,10 +281,10 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
     }
 
     // Utility: Find sprite in block/gui/items atlases
-    private org.apache.commons.lang3.tuple.Pair<net.minecraft.client.texture.SpriteAtlasTexture, net.minecraft.client.texture.Sprite> findSpriteInAtlases(MinecraftClient client, Identifier id) {
+    private org.apache.commons.lang3.tuple.Pair<net.minecraft.client.renderer.texture.TextureAtlas, net.minecraft.client.renderer.texture.TextureAtlasSprite> findSpriteInAtlases(Minecraft client, Identifier id) {
         // Check block atlas
         try {
-            var blockAtlas = (net.minecraft.client.texture.SpriteAtlasTexture) client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+            var blockAtlas = (net.minecraft.client.renderer.texture.TextureAtlas) client.getTextureManager().getTexture(net.minecraft.client.renderer.texture.TextureAtlas.BLOCK_ATLAS_TEXTURE);
             var sprite = blockAtlas.getSprite(id);
             if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
                 return org.apache.commons.lang3.tuple.Pair.of(blockAtlas, sprite);
@@ -293,8 +293,8 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
         // Check items atlas
         try {
-            var tex = client.getTextureManager().getTexture(net.minecraft.client.texture.SpriteAtlasTexture.ITEMS_ATLAS_TEXTURE);
-            if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture itemsAtlas) {
+            var tex = client.getTextureManager().getTexture(net.minecraft.client.renderer.texture.TextureAtlas.ITEMS_ATLAS_TEXTURE);
+            if (tex instanceof net.minecraft.client.renderer.texture.TextureAtlas itemsAtlas) {
                 var sprite = itemsAtlas.getSprite(id);
                 if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
                     return org.apache.commons.lang3.tuple.Pair.of(itemsAtlas, sprite);
@@ -306,7 +306,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         Identifier guiAtlasId = Identifier.ofVanilla("textures/atlas/gui.png");
         try {
             var tex = client.getTextureManager().getTexture(guiAtlasId);
-            if (tex instanceof net.minecraft.client.texture.SpriteAtlasTexture guiAtlas) {
+            if (tex instanceof net.minecraft.client.renderer.texture.TextureAtlas guiAtlas) {
                 // Try full path first
                 var sprite = guiAtlas.getSprite(id);
                 if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
@@ -329,9 +329,9 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                     .substring("textures/".length(), id.getPath().length() - ".png".length());
             Identifier spriteId = Identifier.of(id.getNamespace(), spritePath);
             try {
-                var blockAtlas = (net.minecraft.client.texture.SpriteAtlasTexture)
+                var blockAtlas = (net.minecraft.client.renderer.texture.TextureAtlas)
                         client.getTextureManager().getTexture(
-                                net.minecraft.client.texture.SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
+                                net.minecraft.client.renderer.texture.TextureAtlas.BLOCK_ATLAS_TEXTURE);
                 var sprite = blockAtlas.getSprite(spriteId);
                 if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
                     return org.apache.commons.lang3.tuple.Pair.of(blockAtlas, sprite);

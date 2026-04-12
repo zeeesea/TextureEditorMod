@@ -5,13 +5,14 @@ import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.io.InputStream;
 
@@ -24,7 +25,7 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     private int currentStage = 0;
 
     public BreakingEditorScreen(Screen parent) {
-        super(Text.translatable("textureeditor.screen.editor.title"));
+        super(Component.translatable("textureeditor.screen.editor.title"));
         this.parent = parent;
         this.zoom = 4;
     }
@@ -46,12 +47,12 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected String getEditorTitle() {
-        return Text.translatable("textureeditor.screen.editor.title", currentStage).getString();
+        return Component.translatable("textureeditor.screen.editor.title", currentStage).getString();
     }
 
     @Override
     protected String getResetCurrentLabel() {
-        return Text.translatable("textureeditor.button.reset").getString();
+        return Component.translatable("textureeditor.button.reset").getString();
     }
 
     private Identifier stageId(int stage) {
@@ -61,7 +62,7 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     @Override
     protected void loadTexture() {
         textureId = stageId(currentStage);
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
 
         int[][] savedPixels = TextureManager.getInstance().getPixels(textureId);
         int[] savedDims = TextureManager.getInstance().getDimensions(textureId);
@@ -101,11 +102,11 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     protected int addExtraButtons(int toolY) {
         // Add prev/next buttons at top similar to SkyEditorScreen
         int btnX = this.width / 2 - 120;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.prev"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.prev"), btn -> {
             int idx = (currentStage - 1 + 10) % 10;
             switchStage(idx);
         }).position(btnX, 5).size(60, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.next"), btn -> {
             int idx = (currentStage + 1) % 10;
             switchStage(idx);
         }).position(btnX + 178, 5).size(60, 20).build());
@@ -116,11 +117,11 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
         int btnW = Math.max(48, (w - 4) / 3);
         int px = x;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.prev"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.prev"), btn -> {
             int idx = (currentStage - 1 + 10) % 10;
             switchStage(idx);
         }).position(px, y).size(btnW, bh).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.next"), btn -> {
+        addDrawableChild(Button.builder(Component.translatable("textureeditor.button.next"), btn -> {
             int idx = (currentStage + 1) % 10;
             switchStage(idx);
         }).position(px + btnW + 4, y).size(btnW, bh).build());
@@ -128,7 +129,7 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
+    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
         int btnX = this.width / 2 - 120;
         context.fill(btnX + 64, 25, btnX + 174, 27, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.HEADER_UNDERLINE);
     }
@@ -145,19 +146,19 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     @Override
     protected void applyLive() {
         if (textureId == null || canvas == null) return;
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         TextureManager.getInstance().putTexture(textureId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight());
         // breaking stages are used as standalone textures in block rendering -> update native texture
         client.execute(() -> {
             NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
             for (int x = 0; x < canvas.getWidth(); x++) for (int y = 0; y < canvas.getHeight(); y++) img.setColorArgb(x, y, canvas.getPixels()[x][y]);
             var existing = client.getTextureManager().getTexture(textureId);
-            if (existing instanceof net.minecraft.client.texture.NativeImageBackedTexture nibt) {
+            if (existing instanceof DynamicTexture nibt) {
                 nibt.setImage(img);
                 nibt.upload();
             } else {
-                var dynamicTex = new net.minecraft.client.texture.NativeImageBackedTexture(() -> "textureeditor_breaking", img);
-                client.getTextureManager().registerTexture(textureId, dynamicTex);
+                var dynamicTex = new DynamicTexture(() -> "textureeditor_breaking", img);
+                client.getTextureManager().register(textureId, dynamicTex);
                 dynamicTex.upload();
             }
         });
