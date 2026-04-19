@@ -15,6 +15,9 @@ import net.minecraft.util.Identifier;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 /**
@@ -27,9 +30,9 @@ import java.util.*;
  */
 public class ItemModelRebaker {
 
-    // Cache mapping spriteId -> list of item model identifiers that use that sprite
+    // Cache mapping spriteId -> BasicItemModel instances that use that sprite
     // Built lazily on first rebake to avoid scanning all models every time
-    private static Map<Identifier, List<Identifier>> spriteToItemModels = null;
+    private static Map<Identifier, List<BasicItemModel>> spriteToItemModels = null;
 
     /**
      * Rebake all item models that reference the given sprite.
@@ -67,24 +70,31 @@ public class ItemModelRebaker {
         }
 
         // Find item models that use this sprite
-        List<Identifier> affectedModels = spriteToItemModels.get(spriteId);
+        List<BasicItemModel> affectedModels = spriteToItemModels.get(spriteId);
         if (affectedModels == null || affectedModels.isEmpty()) {
             // Sprite not found in cache - might be a new mapping, rebuild and retry
             buildReverseIndex(bakedItemModels);
             affectedModels = spriteToItemModels.get(spriteId);
-            if (affectedModels == null || affectedModels.isEmpty()) {
-                System.out.println("[TextureEditor] ItemModelRebaker: No item models found for sprite " + spriteId);
-                return;
+            if ((affectedModels == null || affectedModels.isEmpty()) && spriteId.getPath().endsWith("_in_hand")) {
+                // Some in-hand models keep quads indexed by the base sprite; use that as fallback.
+                Identifier baseSpriteId = Identifier.of(spriteId.getNamespace(), spriteId.getPath().replace("_in_hand", ""));
+                List<BasicItemModel> baseModels = spriteToItemModels.get(baseSpriteId);
+                if (baseModels != null && !baseModels.isEmpty()) {
+                    affectedModels = baseModels;
+                    System.out.println("[TextureEditor] ItemModelRebaker: Using base sprite fallback " + baseSpriteId + " for " + spriteId);
+                }
             }
+        }
+
+        if (affectedModels == null || affectedModels.isEmpty()) {
+            System.out.println("[TextureEditor] ItemModelRebaker: No item models found for sprite " + spriteId);
+            return;
         }
 
         System.out.println("[TextureEditor] ItemModelRebaker: Rebaking " + affectedModels.size() + " model(s) for sprite " + spriteId);
 
-        for (Identifier modelId : affectedModels) {
-            ItemModel model = bakedItemModels.get(modelId);
-            if (model instanceof BasicItemModel basicModel) {
-                rebakeBasicItemModel(basicModel, spriteId);
-            }
+        for (BasicItemModel basicModel : affectedModels) {
+            rebakeBasicItemModel(basicModel, spriteId);
         }
     }
 
@@ -93,29 +103,70 @@ public class ItemModelRebaker {
      */
     private static void buildReverseIndex(Map<Identifier, ItemModel> bakedItemModels) {
         spriteToItemModels = new HashMap<>();
+        Set<BasicItemModel> discovered = Collections.newSetFromMap(new IdentityHashMap<>());
 
-        for (Map.Entry<Identifier, ItemModel> entry : bakedItemModels.entrySet()) {
-            Identifier modelId = entry.getKey();
-            ItemModel model = entry.getValue();
+        for (ItemModel model : bakedItemModels.values()) {
+            collectBasicModels(model, discovered, Collections.newSetFromMap(new IdentityHashMap<>()));
+        }
 
-            if (model instanceof BasicItemModel basicModel) {
-                BasicItemModelAccessor accessor = (BasicItemModelAccessor) basicModel;
-                List<BakedQuad> quads = accessor.getQuads();
-                if (quads != null) {
-                    Set<Identifier> seenSprites = new HashSet<>();
-                    for (BakedQuad quad : quads) {
-                        if (quad.sprite() != null) {
-                            Identifier sid = quad.sprite().getContents().getId();
-                            if (seenSprites.add(sid)) {
-                                spriteToItemModels.computeIfAbsent(sid, k -> new ArrayList<>()).add(modelId);
-                            }
-                        }
+        for (BasicItemModel basicModel : discovered) {
+            BasicItemModelAccessor accessor = (BasicItemModelAccessor) basicModel;
+            List<BakedQuad> quads = accessor.getQuads();
+            if (quads == null) continue;
+
+            Set<Identifier> seenSprites = new HashSet<>();
+            for (BakedQuad quad : quads) {
+                if (quad.sprite() != null) {
+                    Identifier sid = quad.sprite().getContents().getId();
+                    if (seenSprites.add(sid)) {
+                        spriteToItemModels.computeIfAbsent(sid, k -> new ArrayList<>()).add(basicModel);
                     }
                 }
             }
         }
 
-        System.out.println("[TextureEditor] ItemModelRebaker: Built reverse index with " + spriteToItemModels.size() + " sprite entries");
+        System.out.println("[TextureEditor] ItemModelRebaker: Built reverse index with " + spriteToItemModels.size() + " sprite entries and " + discovered.size() + " basic models");
+    }
+
+    private static void collectBasicModels(Object node, Set<BasicItemModel> out, Set<Object> visited) {
+        if (node == null || !visited.add(node)) return;
+
+        if (node instanceof BasicItemModel basic) {
+            out.add(basic);
+        }
+
+        Class<?> cls = node.getClass();
+        while (cls != null && cls != Object.class) {
+            Field[] fields = cls.getDeclaredFields();
+            for (Field field : fields) {
+                if (Modifier.isStatic(field.getModifiers())) continue;
+                field.setAccessible(true);
+                try {
+                    Object value = field.get(node);
+                    if (value == null) continue;
+
+                    if (value instanceof ItemModel || value instanceof BasicItemModel) {
+                        collectBasicModels(value, out, visited);
+                    } else if (value instanceof Iterable<?> it) {
+                        for (Object entry : it) {
+                            if (entry instanceof ItemModel || entry instanceof BasicItemModel) {
+                                collectBasicModels(entry, out, visited);
+                            }
+                        }
+                    } else if (value.getClass().isArray()) {
+                        int len = Array.getLength(value);
+                        for (int i = 0; i < len; i++) {
+                            Object entry = Array.get(value, i);
+                            if (entry instanceof ItemModel || entry instanceof BasicItemModel) {
+                                collectBasicModels(entry, out, visited);
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            cls = cls.getSuperclass();
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.zeeesea.textureeditor.screen;
 
+import com.zeeesea.textureeditor.EntityTextureSyncPayload;
 import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.settings.ModSettings;
@@ -26,6 +27,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     private final ItemStack itemStack;
     private final String itemName;
     private final Screen parent;
+    private final ItemTextureExtractor.TextureTarget textureTarget;
     private boolean redirectEvaluated = false;
     private boolean redirectToAnimationEditor = false;
     private List<int[][]> redirectFrames = null;
@@ -33,15 +35,23 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     private boolean redirectInterpolate = false;
 
     public ItemEditorScreen(ItemStack itemStack, Screen parent) {
+        this(itemStack, parent, ItemTextureExtractor.TextureTarget.ITEM);
+    }
+
+    public ItemEditorScreen(ItemStack itemStack, Screen parent, ItemTextureExtractor.TextureTarget textureTarget) {
         super(Text.translatable("textureeditor.screen.item.title"));
         this.itemStack = itemStack;
         this.itemName = itemStack.getName().getString();
         this.parent = parent;
+        this.textureTarget = textureTarget;
     }
 
     @Override
     protected void loadTexture() {
-        ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(itemStack);
+        ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(itemStack, textureTarget);
+        if (tex == null && textureTarget == ItemTextureExtractor.TextureTarget.IN_HAND) {
+            tex = ItemTextureExtractor.extract(itemStack, ItemTextureExtractor.TextureTarget.ITEM);
+        }
         if (tex != null) {
             textureId = tex.textureId();
             spriteId = tex.spriteId();
@@ -62,7 +72,12 @@ public class ItemEditorScreen extends AbstractEditorScreen {
                 canvas = new PixelCanvas(tex.width(), tex.height(), tex.pixels());
             }
 
-            evaluateAnimationRedirect(savedPixels);
+            if (textureTarget == ItemTextureExtractor.TextureTarget.ITEM) {
+                evaluateAnimationRedirect(savedPixels);
+            } else {
+                redirectEvaluated = true;
+                redirectToAnimationEditor = false;
+            }
         }
     }
 
@@ -91,7 +106,12 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected String getEditorTitle() { return Text.translatable("textureeditor.screen.item.editor_title", itemName).getString(); }
+    protected String getEditorTitle() {
+        if (textureTarget == ItemTextureExtractor.TextureTarget.IN_HAND) {
+            return Text.translatable("textureeditor.screen.item.editor_title.in_hand", itemName).getString();
+        }
+        return Text.translatable("textureeditor.screen.item.editor_title", itemName).getString();
+    }
 
 
     @Override
@@ -104,15 +124,29 @@ public class ItemEditorScreen extends AbstractEditorScreen {
     protected int addExtraLeftGeneralButtons(int y, int x, int w, int bh) {
         int px = x;
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.create_animation"), btn -> {
-            int[][] current = (canvas != null) ? copyPixels(canvas.getPixels(), canvas.getWidth(), canvas.getHeight()) : null;
-            int[][] orig = null;
-            if (originalPixels != null && originalPixels.length > 0 && originalPixels[0].length > 0) {
-                orig = copyPixels(originalPixels, originalPixels.length, originalPixels[0].length);
-            }
-            MinecraftClient.getInstance().setScreen(new ItemAnimationEditorScreen(itemStack, this, textureId, spriteId, orig, current));
-        }).position(px, y).size(w, bh).build());
-        y += bh + 4;
+        if (ItemTextureExtractor.hasInHandTexture(itemStack)) {
+            Text modeLabel = textureTarget == ItemTextureExtractor.TextureTarget.IN_HAND
+                    ? Text.translatable("textureeditor.item_texture_mode.in_hand")
+                    : Text.translatable("textureeditor.item_texture_mode.item");
+            addDrawableChild(ButtonWidget.builder(
+                    Text.translatable("textureeditor.button.item_texture_mode", modeLabel),
+                    btn -> MinecraftClient.getInstance().setScreen(
+                            new ItemEditorScreen(itemStack, parent, textureTarget.toggled())))
+                    .position(px, y).size(w, bh).build());
+            y += bh + 4;
+        }
+
+        if (textureTarget == ItemTextureExtractor.TextureTarget.ITEM) {
+            addDrawableChild(ButtonWidget.builder(Text.translatable("textureeditor.button.create_animation"), btn -> {
+                int[][] current = (canvas != null) ? copyPixels(canvas.getPixels(), canvas.getWidth(), canvas.getHeight()) : null;
+                int[][] orig = null;
+                if (originalPixels != null && originalPixels.length > 0 && originalPixels[0].length > 0) {
+                    orig = copyPixels(originalPixels, originalPixels.length, originalPixels[0].length);
+                }
+                MinecraftClient.getInstance().setScreen(new ItemAnimationEditorScreen(itemStack, this, textureId, spriteId, orig, current));
+            }).position(px, y).size(w, bh).build());
+            y += bh + 4;
+        }
 
         // "Edit Mob/Entity" button for spawn eggs, boats, minecarts, etc.
         if (EntityMapper.hasEntityMode(itemStack)) {
@@ -139,35 +173,49 @@ public class ItemEditorScreen extends AbstractEditorScreen {
 
     @Override
     protected void applyLive() {
-        if (spriteId == null || canvas == null) return;
+        if (canvas == null) return;
         if (textureId != null) {
             TextureManager.getInstance().stopItemAnimationLive(textureId);
             TextureManager.getInstance().removeItemAnimation(textureId);
         }
-        System.out.println("[TextureEditor] ItemEditor.applyLive: spriteId=" + spriteId + " textureId=" + textureId + " canvas=" + canvas.getWidth() + "x" + canvas.getHeight());
-        final int[][] origCopy = originalPixels;
-        MinecraftClient.getInstance().execute(() ->
-                TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));
+        System.out.println("[TextureEditor] ItemEditor.applyLive: target=" + textureTarget + " spriteId=" + spriteId + " textureId=" + textureId + " canvas=" + canvas.getWidth() + "x" + canvas.getHeight());
 
         final int[][] px = canvas.getPixels();
         final int w = canvas.getWidth();
         final int h = canvas.getHeight();
+
+        int[] flat = new int[w * h];
+        for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+                flat[y * w + x] = px[x][y];
+
+        int[] origFlat = new int[w * h];
+        if (originalPixels != null) {
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h; y++)
+                    origFlat[y * w + x] = originalPixels[x][y];
+        }
+
+        if (spriteId != null) {
+            final int[][] origCopy = originalPixels;
+            MinecraftClient.getInstance().execute(() ->
+                    TextureManager.getInstance().applyLive(spriteId, canvas.getPixels(), canvas.getWidth(), canvas.getHeight(), origCopy));
+        } else if (textureId != null) {
+            final Identifier tid = textureId;
+            MinecraftClient.getInstance().execute(() ->
+                    TextureManager.getInstance().applyLiveEntity(tid, flat, origFlat, w, h));
+        }
+
         final Identifier sid = spriteId;
+        final Identifier tid = textureId;
 
         // Send to other players if multiplayer sync enabled
         if (ModSettings.getInstance().multiplayerSync) {
-            int[] flat = new int[w * h];
-            for (int x = 0; x < w; x++)
-                for (int y = 0; y < h; y++)
-                    flat[y * w + x] = px[x][y];
-
-            int[] origFlat = new int[w * h];
-            if (originalPixels != null) {
-                for (int x = 0; x < w; x++)
-                    for (int y = 0; y < h; y++)
-                        origFlat[y * w + x] = originalPixels[x][y];
+            if (sid != null) {
+                ClientPlayNetworking.send(new TextureSyncPayload(sid, w, h, flat, origFlat));
+            } else if (tid != null) {
+                ClientPlayNetworking.send(new EntityTextureSyncPayload(tid, null, w, h, flat, origFlat));
             }
-            ClientPlayNetworking.send(new TextureSyncPayload(sid, w, h, flat, origFlat));
         }
     }
 

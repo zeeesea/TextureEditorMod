@@ -268,8 +268,19 @@ public class BrowseScreen extends Screen {
                     id,
                     item.getName().getString(),
                     type,
-                    stack
+                    stack,
+                    ItemTextureExtractor.TextureTarget.ITEM
             ));
+
+            if (type == EntryType.ITEM && ItemTextureExtractor.hasInHandTexture(stack)) {
+                entries.add(new BrowseEntry(
+                        id,
+                        item.getName().getString() + " (In Hand)",
+                        type,
+                        stack,
+                        ItemTextureExtractor.TextureTarget.IN_HAND
+                ));
+            }
         }
 
         // 3. Add Custom Categories (GUI, Particles, Entities, Variants)
@@ -1140,8 +1151,10 @@ public class BrowseScreen extends Screen {
         } else if (entry.type == EntryType.ITEM && entry.stack != null) {
             // Don't call ItemTextureExtractor.extract() here — it's expensive and called every frame.
             // Instead check common texture path patterns for item textures.
-            Identifier itemId = Registries.ITEM.getId(entry.stack.getItem());
-            Identifier texId = Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
+            ItemTextureExtractor.TextureTarget target = entry.itemTextureTarget != null
+                    ? entry.itemTextureTarget
+                    : ItemTextureExtractor.TextureTarget.ITEM;
+            Identifier texId = ItemTextureExtractor.getTextureId(entry.stack, target);
             if (TextureManager.getInstance().getPixels(texId) != null) return true;
 
         } else if (entry.type == EntryType.MOB) {
@@ -1529,10 +1542,13 @@ public class BrowseScreen extends Screen {
             }
         } else if (entry.type == EntryType.ITEM) {
             if (entry.stack != null) {
+                ItemTextureExtractor.TextureTarget target = entry.itemTextureTarget != null
+                        ? entry.itemTextureTarget
+                        : ItemTextureExtractor.TextureTarget.ITEM;
                 if (useExternal) {
-                    openExternalForItem(entry.stack);
+                    openExternalForItem(entry.stack, target);
                 } else {
-                    client.setScreen(new ItemEditorScreen(entry.stack, this));
+                    client.setScreen(new ItemEditorScreen(entry.stack, this, target));
                 }
             }
         } else if (entry.type == EntryType.ENTITY) {
@@ -1589,7 +1605,10 @@ public class BrowseScreen extends Screen {
                 }
             }
         } else if (entry.type == EntryType.ITEM && entry.stack != null) {
-            ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(entry.stack);
+            ItemTextureExtractor.TextureTarget target = entry.itemTextureTarget != null
+                    ? entry.itemTextureTarget
+                    : ItemTextureExtractor.TextureTarget.ITEM;
+            ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(entry.stack, target);
             if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
                 com.zeeesea.textureeditor.editor.ExternalEditorManager.resetTextureStatic(
                         tex.textureId(), tex.spriteId(), tex.pixels(), tex.width(), tex.height());
@@ -1653,7 +1672,11 @@ public class BrowseScreen extends Screen {
     }
 
     private void openExternalForItem(ItemStack stack) {
-        ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(stack);
+        openExternalForItem(stack, ItemTextureExtractor.TextureTarget.ITEM);
+    }
+
+    private void openExternalForItem(ItemStack stack, ItemTextureExtractor.TextureTarget target) {
+        ItemTextureExtractor.ItemTexture tex = ItemTextureExtractor.extract(stack, target);
         if (tex != null) {
             int[][] origCopy = copyPixels(tex.pixels(), tex.width(), tex.height());
             if (tex.spriteId() != null && !tex.textureId().getPath().startsWith("textures/entity/")) {
@@ -1761,12 +1784,18 @@ public class BrowseScreen extends Screen {
         final String name;
         final EntryType type;
         final ItemStack stack;
+        final ItemTextureExtractor.TextureTarget itemTextureTarget;
 
         BrowseEntry(Identifier id, String name, EntryType type, ItemStack stack) {
+            this(id, name, type, stack, null);
+        }
+
+        BrowseEntry(Identifier id, String name, EntryType type, ItemStack stack, ItemTextureExtractor.TextureTarget itemTextureTarget) {
             this.id = id;
             this.name = name;
             this.type = type;
             this.stack = stack;
+            this.itemTextureTarget = itemTextureTarget;
         }
     }
 }

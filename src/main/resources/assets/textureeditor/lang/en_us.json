@@ -25,6 +25,7 @@
   "//": "--- EDITOR SPECIFIC TITLES ---",
   "textureeditor.screen.block.editor_title": "Block Editor - %s (%s)%s",
   "textureeditor.screen.item.editor_title": "Item Editor - %s",
+  "textureeditor.screen.item.editor_title.in_hand": "Item Editor - %s (In Hand)",
   "textureeditor.screen.mob.editor_title": "Mob Editor - %s",
   "textureeditor.screen.gui.editor_title": "GUI Editor - %s",
   "textureeditor.screen.sky.editor_title": "Sky Editor - %s",
@@ -82,6 +83,9 @@
   "textureeditor.button.delete_animation": "Delete Animation",
   "textureeditor.button.edit_mob_entity": "Edit Mob/Entity",
   "textureeditor.button.edit_wing_tex": "Edit Wing Tex",
+  "textureeditor.button.item_texture_mode": "Texture: %s",
+  "textureeditor.item_texture_mode.item": "Item",
+  "textureeditor.item_texture_mode.in_hand": "In Hand",
   "textureeditor.label.tinted": "[Tinted]",
   "textureeditor.elytra.wings": "Elytra Wings",
 

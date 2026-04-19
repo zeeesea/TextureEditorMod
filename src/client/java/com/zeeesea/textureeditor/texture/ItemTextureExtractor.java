@@ -23,15 +23,43 @@ import java.util.List;
  */
 public class ItemTextureExtractor {
 
+    public enum TextureTarget {
+        ITEM,
+        IN_HAND;
+
+        public TextureTarget toggled() {
+            return this == ITEM ? IN_HAND : ITEM;
+        }
+    }
+
     public record ItemTexture(Identifier textureId, Identifier spriteId, int[][] pixels, int width, int height) {}
 
     /**
      * Extract the texture for a given item stack.
      */
     public static ItemTexture extract(ItemStack stack) {
+        return extract(stack, TextureTarget.ITEM);
+    }
+
+    /**
+     * Extract either the regular item texture or the optional in-hand texture.
+     */
+    public static ItemTexture extract(ItemStack stack, TextureTarget target) {
         MinecraftClient client = MinecraftClient.getInstance();
         Identifier itemId = Registries.ITEM.getId(stack.getItem());
-        System.out.println("[TextureEditor] Extracting item texture for: " + itemId);
+        System.out.println("[TextureEditor] Extracting item texture for: " + itemId + " target=" + target);
+
+        if (target == TextureTarget.IN_HAND) {
+            Identifier inHandSpriteId = Identifier.of(itemId.getNamespace(), "item/" + itemId.getPath() + "_in_hand");
+            Sprite inHandSprite = findSpriteInAnyAtlas(client, inHandSpriteId);
+            if (inHandSprite != null) {
+                System.out.println("[TextureEditor] Found in-hand sprite in atlas: " + inHandSprite.getContents().getId());
+                return extractFromSprite(inHandSprite);
+            }
+
+            Identifier inHandTexture = getInHandTextureId(itemId);
+            return tryLoadFromResource(client, inHandTexture, null);
+        }
 
         // Strategy 1: Handle spawn eggs specially — they share the 'item/spawn_egg' sprite with tints
         if (stack.getItem() instanceof SpawnEggItem) {
@@ -130,6 +158,27 @@ public class ItemTextureExtractor {
         }
 
         return null;
+    }
+
+    public static Identifier getTextureId(ItemStack stack, TextureTarget target) {
+        Identifier itemId = Registries.ITEM.getId(stack.getItem());
+        return target == TextureTarget.IN_HAND
+                ? getInHandTextureId(itemId)
+                : Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
+    }
+
+    public static boolean hasInHandTexture(ItemStack stack) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        Identifier textureId = getTextureId(stack, TextureTarget.IN_HAND);
+        try {
+            return client.getResourceManager().getResource(textureId).isPresent();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static Identifier getInHandTextureId(Identifier itemId) {
+        return Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + "_in_hand.png");
     }
 
     /**
