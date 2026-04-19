@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor;
+ackage com.zeeesea.textureeditor;
 
 import com.zeeesea.textureeditor.screen.BrowseScreen;
 import com.zeeesea.textureeditor.screen.EditorScreen;
@@ -51,7 +51,7 @@ public class TextureEditorClient implements ClientModInitializer {
     public void onInitializeClient() {
         ModSettings s = ModSettings.getInstance();
 
-        KeyBinding.Category category = KeyBinding.Category.create(Identifier.of("textureeditor", "category"));
+        KeyBinding.Category category = KeyBinding.Category.create(new Identifier("textureeditor", "category"));
 
         toggleEditorKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.textureeditor.toggle",
@@ -246,7 +246,7 @@ public class TextureEditorClient implements ClientModInitializer {
             }
         }
         if (tex != null) {
-            Identifier spriteId = Identifier.of(tex.textureId().getNamespace(),
+            Identifier spriteId = new Identifier(tex.textureId().getNamespace(),
                     tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
             int[][] origCopy = new int[tex.width()][tex.height()];
             for (int x = 0; x < tex.width(); x++)

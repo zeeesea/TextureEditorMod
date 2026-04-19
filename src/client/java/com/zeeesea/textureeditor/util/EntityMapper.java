@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.util;
+ackage com.zeeesea.textureeditor.util;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
@@ -26,7 +26,7 @@ public class EntityMapper {
             String path = id.getPath();
             if (path.endsWith("_spawn_egg")) {
                 String entityName = path.substring(0, path.length() - "_spawn_egg".length());
-                Identifier entityId = Identifier.of(id.getNamespace(), entityName);
+                Identifier entityId = new Identifier(id.getNamespace(), entityName);
                 EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(entityId);
 
                 // Pig is default if not found, so check if name matches
@@ -91,7 +91,7 @@ public class EntityMapper {
         // For spawn egg mobs, try to find the spawn egg
         EntityType<?> type = entity.getType();
         Identifier entityId = BuiltInRegistries.ENTITY_TYPE.getId(type);
-        Identifier eggId = Identifier.of(entityId.getNamespace(), entityId.getPath() + "_spawn_egg");
+        Identifier eggId = new Identifier(entityId.getNamespace(), entityId.getPath() + "_spawn_egg");
         Item eggItem = BuiltInRegistries.ITEM.get(eggId);
         if (eggItem != Items.AIR) {
             return new ItemStack(eggItem);

@@ -1,10 +1,10 @@
-package com.zeeesea.textureeditor.texture;
+ackage com.zeeesea.textureeditor.texture;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.resources.Identifier;
 

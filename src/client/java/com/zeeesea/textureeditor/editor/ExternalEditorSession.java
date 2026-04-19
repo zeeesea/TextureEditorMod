@@ -1,8 +1,8 @@
-package com.zeeesea.textureeditor.editor;
+ackage com.zeeesea.textureeditor.editor;
 
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.texture.TextureManager;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -220,7 +220,7 @@ public class ExternalEditorSession {
                 if (path.startsWith("textures/") && path.endsWith(".png")) {
                     path = path.substring("textures/".length(), path.length() - ".png".length());
                 }
-                Identifier derivedSpriteId = Identifier.of(lookupId.getNamespace(), path);
+                Identifier derivedSpriteId = new Identifier(lookupId.getNamespace(), path);
                 tm.applyLive(derivedSpriteId, newPixels, newW, newH, originalPixels);
             }
         } else {

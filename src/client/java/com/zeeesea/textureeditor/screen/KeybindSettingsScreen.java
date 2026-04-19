@@ -1,7 +1,7 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
@@ -92,7 +92,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         context.fill(0, 0, this.width, this.height, pal.BROWSE_BACKGROUND);
         context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a7eEditor Keybinds", this.width / 2, 15, pal.TEXT_NORMAL);
@@ -127,7 +127,7 @@ public class KeybindSettingsScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics ctx, int mx, int my, float d) {}
+    public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
 
     @Override
     public boolean mouseScrolled(double mx, double my, double ha, double va) {
@@ -259,4 +259,5 @@ public class KeybindSettingsScreen extends Screen {
     @Override
     public boolean shouldPause() { return false; }
 }
+
 

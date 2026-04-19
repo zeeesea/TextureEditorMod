@@ -1,13 +1,13 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ResourcePackExporter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -41,7 +41,7 @@ public class ExportScreen extends Screen {
 
     // Cached icon texture for performance (avoids 4096 fill() calls per frame)
     private DynamicTexture iconTexture = null;
-    private static final Identifier ICON_TEX_ID = Identifier.of("textureeditor", "export_icon");
+    private static final Identifier ICON_TEX_ID = new Identifier("textureeditor", "export_icon");
     private long lastIconVersion = -1;
 
     // Continuous drawing: track last drawn pixel for line interpolation
@@ -87,7 +87,7 @@ public class ExportScreen extends Screen {
         authorInput.setText("");
         addDrawableChild(authorInput);
 
-        // Icon canvas position Ã¢â‚¬â€ scale-aware zoom
+        // Icon canvas position ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â scale-aware zoom
         int guiScale = (int) net.minecraft.client.Minecraft.getInstance().getWindow().getScaleFactor();
         iconZoom = guiScale >= 4 ? 2 : (guiScale >= 3 ? 3 : 4);
         iconScreenX = centerX - (ICON_SIZE * iconZoom) / 2;
@@ -115,12 +115,12 @@ public class ExportScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
@@ -161,7 +161,7 @@ public class ExportScreen extends Screen {
 
     }
 
-    private void drawIconCanvas(GuiGraphics context, int mouseX, int mouseY) {
+    private void drawIconCanvas(DrawContext context, int mouseX, int mouseY) {
         // Use cached texture rendering (1 draw call instead of 4096 fill calls)
         long version = iconCanvas.getVersion();
         if (version != lastIconVersion || iconTexture == null) {
@@ -317,4 +317,5 @@ public class ExportScreen extends Screen {
         return false;
     }
 }
+
 

@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureExtractor;
@@ -6,7 +6,7 @@ import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.BlockFilter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -20,7 +20,7 @@ import org.lwjgl.glfw.GLFW;
 import java.util.*;
 import java.io.InputStream;
 import java.util.concurrent.ConcurrentHashMap;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import java.util.stream.Collectors;
 
@@ -84,7 +84,7 @@ public class BrowseScreen extends Screen {
                     Component.translatable("textureeditor.button.tab_cycle", Component.translatable("textureeditor.tab." + currentTab.name().toLowerCase())),
                     btn -> {
                         Tab[] tabs = Tab.values();
-                        // SKY ÃƒÂ¼berspringen (ÃƒÂ¶ffnet extra screen)
+                        // SKY ÃƒÆ’Ã‚Â¼berspringen (ÃƒÆ’Ã‚Â¶ffnet extra screen)
                         Tab next = tabs[(currentTab.ordinal() + 1) % (tabs.length - 1)];
                         switchTab(next);
                         btn.setMessage(Component.translatable("textureeditor.button.tab_cycle", Component.translatable("textureeditor.tab." + next.name().toLowerCase())));
@@ -292,7 +292,7 @@ public class BrowseScreen extends Screen {
 
             // In 1.21.11, textures are referenced as "textures/particle/name.png"
             // We build the full path identifier for the texture manager
-            Identifier texturePath = Identifier.of(namespace, "textures/particle/" + path + ".png");
+            Identifier texturePath = new Identifier(namespace, "textures/particle/" + path + ".png");
 
             entries.add(new BrowseEntry(
                     texturePath, // Use the full path as ID
@@ -689,7 +689,7 @@ public class BrowseScreen extends Screen {
                 String name = generateGuiName(cleanPath);
 
                 entries.add(new BrowseEntry(
-                        Identifier.of(fullId.getNamespace(), cleanPath),
+                        new Identifier(fullId.getNamespace(), cleanPath),
                         name,
                         EntryType.GUI,
                         null
@@ -708,7 +708,7 @@ public class BrowseScreen extends Screen {
 
         //Grass Overhang
         entries.add(new BrowseEntry(
-                Identifier.of("minecraft", "textures/block/grass_block_side_overlay.png"),
+                new Identifier("minecraft", "textures/block/grass_block_side_overlay.png"),
                 "Grass Overhang",
                 EntryType.GUI,
                 null
@@ -716,7 +716,7 @@ public class BrowseScreen extends Screen {
 
         // Block breaking (destroy stages) - single browse entry that opens a frame-based editor
         entries.add(new BrowseEntry(
-                Identifier.of("minecraft", "textures/block/destroy_stage_0.png"),
+                new Identifier("minecraft", "textures/block/destroy_stage_0.png"),
                 "Block Breaking",
                 EntryType.GUI,
                 null
@@ -724,163 +724,163 @@ public class BrowseScreen extends Screen {
 
         /*
         // Empty Armor Slots
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_boots.png"), "Empty Armor Slot Boots", EntryType.GUI, null));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_chestplate.png"), "Empty Armor Slot Chestplate", EntryType.GUI, null));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_helmet.png"), "Empty Armor Slot Helmet", EntryType.GUI, null));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_leggings.png"), "Empty Armor Slot Leggings", EntryType.GUI, null));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/item/empty_armor_slot_shield.png"), "Empty Armor Slot Shield", EntryType.GUI, null));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/item/empty_armor_slot_boots.png"), "Empty Armor Slot Boots", EntryType.GUI, null));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/item/empty_armor_slot_chestplate.png"), "Empty Armor Slot Chestplate", EntryType.GUI, null));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/item/empty_armor_slot_helmet.png"), "Empty Armor Slot Helmet", EntryType.GUI, null));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/item/empty_armor_slot_leggings.png"), "Empty Armor Slot Leggings", EntryType.GUI, null));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/item/empty_armor_slot_shield.png"), "Empty Armor Slot Shield", EntryType.GUI, null));
         */
 
         // Boats
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/oak.png"), "Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.OAK_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/spruce.png"), "Spruce Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SPRUCE_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/birch.png"), "Birch Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.BIRCH_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/jungle.png"), "Jungle Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.JUNGLE_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/acacia.png"), "Acacia Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ACACIA_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/dark_oak.png"), "Dark Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.DARK_OAK_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/mangrove.png"), "Mangrove Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.MANGROVE_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/cherry.png"), "Cherry Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHERRY_BOAT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/bamboo.png"), "Bamboo Raft", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.BAMBOO_RAFT)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/boat/pale_oak.png"), "Pale Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PALE_OAK_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/oak.png"), "Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.OAK_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/spruce.png"), "Spruce Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SPRUCE_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/birch.png"), "Birch Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.BIRCH_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/jungle.png"), "Jungle Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.JUNGLE_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/acacia.png"), "Acacia Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ACACIA_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/dark_oak.png"), "Dark Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.DARK_OAK_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/mangrove.png"), "Mangrove Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.MANGROVE_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/cherry.png"), "Cherry Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHERRY_BOAT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/bamboo.png"), "Bamboo Raft", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.BAMBOO_RAFT)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/boat/pale_oak.png"), "Pale Oak Boat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PALE_OAK_BOAT)));
 
         // Minecart & Elytra
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/minecart.png"), "Minecart", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.MINECART)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/elytra.png"), "Elytra", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ELYTRA)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/minecart.png"), "Minecart", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.MINECART)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/elytra.png"), "Elytra", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ELYTRA)));
 
         // Sheep Wool
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_wool.png"), "Sheep Wool", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHEEP_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/sheep/sheep_wool_undercoat.png"), "Sheep Wool Undercoat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHEEP_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/sheep/sheep_wool.png"), "Sheep Wool", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHEEP_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/sheep/sheep_wool_undercoat.png"), "Sheep Wool Undercoat", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHEEP_SPAWN_EGG)));
 
         // Cow variants
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cow/temperate_cow.png"), "Cow (Temperate)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.COW_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cow/cold_cow.png"), "Cow (Cold)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.COW_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cow/warm_cow.png"), "Cow (Warm)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.COW_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cow/temperate_cow.png"), "Cow (Temperate)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.COW_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cow/cold_cow.png"), "Cow (Cold)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.COW_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cow/warm_cow.png"), "Cow (Warm)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.COW_SPAWN_EGG)));
 
         // Pig variants
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/pig/temperate_pig.png"), "Pig (Temperate)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PIG_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/pig/cold_pig.png"), "Pig (Cold)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PIG_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/pig/warm_pig.png"), "Pig (Warm)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PIG_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/pig/temperate_pig.png"), "Pig (Temperate)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PIG_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/pig/cold_pig.png"), "Pig (Cold)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PIG_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/pig/warm_pig.png"), "Pig (Warm)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.PIG_SPAWN_EGG)));
 
         // Chicken variants
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/chicken/temperate_chicken.png"), "Chicken (Temperate)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHICKEN_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/chicken/cold_chicken.png"), "Chicken (Cold)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHICKEN_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/chicken/warm_chicken.png"), "Chicken (Warm)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHICKEN_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/chicken/temperate_chicken.png"), "Chicken (Temperate)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHICKEN_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/chicken/cold_chicken.png"), "Chicken (Cold)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHICKEN_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/chicken/warm_chicken.png"), "Chicken (Warm)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CHICKEN_SPAWN_EGG)));
 
         // Wolf
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf.png"), "Wolf", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_angry.png"), "Wolf (Angry)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_tame.png"), "Wolf (Tame)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf.png"), "Wolf", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_angry.png"), "Wolf (Angry)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_tame.png"), "Wolf (Tame)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
 
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_pale.png"), "Wolf (Pale/Standard)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_ashen.png"), "Wolf (Ashen)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_black.png"), "Wolf (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_chestnut.png"), "Wolf (Chestnut)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_rusty.png"), "Wolf (Rusty)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_snowy.png"), "Wolf (Snowy)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_spotted.png"), "Wolf (Spotted)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_striped.png"), "Wolf (Striped)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/wolf/wolf_woods.png"), "Wolf (Woods)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_pale.png"), "Wolf (Pale/Standard)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_ashen.png"), "Wolf (Ashen)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_black.png"), "Wolf (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_chestnut.png"), "Wolf (Chestnut)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_rusty.png"), "Wolf (Rusty)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_snowy.png"), "Wolf (Snowy)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_spotted.png"), "Wolf (Spotted)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_striped.png"), "Wolf (Striped)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/wolf/wolf_woods.png"), "Wolf (Woods)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.WOLF_SPAWN_EGG)));
 
         // Cat variants
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/tabby.png"), "Cat (Tabby)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/black.png"), "Cat (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/british_shorthair.png"), "Cat (British Shorthair)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/calico.png"), "Cat (Calico)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/jellie.png"), "Cat (Jellie)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/ocelot.png"), "Cat (Ocelot)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.OCELOT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/persian.png"), "Cat (Persian)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/ragdoll.png"), "Cat (Ragdoll)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/red.png"), "Cat (Red)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/siamese.png"), "Cat (Siamese)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/white.png"), "Cat (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/all_black.png"), "Cat (All Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/tabby.png"), "Cat (Tabby)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/black.png"), "Cat (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/british_shorthair.png"), "Cat (British Shorthair)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/calico.png"), "Cat (Calico)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/jellie.png"), "Cat (Jellie)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/ocelot.png"), "Cat (Ocelot)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.OCELOT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/persian.png"), "Cat (Persian)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/ragdoll.png"), "Cat (Ragdoll)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/red.png"), "Cat (Red)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/siamese.png"), "Cat (Siamese)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/white.png"), "Cat (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/all_black.png"), "Cat (All Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
 
         // Horse variants
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_white.png"), "Horse (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_creamy.png"), "Horse (Creamy)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_chestnut.png"), "Horse (Chestnut)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_brown.png"), "Horse (Brown)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_black.png"), "Horse (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_gray.png"), "Horse (Gray)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_darkbrown.png"), "Horse (Dark Brown)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_white.png"), "Horse (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_creamy.png"), "Horse (Creamy)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_chestnut.png"), "Horse (Chestnut)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_brown.png"), "Horse (Brown)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_black.png"), "Horse (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_gray.png"), "Horse (Gray)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_darkbrown.png"), "Horse (Dark Brown)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
 
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_zombie.png"), "Zombie Horse", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_skeleton.png"), "Skeleton Horse", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SKELETON_HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/donkey.png"), "Donkey", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.DONKEY_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/mule.png"), "Mule", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.MULE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_zombie.png"), "Zombie Horse", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_skeleton.png"), "Skeleton Horse", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SKELETON_HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/donkey.png"), "Donkey", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.DONKEY_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/mule.png"), "Mule", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.MULE_SPAWN_EGG)));
 
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_white.png"), "Horse Markings (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_whitefield.png"), "Horse Markings (Whitefield)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_whitedots.png"), "Horse Markings (White Dots)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/horse/horse_markings_blackdots.png"), "Horse Markings (Black Dots)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_markings_white.png"), "Horse Markings (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_markings_whitefield.png"), "Horse Markings (Whitefield)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_markings_whitedots.png"), "Horse Markings (White Dots)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/horse/horse_markings_blackdots.png"), "Horse Markings (Black Dots)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.HORSE_SPAWN_EGG)));
 
         // Villager professions
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/villager.png"), "Villager", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/armorer.png"), "Villager (Armorer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/butcher.png"), "Villager (Butcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/cartographer.png"), "Villager (Cartographer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/cleric.png"), "Villager (Cleric)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/farmer.png"), "Villager (Farmer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/fisherman.png"), "Villager (Fisherman)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/fletcher.png"), "Villager (Fletcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/leatherworker.png"), "Villager (Leatherworker)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/librarian.png"), "Villager (Librarian)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/mason.png"), "Villager (Mason)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/nitwit.png"), "Villager (Nitwit)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/shepherd.png"), "Villager (Shepherd)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/toolsmith.png"), "Villager (Toolsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/profession/weaponsmith.png"), "Villager (Weaponsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/villager.png"), "Villager", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/armorer.png"), "Villager (Armorer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/butcher.png"), "Villager (Butcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/cartographer.png"), "Villager (Cartographer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/cleric.png"), "Villager (Cleric)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/farmer.png"), "Villager (Farmer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/fisherman.png"), "Villager (Fisherman)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/fletcher.png"), "Villager (Fletcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/leatherworker.png"), "Villager (Leatherworker)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/librarian.png"), "Villager (Librarian)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/mason.png"), "Villager (Mason)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/nitwit.png"), "Villager (Nitwit)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/shepherd.png"), "Villager (Shepherd)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/toolsmith.png"), "Villager (Toolsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/profession/weaponsmith.png"), "Villager (Weaponsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
 
         // Villager Biomes
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/type/desert.png"), "Villager (Desert)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/type/jungle.png"), "Villager (Jungle)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/type/plains.png"), "Villager (Plains)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/type/savanna.png"), "Villager (Savanna)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/type/snow.png"), "Villager (Snow)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/type/swamp.png"), "Villager (Swamp)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/villager/type/taiga.png"), "Villager (Taiga)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/type/desert.png"), "Villager (Desert)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/type/jungle.png"), "Villager (Jungle)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/type/plains.png"), "Villager (Plains)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/type/savanna.png"), "Villager (Savanna)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/type/snow.png"), "Villager (Snow)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/type/swamp.png"), "Villager (Swamp)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/villager/type/taiga.png"), "Villager (Taiga)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.VILLAGER_SPAWN_EGG)));
 
         // Zombie Villager
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/zombie_villager.png"), "Zombie Villager", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/armorer.png"), "Zombie Villager (Armorer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/butcher.png"), "Zombie Villager (Butcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/cartographer.png"), "Zombie Villager (Cartographer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/cleric.png"), "Zombie Villager (Cleric)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/farmer.png"), "Zombie Villager (Farmer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/fisherman.png"), "Zombie Villager (Fisherman)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/fletcher.png"), "Zombie Villager (Fletcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/leatherworker.png"), "Zombie Villager (Leatherworker)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/librarian.png"), "Zombie Villager (Librarian)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/mason.png"), "Zombie Villager (Mason)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/nitwit.png"), "Zombie Villager (Nitwit)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/shepherd.png"), "Zombie Villager (Shepherd)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/toolsmith.png"), "Zombie Villager (Toolsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie_villager/profession/weaponsmith.png"), "Zombie Villager (Weaponsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/zombie_villager.png"), "Zombie Villager", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/armorer.png"), "Zombie Villager (Armorer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/butcher.png"), "Zombie Villager (Butcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/cartographer.png"), "Zombie Villager (Cartographer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/cleric.png"), "Zombie Villager (Cleric)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/farmer.png"), "Zombie Villager (Farmer)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/fisherman.png"), "Zombie Villager (Fisherman)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/fletcher.png"), "Zombie Villager (Fletcher)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/leatherworker.png"), "Zombie Villager (Leatherworker)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/librarian.png"), "Zombie Villager (Librarian)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/mason.png"), "Zombie Villager (Mason)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/nitwit.png"), "Zombie Villager (Nitwit)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/shepherd.png"), "Zombie Villager (Shepherd)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/toolsmith.png"), "Zombie Villager (Toolsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie_villager/profession/weaponsmith.png"), "Zombie Villager (Weaponsmith)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.ZOMBIE_VILLAGER_SPAWN_EGG)));
 
         // Shulker colors
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker.png"), "Shulker", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_white.png"), "Shulker (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_orange.png"), "Shulker (Orange)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_magenta.png"), "Shulker (Magenta)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_light_blue.png"), "Shulker (Light Blue)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_yellow.png"), "Shulker (Yellow)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_lime.png"), "Shulker (Lime)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_pink.png"), "Shulker (Pink)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_gray.png"), "Shulker (Gray)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_light_gray.png"), "Shulker (Light Gray)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_cyan.png"), "Shulker (Cyan)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_purple.png"), "Shulker (Purple)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_blue.png"), "Shulker (Blue)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_brown.png"), "Shulker (Brown)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_green.png"), "Shulker (Green)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_red.png"), "Shulker (Red)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/shulker/shulker_black.png"), "Shulker (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker.png"), "Shulker", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_white.png"), "Shulker (White)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_orange.png"), "Shulker (Orange)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_magenta.png"), "Shulker (Magenta)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_light_blue.png"), "Shulker (Light Blue)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_yellow.png"), "Shulker (Yellow)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_lime.png"), "Shulker (Lime)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_pink.png"), "Shulker (Pink)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_gray.png"), "Shulker (Gray)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_light_gray.png"), "Shulker (Light Gray)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_cyan.png"), "Shulker (Cyan)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_purple.png"), "Shulker (Purple)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_blue.png"), "Shulker (Blue)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_brown.png"), "Shulker (Brown)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_green.png"), "Shulker (Green)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_red.png"), "Shulker (Red)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/shulker/shulker_black.png"), "Shulker (Black)", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.SHULKER_SPAWN_EGG)));
 
         // Special
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/cat/cat_collar.png"), "Cat Collar", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/cat/cat_collar.png"), "Cat Collar", EntryType.MOB, new ItemStack(net.minecraft.world.item.Items.CAT_SPAWN_EGG)));
 
         //Drowned
-        entries.add(new BrowseEntry(Identifier.of("minecraft", "textures/entity/zombie/drowned_outer_layer.png"), "Drowned Outer Layer", EntryType.MOB, new ItemStack(Items.DROWNED_SPAWN_EGG)));
+        entries.add(new BrowseEntry(new Identifier("minecraft", "textures/entity/zombie/drowned_outer_layer.png"), "Drowned Outer Layer", EntryType.MOB, new ItemStack(Items.DROWNED_SPAWN_EGG)));
 
 
         return entries;
@@ -913,7 +913,7 @@ public class BrowseScreen extends Screen {
     }
 
     private void addEntityArmorEntry(List<BrowseEntry> entries, String fileName) {
-        Identifier id = Identifier.of("minecraft", "textures/models/armor/" + fileName + ".png");
+        Identifier id = new Identifier("minecraft", "textures/models/armor/" + fileName + ".png");
         entries.add(new BrowseEntry(id, formatArmorDisplayName(fileName), EntryType.ENTITY, null));
     }
 
@@ -939,12 +939,12 @@ public class BrowseScreen extends Screen {
     }
 
     private void addGUIEntry(List<BrowseEntry> entries, String texturePath, String displayName) {
-        Identifier id = Identifier.of("minecraft", texturePath);
+        Identifier id = new Identifier("minecraft", texturePath);
         entries.add(new BrowseEntry(id, displayName, EntryType.GUI, null));
     }
 
     private String generateGuiName(String path) {
-        // gui/sprites/icon/ping_1 Ã¢â€ â€™ Icon Ping 1
+        // gui/sprites/icon/ping_1 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Icon Ping 1
 
         String withoutPrefix = path.replace("gui/sprites/", "");
 
@@ -967,12 +967,12 @@ public class BrowseScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
         // Custom background
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
 
         // Background
@@ -1007,7 +1007,7 @@ public class BrowseScreen extends Screen {
         renderGrid(context, mouseX, mouseY);
     }
 
-    private void renderGrid(GuiGraphics context, int mouseX, int mouseY) {
+    private void renderGrid(DrawContext context, int mouseX, int mouseY) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         int startIdx = scrollOffset * columns;
         int gridX = GRID_SIDE_MARGIN;
@@ -1090,7 +1090,7 @@ public class BrowseScreen extends Screen {
                 }
             }
         }
-        // Draw tooltip Ã¢â‚¬â€ use createNewRootLayer to render above item icons
+        // Draw tooltip ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â use createNewRootLayer to render above item icons
         if (tooltipParts != null && !tooltipParts.isEmpty()) {
             context.createNewRootLayer();
             int tw = 8; // padding
@@ -1138,10 +1138,10 @@ public class BrowseScreen extends Screen {
                 }
             }
         } else if (entry.type == EntryType.ITEM && entry.stack != null) {
-            // Don't call ItemTextureExtractor.extract() here Ã¢â‚¬â€ it's expensive and called every frame.
+            // Don't call ItemTextureExtractor.extract() here ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â it's expensive and called every frame.
             // Instead check common texture path patterns for item textures.
             Identifier itemId = BuiltInRegistries.ITEM.getId(entry.stack.getItem());
-            Identifier texId = Identifier.of(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
+            Identifier texId = new Identifier(itemId.getNamespace(), "textures/item/" + itemId.getPath() + ".png");
             if (TextureManager.getInstance().getPixels(texId) != null) return true;
 
         } else if (entry.type == EntryType.MOB) {
@@ -1151,7 +1151,7 @@ public class BrowseScreen extends Screen {
                 try {
                     if (entry.stack.getItem() instanceof net.minecraft.world.item.SpawnEggItem) {
                         // Shared spawn egg sprite (tinted)
-                        Identifier spawnTex = Identifier.of("minecraft", "textures/item/spawn_egg.png");
+                        Identifier spawnTex = new Identifier("minecraft", "textures/item/spawn_egg.png");
                         if (TextureManager.getInstance().getPixels(spawnTex) != null) return true;
 
                         // Also try common entity texture candidates derived from the spawn egg item id
@@ -1159,9 +1159,9 @@ public class BrowseScreen extends Screen {
                         String path = itemId2.getPath();
                         if (path.endsWith("_spawn_egg")) {
                             String entityName = path.substring(0, path.length() - "_spawn_egg".length());
-                            Identifier ent1 = Identifier.of(itemId2.getNamespace(), "textures/entity/" + entityName + ".png");
+                            Identifier ent1 = new Identifier(itemId2.getNamespace(), "textures/entity/" + entityName + ".png");
                             if (TextureManager.getInstance().getPixels(ent1) != null) return true;
-                            Identifier ent2 = Identifier.of(itemId2.getNamespace(), "textures/entity/" + entityName + "/" + entityName + ".png");
+                            Identifier ent2 = new Identifier(itemId2.getNamespace(), "textures/entity/" + entityName + "/" + entityName + ".png");
                             if (TextureManager.getInstance().getPixels(ent2) != null) return true;
                         }
                     }
@@ -1238,13 +1238,13 @@ public class BrowseScreen extends Screen {
 
     private void addEquipmentCandidate(java.util.List<Identifier> candidates, Identifier baseId, String folderPath, String rawMaterial, String suffix) {
         String normalized = normalizeArmorMaterial(rawMaterial);
-        candidates.add(Identifier.of(baseId.getNamespace(), folderPath + rawMaterial + suffix + ".png"));
+        candidates.add(new Identifier(baseId.getNamespace(), folderPath + rawMaterial + suffix + ".png"));
         if (!normalized.equals(rawMaterial)) {
-            candidates.add(Identifier.of(baseId.getNamespace(), folderPath + normalized + suffix + ".png"));
+            candidates.add(new Identifier(baseId.getNamespace(), folderPath + normalized + suffix + ".png"));
         }
     }
 
-    private void drawRectOutline(GuiGraphics ctx, int x1, int y1, int x2, int y2, int c) {
+    private void drawRectOutline(DrawContext ctx, int x1, int y1, int x2, int y2, int c) {
         ctx.fill(x1, y1, x2, y1 + 1, c);
         ctx.fill(x1, y2 - 1, x2, y2, c);
         ctx.fill(x1, y1, x1 + 1, y2, c);
@@ -1332,7 +1332,7 @@ public class BrowseScreen extends Screen {
 
     private Identifier findBestResource(Identifier requestId) {
         Minecraft client = Minecraft.getInstance();
-        Identifier full = requestId.getPath().startsWith("textures/") ? requestId : Identifier.of(requestId.getNamespace(), "textures/" + requestId.getPath() + ".png");
+        Identifier full = requestId.getPath().startsWith("textures/") ? requestId : new Identifier(requestId.getNamespace(), "textures/" + requestId.getPath() + ".png");
         try {
             var opt = client.getResourceManager().getResource(full);
             if (opt.isPresent()) return full;
@@ -1352,11 +1352,11 @@ public class BrowseScreen extends Screen {
             if (full.getPath().startsWith("textures/entity/") && full.getPath().endsWith(".png")) {
                 String filename = full.getPath().replace("textures/entity/", "").replace(".png", "");
                 if (!filename.contains("/")) {
-                    Identifier a1 = Identifier.of(full.getNamespace(), "textures/entity/" + filename + "/" + filename + ".png");
+                    Identifier a1 = new Identifier(full.getNamespace(), "textures/entity/" + filename + "/" + filename + ".png");
                     if (client.getResourceManager().getResource(a1).isPresent()) return a1;
-                    Identifier a2 = Identifier.of(full.getNamespace(), "textures/entity/equipment/wings/" + filename + ".png");
+                    Identifier a2 = new Identifier(full.getNamespace(), "textures/entity/equipment/wings/" + filename + ".png");
                     if (client.getResourceManager().getResource(a2).isPresent()) return a2;
-                    Identifier a3 = Identifier.of(full.getNamespace(), "textures/entity/equipment/" + filename + ".png");
+                    Identifier a3 = new Identifier(full.getNamespace(), "textures/entity/equipment/" + filename + ".png");
                     if (client.getResourceManager().getResource(a3).isPresent()) return a3;
                 }
             }
@@ -1411,7 +1411,7 @@ public class BrowseScreen extends Screen {
     private Identifier registerOrUpdatePreviewTexture(Identifier sourceId, NativeImage img) {
         try {
             String safe = sourceId.toString().replaceAll("[^a-zA-Z0-9._-]", "_");
-            Identifier dyn = Identifier.of("textureeditor", "preview/" + safe);
+            Identifier dyn = new Identifier("textureeditor", "preview/" + safe);
             DynamicTexture tex = new DynamicTexture(() -> "textureeditor_preview", img);
             Minecraft.getInstance().getTextureManager().registerTexture(dyn, tex);
             try { tex.upload(); } catch (Exception ignored) {}
@@ -1443,7 +1443,7 @@ public class BrowseScreen extends Screen {
             } catch (Exception ignored) {}
         }
         if (c != null) {
-            // nothing else to free Ã¢â‚¬â€ NativeImage owned by texture manager
+            // nothing else to free ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â NativeImage owned by texture manager
         }
     }
 
@@ -1582,7 +1582,7 @@ public class BrowseScreen extends Screen {
             for (Direction dir : Direction.values()) {
                 TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(block.getDefaultState(), dir);
                 if (tex != null && TextureManager.getInstance().getPixels(tex.textureId()) != null) {
-                    Identifier spriteId = Identifier.of(tex.textureId().getNamespace(),
+                    Identifier spriteId = new Identifier(tex.textureId().getNamespace(),
                             tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
                     com.zeeesea.textureeditor.editor.ExternalEditorManager.resetTextureStatic(
                             tex.textureId(), spriteId, tex.pixels(), tex.width(), tex.height());
@@ -1610,13 +1610,13 @@ public class BrowseScreen extends Screen {
     private Identifier asFullTextureId(Identifier id) {
         return id.getPath().startsWith("textures/")
                 ? id
-                : Identifier.of(id.getNamespace(), "textures/" + id.getPath() + ".png");
+                : new Identifier(id.getNamespace(), "textures/" + id.getPath() + ".png");
     }
 
     private GuiTextureEditorScreen createGuiEditorWithTint(BrowseEntry entry) {
         GuiTextureEditorScreen screen = new GuiTextureEditorScreen(entry.id, entry.name, this);
 
-        // Tint fÃƒÂ¼r bekannte tinted Block-Texturen setzen
+        // Tint fÃƒÆ’Ã‚Â¼r bekannte tinted Block-Texturen setzen
         if (entry.id.getPath().contains("grass_block_side_overlay") ||
                 entry.id.getPath().contains("grass_block_top")) {
             if (client.world != null && client.player != null) {
@@ -1644,7 +1644,7 @@ public class BrowseScreen extends Screen {
             }
         }
         if (tex != null) {
-            Identifier spriteId = Identifier.of(tex.textureId().getNamespace(),
+            Identifier spriteId = new Identifier(tex.textureId().getNamespace(),
                     tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
             int[][] origCopy = copyPixels(tex.pixels(), tex.width(), tex.height());
             com.zeeesea.textureeditor.editor.ExternalEditorManager.getInstance().startAtlasSession(
@@ -1682,7 +1682,7 @@ public class BrowseScreen extends Screen {
                 || textureId.getPath().startsWith("gui/");
 
         Identifier fullId = textureId.getPath().startsWith("textures/") ? textureId :
-                Identifier.of(textureId.getNamespace(), "textures/" + textureId.getPath() + ".png");
+                new Identifier(textureId.getNamespace(), "textures/" + textureId.getPath() + ".png");
         try {
             var optResource = client.getResourceManager().getResource(fullId);
             if (optResource.isPresent()) {
@@ -1770,4 +1770,5 @@ public class BrowseScreen extends Screen {
         }
     }
 }
+
 

@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.texture;
+ackage com.zeeesea.textureeditor.texture;
 
 import net.minecraft.resources.Identifier;
 

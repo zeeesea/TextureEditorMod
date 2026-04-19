@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.EntityTextureSyncPayload;
 import com.zeeesea.textureeditor.TextureSyncPayload;
@@ -7,10 +7,10 @@ import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
@@ -41,7 +41,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
 
         SkyTexture(String key, String[] p, String sid, int dw, int dh) { this.key = key; paths = p; spriteId = sid; defaultWidth = dw; defaultHeight = dh; }
 
-        Identifier getTextureId() { return Identifier.of("minecraft", "textures/" + paths[0] + ".png"); }
+        Identifier getTextureId() { return new Identifier("minecraft", "textures/" + paths[0] + ".png"); }
 
         /** Get the sprite Identifier for celestials atlas lookup (null for standalone textures) */
         Identifier getSpriteId() { return spriteId != null ? Identifier.ofVanilla(spriteId) : null; }
@@ -50,7 +50,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
         java.util.List<Identifier> getCandidateIds() {
             java.util.List<Identifier> ids = new java.util.ArrayList<>();
             for (String p : paths) {
-                ids.add(Identifier.of("minecraft", "textures/" + p + ".png"));
+                ids.add(new Identifier("minecraft", "textures/" + p + ".png"));
             }
             return ids;
         }
@@ -173,7 +173,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
+    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
         // Active texture indicator
         int skyBtnX = this.width / 2 - 120;
         context.fill(skyBtnX + 64, 25, skyBtnX + 174, 27, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.HEADER_UNDERLINE);
@@ -196,7 +196,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
 
         Identifier spriteId = currentSkyTexture.getSpriteId();
         if (spriteId != null) {
-            // Sun/moon: sprite in celestials atlas Ã¢â‚¬â€ use the atlas blit approach
+            // Sun/moon: sprite in celestials atlas ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â use the atlas blit approach
             client.execute(() -> {
                 try {
                     // Find the sprite in the celestials atlas
@@ -219,7 +219,7 @@ public class SkyEditorScreen extends AbstractEditorScreen {
                 }
             });
         } else {
-            // End sky: standalone texture Ã¢â‚¬â€ replace via DynamicTexture
+            // End sky: standalone texture ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â replace via DynamicTexture
             client.execute(() -> {
                 NativeImage img = new NativeImage(canvas.getWidth(), canvas.getHeight(), false);
                 for (int x = 0; x < canvas.getWidth(); x++)
@@ -274,4 +274,5 @@ public class SkyEditorScreen extends AbstractEditorScreen {
         applyLive();
     }
 }
+
 

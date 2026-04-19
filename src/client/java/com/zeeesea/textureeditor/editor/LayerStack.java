@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.editor;
+ackage com.zeeesea.textureeditor.editor;
 
 import net.minecraft.network.chat.Component;
 

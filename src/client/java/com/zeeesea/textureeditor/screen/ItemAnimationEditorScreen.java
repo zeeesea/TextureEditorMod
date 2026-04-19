@@ -1,11 +1,11 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.texture.ItemTextureExtractor;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.world.item.ItemStack;
@@ -182,7 +182,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
+    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
         if (canvas == null) return;
         saveCurrentFrame();
         computeControlsLayout();
@@ -448,13 +448,13 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         clampFrameStripOffset();
     }
 
-    private void drawButton(GuiGraphics context, int x, int y, String label) {
+    private void drawButton(DrawContext context, int x, int y, String label) {
         context.fill(x, y, x + BTN_W, y + BTN_H, 0xFF2B2B2B);
         drawRectOutline(context, x, y, x + BTN_W, y + BTN_H, 0xFF888888);
         context.drawCenteredTextWithShadow(textRenderer, Component.literal(label), x + BTN_W / 2, y + 4, 0xFFFFFFFF);
     }
 
-    private void drawReverseTooltip(GuiGraphics context, int mouseX, int mouseY) {
+    private void drawReverseTooltip(DrawContext context, int mouseX, int mouseY) {
         var pal = com.zeeesea.textureeditor.util.ColorPalette.INSTANCE;
         String mode = pingPong ? "Reverse: ON (Ping-Pong)" : "Reverse: OFF (Loop)";
         int tw = textRenderer.getWidth(mode) + 8;
@@ -465,7 +465,7 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         context.drawText(textRenderer, mode, tx + 4, ty + 2, pal.TEXT_NORMAL, false);
     }
 
-    private void drawFrameThumb(GuiGraphics context, int[][] frame, int x, int y) {
+    private void drawFrameThumb(DrawContext context, int[][] frame, int x, int y) {
         if (frame == null || frame.length == 0 || frame[0].length == 0) return;
         int fw = frame.length;
         int fh = frame[0].length;
@@ -520,5 +520,6 @@ public class ItemAnimationEditorScreen extends AbstractEditorScreen {
         return out;
     }
 }
+
 
 

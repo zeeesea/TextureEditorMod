@@ -1,13 +1,13 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.EntityTextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -56,7 +56,7 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     }
 
     private Identifier stageId(int stage) {
-        return Identifier.of("minecraft", "textures/block/destroy_stage_" + stage + ".png");
+        return new Identifier("minecraft", "textures/block/destroy_stage_" + stage + ".png");
     }
 
     @Override
@@ -129,7 +129,7 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
+    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
         int btnX = this.width / 2 - 120;
         context.fill(btnX + 64, 25, btnX + 174, 27, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.HEADER_UNDERLINE);
     }
@@ -188,5 +188,6 @@ public class BreakingEditorScreen extends AbstractEditorScreen {
         applyLive();
     }
 }
+
 
 

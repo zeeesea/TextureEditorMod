@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.EntityTextureSyncPayload;
 import com.zeeesea.textureeditor.TextureSyncPayload;
@@ -9,7 +9,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.network.chat.Component;
@@ -58,12 +58,12 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         if (guiTextureId.getPath().startsWith("textures/")) {
             fullTextureId = guiTextureId;
         } else {
-            fullTextureId = Identifier.of(guiTextureId.getNamespace(), "textures/" + guiTextureId.getPath() + ".png");
+            fullTextureId = new Identifier(guiTextureId.getNamespace(), "textures/" + guiTextureId.getPath() + ".png");
         }
 
         isSpriteTexture = guiTextureId.getPath().startsWith("gui/sprites/");
         if (isSpriteTexture) {
-            spriteAtlasId = Identifier.of(guiTextureId.getNamespace(),
+            spriteAtlasId = new Identifier(guiTextureId.getNamespace(),
                     guiTextureId.getPath().replace("gui/sprites/", ""));
         }
 
@@ -77,7 +77,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         String[] alts = ALTERNATIVE_PATHS.get(fullTextureId.getPath());
         if (alts != null) {
             for (String alt : alts) {
-                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), alt));
+                candidateSet.add(new Identifier(fullTextureId.getNamespace(), alt));
             }
         }
         addArmorAliasCandidates(candidateSet, fullTextureId);
@@ -87,10 +87,10 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
             String filename = fullTextureId.getPath().replace("textures/entity/", "").replace(".png", "");
             // Try textures/entity/<name>/<name>.png
             if (!filename.contains("/")) {
-                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/" + filename + "/" + filename + ".png"));
+                candidateSet.add(new Identifier(fullTextureId.getNamespace(), "textures/entity/" + filename + "/" + filename + ".png"));
                 // Try textures/entity/equipment/wings/<name>.png (1.21.4 pattern)
-                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/equipment/wings/" + filename + ".png"));
-                candidateSet.add(Identifier.of(fullTextureId.getNamespace(), "textures/entity/equipment/" + filename + ".png"));
+                candidateSet.add(new Identifier(fullTextureId.getNamespace(), "textures/entity/equipment/wings/" + filename + ".png"));
+                candidateSet.add(new Identifier(fullTextureId.getNamespace(), "textures/entity/equipment/" + filename + ".png"));
             }
         }
 
@@ -167,9 +167,9 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
 
     private void addEquipmentCandidate(Set<Identifier> candidates, Identifier baseId, String folderPath, String rawMaterial, String suffix) {
         String normalizedMaterial = normalizeArmorMaterial(rawMaterial);
-        candidates.add(Identifier.of(baseId.getNamespace(), folderPath + rawMaterial + suffix + ".png"));
+        candidates.add(new Identifier(baseId.getNamespace(), folderPath + rawMaterial + suffix + ".png"));
         if (!normalizedMaterial.equals(rawMaterial)) {
-            candidates.add(Identifier.of(baseId.getNamespace(), folderPath + normalizedMaterial + suffix + ".png"));
+            candidates.add(new Identifier(baseId.getNamespace(), folderPath + normalizedMaterial + suffix + ".png"));
         }
     }
 
@@ -315,7 +315,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
                 // Try without gui/sprites/ prefix (HUD sprites use short IDs like hud/hotbar)
                 if (id.getPath().startsWith("gui/sprites/")) {
                     String shortPath = id.getPath().substring("gui/sprites/".length());
-                    Identifier shortId = Identifier.of(id.getNamespace(), shortPath);
+                    Identifier shortId = new Identifier(id.getNamespace(), shortPath);
                     sprite = guiAtlas.getSprite(shortId);
                     if (sprite != null && !sprite.getContents().getId().getPath().equals("missingno")) {
                         return org.apache.commons.lang3.tuple.Pair.of(guiAtlas, sprite);
@@ -327,7 +327,7 @@ public class GuiTextureEditorScreen extends AbstractEditorScreen {
         if (id.getPath().startsWith("textures/") && id.getPath().endsWith(".png")) {
             String spritePath = id.getPath()
                     .substring("textures/".length(), id.getPath().length() - ".png".length());
-            Identifier spriteId = Identifier.of(id.getNamespace(), spritePath);
+            Identifier spriteId = new Identifier(id.getNamespace(), spritePath);
             try {
                 var blockAtlas = (net.minecraft.client.renderer.texture.TextureAtlas)
                         client.getTextureManager().getTexture(

@@ -1,7 +1,7 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -40,7 +40,7 @@ public class MobPreviewWidget {
         this.height = height;
     }
 
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(DrawContext context, int mouseX, int mouseY) {
         if (!visible || entity == null) return;
 
         // Panel background
@@ -139,4 +139,5 @@ public class MobPreviewWidget {
         return false;
     }
 }
+
 

@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.texture;
+ackage com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteAccessor;
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
@@ -10,7 +10,7 @@ import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gl.GpuSampler;
 import net.minecraft.client.renderer.RenderPipelines;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.SpriteContents;
@@ -130,21 +130,21 @@ public class TextureManager {
         if (path.startsWith("textures/entity/equipment/humanoid/")) {
             String name = path.substring("textures/entity/equipment/humanoid/".length());
             if (name.endsWith(".png")) name = name.substring(0, name.length() - 4);
-            Identifier modelId = Identifier.of(ns, "textures/models/armor/" + name + "_layer_1.png");
+            Identifier modelId = new Identifier(ns, "textures/models/armor/" + name + "_layer_1.png");
             modifiedTextures.putIfAbsent(modelId, pixels);
             textureDimensions.putIfAbsent(modelId, new int[]{width, height});
         }
         if (path.startsWith("textures/entity/equipment/humanoid_leggings/")) {
             String name = path.substring("textures/entity/equipment/humanoid_leggings/".length());
             if (name.endsWith(".png")) name = name.substring(0, name.length() - 4);
-            Identifier modelId = Identifier.of(ns, "textures/models/armor/" + name + "_layer_2.png");
+            Identifier modelId = new Identifier(ns, "textures/models/armor/" + name + "_layer_2.png");
             modifiedTextures.putIfAbsent(modelId, pixels);
             textureDimensions.putIfAbsent(modelId, new int[]{width, height});
         }
         if (path.startsWith("textures/entity/equipment/piglin_head/")) {
             String name = path.substring("textures/entity/equipment/piglin_head/".length());
             if (name.endsWith(".png")) name = name.substring(0, name.length() - 4);
-            Identifier modelId = Identifier.of(ns, "textures/models/armor/" + name + "_piglin_helmet.png");
+            Identifier modelId = new Identifier(ns, "textures/models/armor/" + name + "_piglin_helmet.png");
             modifiedTextures.putIfAbsent(modelId, pixels);
             textureDimensions.putIfAbsent(modelId, new int[]{width, height});
         }
@@ -159,18 +159,18 @@ public class TextureManager {
 
             if (raw.endsWith("_layer_1")) {
                 String material = raw.substring(0, raw.length() - "_layer_1".length());
-                Identifier eq = Identifier.of(ns, "textures/entity/equipment/humanoid/" + material + suffix + ".png");
+                Identifier eq = new Identifier(ns, "textures/entity/equipment/humanoid/" + material + suffix + ".png");
                 modifiedTextures.putIfAbsent(eq, pixels);
                 textureDimensions.putIfAbsent(eq, new int[]{width, height});
             } else if (raw.endsWith("_layer_2")) {
                 String material = raw.substring(0, raw.length() - "_layer_2".length());
-                Identifier eq = Identifier.of(ns, "textures/entity/equipment/humanoid_leggings/" + material + suffix + ".png");
+                Identifier eq = new Identifier(ns, "textures/entity/equipment/humanoid_leggings/" + material + suffix + ".png");
                 modifiedTextures.putIfAbsent(eq, pixels);
                 textureDimensions.putIfAbsent(eq, new int[]{width, height});
             } else if (raw.contains("_piglin_helmet")) {
                 String material = raw.replace("_piglin_helmet", "");
-                Identifier eq1 = Identifier.of(ns, "textures/entity/equipment/piglin_head/" + material + suffix + ".png");
-                Identifier eq2 = Identifier.of(ns, "textures/entity/equipment/humanoid/" + material + suffix + ".png");
+                Identifier eq1 = new Identifier(ns, "textures/entity/equipment/piglin_head/" + material + suffix + ".png");
+                Identifier eq2 = new Identifier(ns, "textures/entity/equipment/humanoid/" + material + suffix + ".png");
                 modifiedTextures.putIfAbsent(eq1, pixels);
                 textureDimensions.putIfAbsent(eq1, new int[]{width, height});
                 modifiedTextures.putIfAbsent(eq2, pixels);
@@ -337,7 +337,7 @@ public class TextureManager {
             if (path.startsWith("textures/") && path.endsWith(".png")) {
                 path = path.substring("textures/".length(), path.length() - ".png".length());
             }
-            Identifier spriteId = Identifier.of(textureId.getNamespace(), path);
+            Identifier spriteId = new Identifier(textureId.getNamespace(), path);
 
             int[][] pixels;
             if (previewing) {
@@ -561,7 +561,7 @@ public class TextureManager {
     }
 
     public void applyLive(Identifier spriteId, int[][] pixels, int width, int height, int[][] origPixels, boolean rebakeModel) {
-        Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
+        Identifier textureId = new Identifier(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
 
         if (origPixels != null) {
             storeOriginal(textureId, origPixels, width, height);
@@ -583,7 +583,7 @@ public class TextureManager {
     }
 
     public void applyLive(Identifier spriteId, int[] flatPixels, int[] flatOriginals, int width, int height) {
-        Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
+        Identifier textureId = new Identifier(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
 
         int[][] origPixels = null;
         if (flatOriginals != null) {

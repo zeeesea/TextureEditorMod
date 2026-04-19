@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;
@@ -126,7 +126,7 @@ public class ItemEditorScreen extends AbstractEditorScreen {
         // "Edit Wing Texture" button for elytra -> opens the entity/elytra.png texture
         if (itemStack.getItem() == Items.ELYTRA) {
             addDrawableChild(Button.builder(Component.translatable("textureeditor.button.edit_wing_tex"), btn -> {
-                Identifier elytraTexId = Identifier.of("minecraft", "textures/entity/elytra.png");
+                Identifier elytraTexId = new Identifier("minecraft", "textures/entity/elytra.png");
                 Minecraft.getInstance().setScreen(new GuiTextureEditorScreen(elytraTexId, Component.translatable("textureeditor.elytra.wings").getString(), parent != null ? parent : this));
             }).position(px, y).size(w, bh).build());
             y += bh + 4;

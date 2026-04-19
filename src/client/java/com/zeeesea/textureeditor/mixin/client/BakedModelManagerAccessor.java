@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.mixin.client;
+ackage com.zeeesea.textureeditor.mixin.client;
 
 public interface BakedModelManagerAccessor {
 }

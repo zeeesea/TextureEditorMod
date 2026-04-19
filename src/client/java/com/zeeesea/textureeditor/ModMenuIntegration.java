@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor;
+ackage com.zeeesea.textureeditor;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;

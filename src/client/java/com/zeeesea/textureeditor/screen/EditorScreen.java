@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.LayerStack;
@@ -69,7 +69,7 @@ public class EditorScreen extends AbstractEditorScreen {
         TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, face);
         if (tex != null) {
             textureId = tex.textureId();
-            spriteId = Identifier.of(tex.textureId().getNamespace(),
+            spriteId = new Identifier(tex.textureId().getNamespace(),
                     tex.textureId().getPath().replace("textures/", "").replace(".png", ""));
 
             // Use stored originals if available (atlas may already be modified)
@@ -238,7 +238,7 @@ public class EditorScreen extends AbstractEditorScreen {
             TextureExtractor.BlockFaceTexture tex = TextureExtractor.extract(blockState, dir);
             if (tex == null) continue;
             Identifier tid = tex.textureId();
-            Identifier sid = Identifier.of(tid.getNamespace(),
+            Identifier sid = new Identifier(tid.getNamespace(),
                     tid.getPath().replace("textures/", "").replace(".png", ""));
             // Use stored originals (the true unmodified pixels)
             int[][] origPx = TextureManager.getInstance().getOriginalPixels(tid);

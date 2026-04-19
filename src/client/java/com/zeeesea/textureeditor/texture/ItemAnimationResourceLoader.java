@@ -1,11 +1,11 @@
-package com.zeeesea.textureeditor.texture;
+ackage com.zeeesea.textureeditor.texture;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.client.Minecraft;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.resources.Identifier;
 
 import java.io.InputStream;
@@ -27,7 +27,7 @@ public final class ItemAnimationResourceLoader {
         Minecraft client = Minecraft.getInstance();
         if (client == null || client.getResourceManager() == null) return null;
 
-        Identifier mcmetaId = Identifier.of(textureId.getNamespace(), textureId.getPath() + ".mcmeta");
+        Identifier mcmetaId = new Identifier(textureId.getNamespace(), textureId.getPath() + ".mcmeta");
         JsonObject animation = readAnimationObject(client, mcmetaId);
         if (animation == null) return null;
 

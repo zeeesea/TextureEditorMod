@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.ExternalEditorDetector;
 import com.zeeesea.textureeditor.editor.ExternalEditorManager;
@@ -6,7 +6,7 @@ import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -151,7 +151,7 @@ public class ExternalEditorSettingsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
         context.drawCenteredTextWithShadow(textRenderer, "\u00a7l\u00a76External Editor Settings", this.width / 2, 10, 0xFFFFFF);
 
@@ -235,7 +235,7 @@ public class ExternalEditorSettingsScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics ctx, int mx, int my, float d) {}
+    public void renderBackground(DrawContext ctx, int mx, int my, float d) {}
 
     @Override
     public void close() {
@@ -352,4 +352,5 @@ public class ExternalEditorSettingsScreen extends Screen {
     @Override
     public boolean shouldPause() { return false; }
 }
+
 

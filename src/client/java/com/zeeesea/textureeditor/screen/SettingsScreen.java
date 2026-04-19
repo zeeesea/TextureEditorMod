@@ -1,8 +1,8 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
 import com.zeeesea.textureeditor.editor.ColorHistory;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
@@ -189,7 +189,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, this.width, this.height, com.zeeesea.textureeditor.util.ColorPalette.INSTANCE.BROWSE_BACKGROUND);
 
         // Draw centered title with custom shadow color when the text is very light (white)
@@ -236,7 +236,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics ctx, int mx, int my, float d) {
+    public void renderBackground(DrawContext ctx, int mx, int my, float d) {
 
     }
 
@@ -357,4 +357,5 @@ public class SettingsScreen extends Screen {
     @Override
     public boolean shouldPause() { return false; }
 }
+
 

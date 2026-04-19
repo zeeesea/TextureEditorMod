@@ -1,11 +1,11 @@
-package com.zeeesea.textureeditor.texture;
+ackage com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.world.level.block.BlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.resources.Identifier;
@@ -78,7 +78,7 @@ public class TextureExtractor {
         }
 
         Identifier spriteId = contents.getId();
-        Identifier textureId = Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
+        Identifier textureId = new Identifier(spriteId.getNamespace(), "textures/" + spriteId.getPath() + ".png");
 
         return new BlockFaceTexture(textureId, pixels, w, h);
     }

@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor;
+ackage com.zeeesea.textureeditor;
 
 import net.fabricmc.fabric.api.datagen.v1.DataGeneratorEntrypoint;
 import net.fabricmc.fabric.api.datagen.v1.FabricDataGenerator;

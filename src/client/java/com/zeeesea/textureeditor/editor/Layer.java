@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.editor;
+ackage com.zeeesea.textureeditor.editor;
 
 import com.zeeesea.textureeditor.settings.ModSettings;
 

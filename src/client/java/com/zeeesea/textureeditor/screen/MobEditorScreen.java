@@ -1,4 +1,4 @@
-package com.zeeesea.textureeditor.screen;
+ackage com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.EntityTextureSyncPayload;
 import com.zeeesea.textureeditor.TextureSyncPayload;
@@ -10,7 +10,7 @@ import com.zeeesea.textureeditor.texture.TextureManager;
 import com.zeeesea.textureeditor.util.EntityMapper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.world.entity.Entity;
@@ -115,17 +115,17 @@ public class MobEditorScreen extends AbstractEditorScreen {
     }
 
     @Override
-    protected void renderExtra(GuiGraphics context, int mouseX, int mouseY) {
+    protected void renderExtra(DrawContext context, int mouseX, int mouseY) {
         if (mobPreview != null) {
             // Compute dynamic position: if the left panel is collapsed, move preview to the left side;
             // otherwise keep it near the right area so it doesn't overlap the panels.
             int pw = 140, ph = 160;
             int px;
             if (!leftOpen) {
-                // left panel is collapsed Ã¢â‚¬â€ place preview near left edge (after the toggle)
+                // left panel is collapsed ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â place preview near left edge (after the toggle)
                 px = 18; // small offset to avoid the toggle button at x=0
             } else {
-                // left panel open Ã¢â‚¬â€ place preview on the right side, avoiding the right sidebar
+                // left panel open ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â place preview on the right side, avoiding the right sidebar
                 px = this.width - getRightSidebarWidth() - pw - 12;
             }
             // Clamp to screen
@@ -265,4 +265,5 @@ public class MobEditorScreen extends AbstractEditorScreen {
         applyLive();
     }
 }
+
 
