@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.texture;
+package com.zeeesea.textureeditor.texture;
 
 import com.zeeesea.textureeditor.mixin.client.SpriteContentsAccessor;
 import net.minecraft.client.Minecraft;

@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.util;
+package com.zeeesea.textureeditor.util;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;

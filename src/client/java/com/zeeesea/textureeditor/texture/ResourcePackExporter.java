@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.texture;
+package com.zeeesea.textureeditor.texture;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;

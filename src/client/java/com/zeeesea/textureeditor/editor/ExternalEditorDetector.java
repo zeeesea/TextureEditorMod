@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.editor;
+package com.zeeesea.textureeditor.editor;
 
 import java.io.BufferedReader;
 import java.io.File;

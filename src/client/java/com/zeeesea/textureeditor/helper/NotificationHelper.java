@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.helper;
+package com.zeeesea.textureeditor.helper;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.SystemToast;

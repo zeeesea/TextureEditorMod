@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor;
+package com.zeeesea.textureeditor;
 
 import com.zeeesea.textureeditor.screen.BrowseScreen;
 import com.zeeesea.textureeditor.screen.EditorScreen;

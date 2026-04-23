@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.screen;
+package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.editor.LayerStack;
 import com.zeeesea.textureeditor.editor.PixelCanvas;

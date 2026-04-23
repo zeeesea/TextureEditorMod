@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.editor;
+package com.zeeesea.textureeditor.editor;
 
 import com.zeeesea.textureeditor.helper.NotificationHelper;
 import com.zeeesea.textureeditor.settings.ModSettings;

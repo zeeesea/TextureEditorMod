@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.mixin.client;
+package com.zeeesea.textureeditor.mixin.client;
 
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.spongepowered.asm.mixin.Mixin;

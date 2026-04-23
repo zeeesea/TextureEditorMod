@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.screen;
+package com.zeeesea.textureeditor.screen;
 
 import com.zeeesea.textureeditor.TextureSyncPayload;
 import com.zeeesea.textureeditor.editor.PixelCanvas;

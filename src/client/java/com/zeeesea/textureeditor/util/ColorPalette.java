@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.util;
+package com.zeeesea.textureeditor.util;
 
 /**
  * Centralized color palette for the texture editor UI.

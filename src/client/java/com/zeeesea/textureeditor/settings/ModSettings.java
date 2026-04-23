@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.settings;
+package com.zeeesea.textureeditor.settings;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

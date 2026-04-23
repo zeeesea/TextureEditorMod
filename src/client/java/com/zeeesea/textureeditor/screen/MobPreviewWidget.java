@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.screen;
+package com.zeeesea.textureeditor.screen;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;

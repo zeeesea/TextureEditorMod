@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.util;
+package com.zeeesea.textureeditor.util;
 
 import net.minecraft.world.level.block.*;
 import net.minecraft.core.registries.BuiltInRegistries;

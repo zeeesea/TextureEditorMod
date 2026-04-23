@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.texture;
+package com.zeeesea.textureeditor.texture;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.texture.NativeImage;

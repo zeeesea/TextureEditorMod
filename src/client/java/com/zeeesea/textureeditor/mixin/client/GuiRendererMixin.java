@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.mixin.client;
+package com.zeeesea.textureeditor.mixin.client;
 
 import com.zeeesea.textureeditor.texture.TextureManager;
 import net.minecraft.client.gui.render.GuiRenderer;

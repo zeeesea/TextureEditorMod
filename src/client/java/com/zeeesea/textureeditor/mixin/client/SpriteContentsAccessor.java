@@ -1,4 +1,4 @@
-ackage com.zeeesea.textureeditor.mixin.client;
+package com.zeeesea.textureeditor.mixin.client;
 
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.renderer.texture.SpriteContents;
