@@ -69,6 +69,8 @@ public abstract class AbstractEditorScreen extends Screen {
     private int previewEndX = -1, previewEndY = -1;
     // Track mouse-down state to distinguish click vs drag
     private boolean leftDown = false;
+    private boolean leftDownStartedInWorkspace = false;
+    private boolean leftPressCapturedByUi = false;
     private int downPx = -1, downPy = -1; // pixel coords where mouse was pressed
     private boolean movedSinceDown = false;
     // Has the user started dragging to adjust the preview shape after setting start point
@@ -2923,6 +2925,8 @@ public abstract class AbstractEditorScreen extends Screen {
         // On press record down state so we can tell click vs drag on release
         if (btn == 0) {
             leftDown = true;
+            leftDownStartedInWorkspace = !isInUIRegion(mx, my);
+            leftPressCapturedByUi = false;
             strokeSnapshotTaken = false;
             if (canvas != null) {
                 int dpx = screenToCanvasX(mx), dpy = screenToCanvasY(my);
@@ -2931,8 +2935,14 @@ public abstract class AbstractEditorScreen extends Screen {
                 downPx = downPy = -1; movedSinceDown = false;
             }
         }
-        if (super.mouseClicked(click, bl)) return true;
-        if (handleExtraClick(mx, my, btn)) return true;
+        if (super.mouseClicked(click, bl)) {
+            if (btn == 0) leftPressCapturedByUi = true;
+            return true;
+        }
+        if (handleExtraClick(mx, my, btn)) {
+            if (btn == 0) leftPressCapturedByUi = true;
+            return true;
+        }
 
         // Middle click = quick wheel
         if (btn == 2) { quickSelectWheel.activate((int)mx, (int)my); return true; }
@@ -2953,15 +2963,30 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Color picker interactions - begin drag capture if clicking inside picker
         if (btn == 0 && rightOpen && rightTab == RightTab.COLOR) {
-            if (startColorPickerDrag(mx, my)) return true;
-            if (handlePaletteClick(mx, my)) return true;
-            if (handleHistoryClick(mx, my)) return true;
+            if (startColorPickerDrag(mx, my)) {
+                leftPressCapturedByUi = true;
+                return true;
+            }
+            if (handlePaletteClick(mx, my)) {
+                leftPressCapturedByUi = true;
+                return true;
+            }
+            if (handleHistoryClick(mx, my)) {
+                leftPressCapturedByUi = true;
+                return true;
+            }
         }
 
         // Layer panel click
-        if (btn == 0 && rightOpen && rightTab == RightTab.LAYERS && handleLayerClick(mx, my)) return true;
+        if (btn == 0 && rightOpen && rightTab == RightTab.LAYERS && handleLayerClick(mx, my)) {
+            leftPressCapturedByUi = true;
+            return true;
+        }
 
-        if (isInUIRegion(mx, my)) return false;
+        if (isInUIRegion(mx, my)) {
+            if (btn == 0) leftPressCapturedByUi = true;
+            return true;
+        }
 
         // Canvas press: we only record the press here; action happens on release
         if (btn == 0 && canvas != null) {
@@ -3126,6 +3151,8 @@ public abstract class AbstractEditorScreen extends Screen {
     public boolean mouseReleased(net.minecraft.client.gui.Click click) {
         double mx = click.x(), my = click.y(); int btn = click.button();
         boolean hadLeftDown = leftDown;
+        boolean pressCapturedByUi = leftPressCapturedByUi;
+        boolean pressStartedInWorkspace = leftDownStartedInWorkspace;
         if (suppressMenuClickThroughUntilRelease) {
             if (btn == 0) {
                 leftDown = false;
@@ -3196,6 +3223,14 @@ public abstract class AbstractEditorScreen extends Screen {
 
         // Commit previewed shapes on left release. Distinguish click (no move) vs drag.
         if (btn == 0 && hadLeftDown) {
+            if (pressCapturedByUi || !pressStartedInWorkspace) {
+                movedSinceDown = false;
+                leftDown = false;
+                strokeSnapshotTaken = false;
+                leftPressCapturedByUi = false;
+                leftDownStartedInWorkspace = false;
+                return true;
+            }
             // compute release pixel coords
             int px = screenToCanvasX(mx), py = screenToCanvasY(my);
             boolean insideCanvas = canvas != null && px >= 0 && px < canvas.getWidth() && py >= 0 && py < canvas.getHeight();
@@ -3268,6 +3303,8 @@ public abstract class AbstractEditorScreen extends Screen {
             movedSinceDown = false;
             leftDown = false;
             strokeSnapshotTaken = false;
+            leftPressCapturedByUi = false;
+            leftDownStartedInWorkspace = false;
             shapeStartConfirmed = shapeStartConfirmed && (lineFirstClick || rectFirstClick);
         }
 
@@ -3318,6 +3355,9 @@ public abstract class AbstractEditorScreen extends Screen {
         // If left button is down and we're in the color panel, begin a drag-capture (prevents jump when entering slider)
         if (btn == 0 && rightOpen && rightTab == RightTab.COLOR && startColorPickerDrag(mx, my)) return true;
         if (handleExtraDrag(mx, my, btn, dx, dy)) return true;
+        if (btn == 0 && (!leftDown || leftPressCapturedByUi || !leftDownStartedInWorkspace)) {
+            return super.mouseDragged(click, dx, dy);
+        }
         if (isInUIRegion(mx, my)) return super.mouseDragged(click, dx, dy);
         if (canvas != null && btn == 0 && currentTool == EditorTool.SELECT
                 && (selectionDraggingCreate || selectionDraggingMove || selectionTransformingResize || selectionTransformingRotate)) {
